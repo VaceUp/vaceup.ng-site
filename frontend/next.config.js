@@ -1,8 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'export',
+  images: {
+    unoptimized: true,
+  },
   typescript: {
-    // Allows production builds/dev server to finish even if there are type errors
     ignoreBuildErrors: true,
+  },
+  trailingSlash: true,
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://api.vaceup.ng'}/api/:path*`,
+      },
+    ];
   },
 };
 

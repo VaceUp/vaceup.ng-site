@@ -1,0 +1,25 @@
+name = "vaceup-frontend"
+compatibility_date = "2026-08-31"
+
+[build]
+command = "npm run build"
+cwd = "frontend"
+
+[build.upload]
+format = "pages"
+dir = ".next"
+
+[env]
+NEXT_PUBLIC_API_URL = "https://api.vaceup.ng"
+
+[vars]
+BACKEND_URL = "https://api.vaceup.ng"
+
+[[pages_build_output_dir]]
+dir = ".next"
+
+# Worker configuration for API proxy
+[triggers]
+crons = []
+
+# Custom domain will be configured in Cloudflare dashboard

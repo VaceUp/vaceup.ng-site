@@ -1,0 +1,16 @@
+name = "vaceup-api-proxy"
+main = "worker/api-proxy.ts"
+compatibility_date = "2026-08-31"
+
+[vars]
+BACKEND_URL = "https://api.vaceup.ng"
+
+[observability]
+enabled = true
+
+# Route pattern: this worker will handle api.vaceup.ng/*
+# Configure custom domain in Cloudflare dashboard: api.vaceup.ng -> this worker
+
+[build]
+command = ""
+watch_dir = "worker"

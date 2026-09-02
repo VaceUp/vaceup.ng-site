@@ -1,0 +1,205 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ========================================================================
+  # LINT & TYPE CHECK
+  # ========================================================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy
+
+      - name: Run Ruff (linting)
+        run: ruff check .
+
+      - name: Run MyPy (type checking)
+        run: mypy .
+
+  # ========================================================================
+  # UNIT TESTS
+  # ========================================================================
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: vaceup_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: [6379:6379]
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov
+
+      - name: Run migrations
+        run: python manage.py migrate --settings=config.settings_test
+
+      - name: Run tests
+        run: |
+          python manage.py test --settings=config.settings_test --verbosity=2
+        env:
+          PAYSTACK_SECRET_KEY: sk_test_dummy
+          PAYSTACK_PUBLIC_KEY: pk_test_dummy
+          PAYSTACK_CALLBACK_URL: http://testserver/payment/callback
+          PAYMENT_CURRENCY: NGN
+          JWT_SIGNING_KEY: test-secret-key-for-testing-purposes-only
+          REDIS_URL: redis://localhost:6379/1
+          CELERY_TASK_ALWAYS_EAGER: "true"
+          CELERY_TASK_EAGER_PROPAGATES: "true"
+          PAYSTACK_CALLBACK_URL: http://localhost:3000/payment/callback
+
+  # ========================================================================
+  # SECURITY SCAN
+  # ========================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Bandit (Python security linter)
+        run: |
+          pip install bandit
+          bandit -r . -f json -o bandit-results.json || true
+
+  # ========================================================================
+  # DOCKER BUILD
+  # ========================================================================
+  docker:
+    name: Build & Push Docker Image
+    needs: [lint, test, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ========================================================================
+  # DEPLOY TO STAGING
+  # ========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment..."
+          # kubectl apply -f k8s/staging/
+          # or use ArgoCD/Flux for GitOps
+
+  # ========================================================================
+  # DEPLOY TO PRODUCTION
+  # ========================================================================
+  deploy-production:
+    name: Deploy to Production
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to production environment..."
+          # kubectl apply -f k8s/production/
+          # or use ArgoCD/Flux for GitOps
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_PROD }}

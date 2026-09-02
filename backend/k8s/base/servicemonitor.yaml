@@ -1,0 +1,53 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vaceup-app
+  namespace: vaceup
+  labels:
+    app: vaceup-app
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: vaceup-app
+  endpoints:
+    - port: http
+      path: /metrics/
+      interval: 30s
+      scheme: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vaceup-celery
+  namespace: vaceup
+  labels:
+    app: vaceup-celery
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: vaceup-celery-worker
+  endpoints:
+    - port: http
+      path: /metrics/
+      interval: 30s
+      scheme: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vaceup-nginx
+  namespace: vaceup
+  labels:
+    app: vaceup-nginx
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: vaceup-nginx
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scheme: http

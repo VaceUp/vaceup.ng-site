@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vaceup-app-pdb
+  namespace: vaceup
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: vaceup-app
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vaceup-celery-pdb
+  namespace: vaceup
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: vaceup-celery-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vaceup-nginx-pdb
+  namespace: vaceup
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: vaceup-nginx

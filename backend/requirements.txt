@@ -1,0 +1,15 @@
+Django>=5.0,<5.1
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.3
+django-environ>=0.11
+django-cors-headers>=4.3
+django-filter>=24.1
+django-storages>=1.14
+boto3>=1.34
+PyMySQL>=1.1        # pure-Python driver (no compiler needed)
+Pillow>=10.0
+gunicorn>=22.0
+whitenoise>=6.6      # serve admin static files without Nginx
+redis>=5.0           # shared cache + DRF throttle store (Upstash) + Celery broker
+sentry-sdk>=2.0      # error monitoring (activated only when SENTRY_DSN is set)
+celery>=5.3          # async email + scheduled live-class reminders (needs a broker)

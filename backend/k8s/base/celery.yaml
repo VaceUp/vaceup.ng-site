@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vaceup-celery
+  namespace: vaceup
+  labels:
+    app: vaceup-celery
+spec:
+  clusterIP: None
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    app: vaceup-celery-worker
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaceup-celery-worker
+  namespace: vaceup
+  labels:
+    app: vaceup-celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vaceup-celery-worker
+  template:
+    metadata:
+      labels:
+        app: vaceup-celery-worker
+    spec:
+      serviceAccountName: vaceup-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: celery-worker
+          image: ghcr.io/vaceup/vaceup:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "config", "worker", "-l", "info", "-Q", "default,payments,liveclasses,notifications,emails", "-c", "4"]
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: REDIS_URL
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_BROKER_URL
+            - name: CELERY_RESULT_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_RESULT_BACKEND
+            - name: CELERY_TASK_ALWAYS_EAGER
+              value: "False"
+            - name: CELERY_TASK_EAGER_PROPAGATES
+              value: "True"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+      volumes:
+        - name: media
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaceup-celery-beat
+  namespace: vaceup
+  labels:
+    app: vaceup-celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vaceup-celery-beat
+  template:
+    metadata:
+      labels:
+        app: vaceup-celery-beat
+    spec:
+      serviceAccountName: vaceup-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: celery-beat
+          image: ghcr.io/vaceup/vaceup:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "config", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: REDIS_URL
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_BROKER_URL
+            - name: CELERY_RESULT_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_RESULT_BACKEND
+            - name: CELERY_TASK_ALWAYS_EAGER
+              value: "False"
+            - name: CELERY_TASK_EAGER_PROPAGATES
+              value: "True"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"

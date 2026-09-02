@@ -1,0 +1,192 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaceup-app
+  namespace: vaceup
+  labels:
+    app: vaceup-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vaceup-app
+  template:
+    metadata:
+      labels:
+        app: vaceup-app
+    spec:
+      serviceAccountName: vaceup-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: app
+          image: ghcr.io/vaceup/vaceup:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: config.settings
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: REDIS_URL
+            - name: CELERY_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_BROKER_URL
+            - name: CELERY_RESULT_BACKEND
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: CELERY_RESULT_BACKEND
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: SECRET_KEY
+            - name: JWT_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: JWT_SIGNING_KEY
+            - name: PAYSTACK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_SECRET_KEY
+            - name: PAYSTACK_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_PUBLIC_KEY
+            - name: PAYSTACK_CALLBACK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_CALLBACK_URL
+            - name: PAYMENT_CURRENCY
+              value: "NGN"
+            - name: LIVEKIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: LIVEKIT_API_KEY
+            - name: LIVEKIT_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: LIVEKIT_API_SECRET
+            - name: LIVEKIT_WS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: LIVEKIT_WS_URL
+            - name: PAYSTACK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_SECRET_KEY
+            - name: PAYSTACK_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_PUBLIC_KEY
+            - name: PAYSTACK_CALLBACK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: PAYSTACK_CALLBACK_URL
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_STORAGE_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: AWS_STORAGE_BUCKET_NAME
+            - name: AWS_S3_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: AWS_S3_REGION_NAME
+            - name: AWS_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: AWS_S3_ENDPOINT_URL
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: vaceup-secrets
+                  key: SENTRY_DSN
+            - name: SENTRY_ENVIRONMENT
+              value: "production"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /healthz/
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
+            - name: media
+              mountPath: /app/media
+      volumes:
+        - name: staticfiles
+          emptyDir: {}
+        - name: media
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vaceup-app
+  namespace: vaceup
+  labels:
+    app: vaceup-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: vaceup-app

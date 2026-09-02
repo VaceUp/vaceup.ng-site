@@ -8,6 +8,7 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
   hover?: boolean;
   interactive?: boolean;
+  children: React.ReactNode;
 }
 
 const paddingStyles = {
@@ -27,26 +28,10 @@ const variantStyles = {
   elevated: 'bg-white dark:bg-slate-900 shadow-xl dark:shadow-slate-900/50',
 };
 
-const paddingStyles = {
-  none: '',
-  sm: 'p-4',
-  md: 'p-6',
-  lg: 'p-8',
-  xl: 'p-8 md:p-10',
-};
-
 const hoverStyles = {
   true: 'transition-all duration-300 hover:shadow-xl hover:-translate-y-1',
   false: '',
 };
-
-export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'glass' | 'glass-dark' | 'primary' | 'bordered' | 'elevated';
-  padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
-  hover?: boolean;
-  interactive?: boolean;
-  children: React.ReactNode;
-}
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   (
@@ -97,7 +82,6 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
           'flex items-start justify-between gap-4 mb-6',
           className
         )}
-        ref={ref}
         {...props}
       >
         <div className="flex-1 min-w-0">
@@ -145,7 +129,6 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(
           'flex items-center gap-4 mt-6 pt-6 border-t border-gray-200 dark:border-slate-700',
           className
         )}
-        ref={ref}
         {...props}
       />
     );

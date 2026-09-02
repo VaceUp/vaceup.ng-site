@@ -6,10 +6,6 @@ import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -32,6 +28,87 @@ interface Course {
   instructor: string;
   totalLessons: number;
   completedLessons: number;
+}
+
+function StatCard({ icon, title, value, change, color }: any) {
+  const colors = {
+    primary: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-primary-200 dark:border-primary-800/50',
+    success: 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800/50',
+    warning: 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800/50',
+    error: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800/50',
+  };
+
+  return (
+    <Card variant="glass" className={cn('p-6', colors[color])}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+          <p className="text-3xl font-bold mt-1">{value}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{change}</p>
+        </div>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/50 dark:bg-slate-800/50">
+          {icon}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function CourseCard({ course }: { course: any }) {
+  return (
+    <Card variant="glass" className="flex flex-col h-full group">
+      <div className="aspect-video relative overflow-hidden rounded-t-xl">
+        <img
+          src={course.thumbnail || '/placeholder-course.jpg'}
+          alt={course.title}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="absolute top-3 left-3">
+          <Badge variant="secondary" className="text-xs">{course.progress}%</Badge>
+        </div>
+      </div>
+      <CardContent className="p-5 flex flex-col flex-1">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{course.title}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{course.instructor}</p>
+        <div className="mb-3">
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+            <span>Progress</span>
+            <span>{course.completedLessons}/{course.totalLessons} lessons</span>
+          </div>
+          <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-500 rounded-full transition-all duration-500"
+              style={{ width: `${course.progress}%` }}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Next: {course.nextLesson}</p>
+        <Button size="sm" variant="primary" className="w-full">Continue</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecommendationCard({ title, instructor, duration, level, rating, students }: any) {
+  return (
+    <Card variant="glass" className="flex flex-col h-full group">
+      <div className="aspect-video relative overflow-hidden rounded-t-xl bg-gradient-to-br from-primary-500/20 to-primary-600/20">
+        <div className="absolute top-3 right-3">
+          <Badge variant="secondary" className="text-xs capitalize">{level}</Badge>
+        </div>
+      </div>
+      <CardContent className="p-5 flex flex-col flex-1">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{title}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{instructor}</p>
+        <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
+          <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{duration}</span>
+          <span className="flex items-center gap-1"><Award className="w-4 h-4" />{rating}</span>
+          <span className="flex items-center gap-1"><Users className="w-4 h-4" />{students.toLocaleString()}</span>
+        </div>
+        <Button size="sm" variant="outline" className="w-full">View Course</Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 function DashboardContent() {
@@ -72,7 +149,7 @@ function DashboardContent() {
       totalLessons: 12,
       completedLessons: 10,
     },
-  ];
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -179,9 +256,11 @@ function DashboardContent() {
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <DashboardContent />

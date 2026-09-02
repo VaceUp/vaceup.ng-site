@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
-import { Award, Download, Eye, Share2, Copy, CheckCircle, Calendar } from 'lucide-react';
 
 interface Certificate {
   id: string;
@@ -24,7 +23,59 @@ interface Certificate {
   grade: string;
 }
 
-function CertificatesPage() {
+function CertificateCard({ certificate }: { certificate: any }) {
+  return (
+    <Card variant="glass" className="flex flex-col">
+      <div className="aspect-video relative overflow-hidden rounded-t-xl">
+        <img
+          src={certificate.courseThumbnail || '/placeholder-course.jpg'}
+          alt={certificate.courseTitle}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute top-3 right-3">
+          <Badge variant={certificate.status === 'issued' ? 'success' : certificate.status === 'pending' ? 'secondary' : 'error'}>
+            {certificate.status.charAt(0).toUpperCase() + certificate.status.slice(1)}
+          </Badge>
+        </div>
+      </div>
+      <CardContent className="p-6">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1">{certificate.courseTitle}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{certificate.studentName}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {certificate.skills.slice(0, 4).map((skill) => (
+            <Badge key={skill} variant="outline" className="text-xs">{skill}</Badge>
+          ))}
+        </div>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Issued</p>
+            <p className="font-medium text-gray-900 dark:text-white">{new Date(certificate.issuedAt).toLocaleDateString()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Grade</p>
+            <p className="font-bold text-gray-900 dark:text-white">{certificate.grade}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Download className="w-4 h-4 mr-1" />
+            Download
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Share2 className="w-4 h-4 mr-1" />
+            Share
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CertificatesContent() {
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'issued' | 'pending' | 'revoked'>('all');
@@ -36,7 +87,6 @@ function CertificatesPage() {
   const fetchCertificates = async () => {
     setLoading(true);
     try {
-      // Mock data
       setCertificates([
         {
           id: '1',
@@ -93,6 +143,14 @@ function CertificatesPage() {
     return cert.status === filter;
   });
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -104,63 +162,38 @@ function CertificatesPage() {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-8">
-          {['all', 'issued', 'pending', 'revoked'].map((filter) => (
+          {['all', 'issued', 'pending', 'revoked'].map((f) => (
             <button
-              key={filter}
-              onClick={() => setFilter(filter)}
+              key={f}
+              onClick={() => setFilter(f as any)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                filter === filter
+                filter === f
                   ? 'bg-primary-500 text-white shadow-md'
                   : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
               }`}
             >
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-slate-700 h-64 rounded-xl mb-4 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse" />
-              </div>
-            )}
-          ) : (
-            filteredCertificates.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">No certificates found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {certificates.map((cert) => (
-                  <CertificateCard key={cert.id} certificate={cert} />
-                ))}
-              </div>
-            )}
-
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Verify a Certificate</h2>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-gray-200 dark:border-slate-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Verify a Certificate</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">Enter a verification code to validate a certificate's authenticity.</              <div className="flex gap-4">
-                <input
-                  type="text"
-                  placeholder="Enter verification code (e.g., VCP-2024-001234-ABC123)"
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-colors"
-                  placeholder="Enter verification code"
-                />
-                <Button size="lg">Verify</Button>
-              </div>
-            </div>
+        {filteredCertificates.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">No certificates found</p>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCertificates.map((cert) => (
+              <CertificateCard key={cert.id} certificate={cert} />
+            ))}
+          </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function CertificatesPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <CertificatesContent />

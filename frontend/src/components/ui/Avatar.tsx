@@ -12,7 +12,7 @@ const sizeStyles = {
   '2xl': 'w-24 h-24 text-xl',
 };
 
-const statusStyles = {
+const statusColors = {
   online: 'bg-green-500 border-white dark:border-slate-900',
   offline: 'bg-gray-400',
   busy: 'bg-red-500',
@@ -34,80 +34,11 @@ const shapeStyles = {
   rounded: 'rounded-xl',
 };
 
-const statusColors = {
-  online: 'bg-green-500 border-white dark:border-slate-900',
-  offline: 'bg-gray-400',
-  busy: 'bg-red-500',
-  away: 'bg-yellow-500',
-};
-
 const statusPositions = {
   'bottom-right': 'bottom-0 right-0 -translate-x-1/2 translate-y-1/2',
   'bottom-left': 'bottom-0 left-0 translate-x-1/2 translate-y-1/2',
   'top-right': 'top-0 right-0 -translate-y-1/2 -translate-x-1/2',
   'top-left': 'top-0 left-0 -translate-y-1/2 translate-x-1/2',
-};
-
-const statusPositions = {
-  'bottom-right': 'bottom-0 right-0 -translate-x-1/2 translate-y-1/2',
-  'bottom-left': 'bottom-0 left-0 translate-x-1/2 translate-y-1/2',
-  'top-right': 'top-0 right-0 -translate-y-1/2 -translate-x-1/2',
-  'top-left': 'top-0 left-0 -translate-y-1/2 translate-x-1/2',
-};
-
-const statusSizes = {
-  xs: 'w-1.5 h-1.5',
-  sm: 'w-2 h-2',
-  md: 'w-2.5 h-2.5',
-  lg: 'w-3 h-3',
-  xl: 'w-3.5 h-3.5',
-  '2xl': 'w-4 h-4',
-};
-
-const statusColors = {
-  online: 'bg-green-500 border-white dark:border-slate-900',
-  offline: 'bg-gray-400',
-  busy: 'bg-red-500',
-  away: 'bg-yellow-500',
-};
-
-const statusPositions = {
-  'bottom-right': 'bottom-0 right-0 -translate-x-1/2 translate-y-1/2',
-  'bottom-left': 'bottom-0 left-0 translate-x-1/2 translate-y-1/2',
-  'top-right': 'top-0 right-0 -translate-y-1/2 -translate-x-1/2',
-  'top-left': 'top-0 left-0 -translate-y-1/2 translate-x-1/2',
-};
-
-const statusSizes = {
-  xs: 'w-1.5 h-1.5',
-  sm: 'w-2 h-2',
-  md: 'w-2.5 h-2.5',
-  lg: 'w-3 h-3',
-  xl: 'w-3.5 h-3.5',
-  '2xl': 'w-4 h-4',
-};
-
-const statusColors = {
-  online: 'bg-green-500 border-white dark:border-slate-900',
-  offline: 'bg-gray-400',
-  busy: 'bg-red-500',
-  away: 'bg-yellow-500',
-};
-
-const statusPositions = {
-  'bottom-right': 'bottom-0 right-0 -translate-x-1/2 translate-y-1/2',
-  'bottom-left': 'bottom-0 left-0 translate-x-1/2 translate-y-1/2',
-  'top-right': 'top-0 right-0 -translate-y-1/2 -translate-x-1/2',
-  'top-left': 'top-0 left-0 -translate-y-1/2 translate-x-1/2',
-};
-
-const statusSizes = {
-  xs: 'w-1.5 h-1.5',
-  sm: 'w-2 h-2',
-  md: 'w-2.5 h-2.5',
-  lg: 'w-3 h-3',
-  xl: 'w-3.5 h-3.5',
-  '2xl': 'w-4 h-4',
 };
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -179,7 +110,7 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
                         .slice(0, 2)
                         .toUpperCase()
                     : '?'}
-                  </span>
+                </span>
               )}
             </div>
           )}
@@ -197,9 +128,6 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
         </div>
       );
     }
-  );
 );
 
 Avatar.displayName = 'Avatar';
-
-export { Avatar };

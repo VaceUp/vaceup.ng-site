@@ -32,7 +32,7 @@ interface Conversation {
   unreadCount: number;
 }
 
-function MessagingPage() {
+export default function MessagingPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -45,7 +45,6 @@ function MessagingPage() {
 
   const fetchConversations = async () => {
     setLoading(true);
-    // Mock data
     setConversations([
       {
         id: '1',
@@ -107,6 +106,26 @@ function MessagingPage() {
     }
   };
 
+  const sendMessage = () => {
+    if (!newMessage.trim() || !activeConversation) return;
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      content: newMessage,
+      timestamp: new Date().toISOString(),
+      isOwn: true,
+      read: false,
+    }]);
+    setNewMessage('');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <div className="flex h-screen">
@@ -138,33 +157,34 @@ function MessagingPage() {
                       ? 'bg-primary-50 dark:bg-primary-900/30 border-r-2 border-primary-500'
                       : 'hover:bg-gray-50 dark:hover:bg-slate-800/50'
                   }`}
-              >
-                <Avatar
-                  src={conversation.participant.avatar}
-                  alt={conversation.participant.name}
-                  size="md"
-                  status={conversation.participant.online ? 'online' : 'offline'}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-gray-900 dark:text-white truncate">
-                      {conversation.participant.name}
-                    </h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
-                      {new Date(conversation.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-                      {conversation.lastMessage}
-                    </p>
-                    {conversation.unreadCount > 0 && (
-                      <span className="w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center text-center">
-                        {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                >
+                  <Avatar
+                    src={conversation.participant.avatar}
+                    alt={conversation.participant.name}
+                    size="md"
+                    status={conversation.participant.online ? 'online' : 'offline'}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                        {conversation.participant.name}
+                      </h4>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
+                        {new Date(conversation.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                        {conversation.lastMessage}
+                      </p>
+                      {conversation.unreadCount > 0 && (
+                        <span className="w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center text-center">
+                          {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -213,7 +233,7 @@ function MessagingPage() {
                         </p>
                       </div>
                     </div>
-                  )}
+                  ))}
                 </ScrollArea>
                 <div className="p-4 border-t border-gray-200 dark:border-slate-700">
                   <div className="flex items-center gap-2">
@@ -224,7 +244,6 @@ function MessagingPage() {
                         placeholder="Type a message..."
                         className="w-full pr-12"
                         onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                        placeholder="Type a message..."
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                         <button className="p-2 text-gray-400 hover:text-primary-500" aria-label="Attach file">
@@ -247,20 +266,20 @@ function MessagingPage() {
                       </div>
                     </div>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <MessageSquare className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Select a conversation</h3>
+                <p className="text-gray-500 dark:text-gray-400">Choose a conversation from the sidebar to start messaging</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex">
-      <MessagingContent />
     </div>
   );
 }
-
-export default MessagingPage;

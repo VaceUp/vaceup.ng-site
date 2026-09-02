@@ -14,7 +14,6 @@ import {
   BarChart2,
   TrendingUp,
   MailCheck,
-  Users as UsersIcon,
   DollarSign,
   ArrowRight,
   ChevronRight,
@@ -53,7 +52,89 @@ interface Campaign {
   createdBy: string;
 }
 
-function MarketingPage() {
+function CampaignCard({ campaign }: { campaign: any }) {
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      sending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      sent: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      paused: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    };
+    return (
+      <Badge variant="outline" className={styles[campaign.status as keyof typeof styles] || ''}>
+        {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+      </Badge>
+    );
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <Card variant="glass" className="flex flex-col h-full">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900 dark:text-white">{campaign.name}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{campaign.subject}</p>
+          </div>
+          {getStatusBadge(campaign.status)}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Open Rate</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{campaign.openRate}%</p>
+          </div>
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Click Rate</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{campaign.clickRate}%</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Sent</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{campaign.sentCount.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Delivered</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{campaign.deliveredCount.toLocaleString()}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>Created: {formatDate(campaign.createdAt)}</span>
+          {campaign.sentAt && <span>• Sent: {formatDate(campaign.sentAt)}</span>}
+        </div>
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Edit className="w-4 h-4 mr-1" />
+            Edit
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1 text-red-600 hover:text-red-700">
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function MarketingPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'failed'>('all');
@@ -69,7 +150,6 @@ function MarketingPage() {
   const fetchCampaigns = async () => {
     setLoading(true);
     try {
-      // Mock data
       setCampaigns([
         {
           id: '1',
@@ -192,6 +272,14 @@ function MarketingPage() {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -216,65 +304,43 @@ function MarketingPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {['all', 'draft', 'scheduled', 'sending', 'sent', 'paused', 'failed'].map((filter) => (
+            {['all', 'draft', 'scheduled', 'sending', 'sent', 'paused', 'failed'].map((f) => (
               <button
-                key={filter}
-                onClick={() => { setFilter(filter); setPage(1); }}
+                key={f}
+                onClick={() => { setFilter(f as any); setPage(1); }}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  filter === filter
+                  filter === f
                     ? 'bg-primary-500 text-white shadow-md'
                     : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-slate-700 h-48 rounded-xl mb-4 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse" />
+        {filteredCampaigns.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">No campaigns found</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCampaigns.map((campaign) => (
+                <CampaignCard key={campaign.id} campaign={campaign} />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="text-center mt-8">
+                <Button variant="outline" size="lg" onClick={() => setPage(p => p + 1)}>
+                  Load More Campaigns
+                </Button>
               </div>
             )}
-          ) : (
-            <>
-              {filteredCampaigns.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400">No campaigns found</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredCampaigns.map((campaign) => (
-                      <CampaignCard key={campaign.id} campaign={campaign} />
-                    ))}
-                  </div>
-                  {hasMore && (
-                    <div className="text-center mt-8">
-                      <Button variant="outline" size="lg" onClick={() => setPage(p => p + 1)}>
-                        Load More Campaigns
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <MarketingContent />
     </div>
   );
 }
-
-export default MarketingPage;

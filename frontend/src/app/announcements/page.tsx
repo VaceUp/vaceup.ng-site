@@ -1,44 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Search, Filter, Plus } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
-import {
-  MessageSquare,
-  Send,
-  Filter,
-  Bell,
-  ChevronRight,
-  Plus,
-  Search,
-  Filter as FilterIcon,
-  Calendar,
-  Clock,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  PlusCircle,
-  MessageSquare,
-  Send,
-  Filter,
-  Bell,
-  ChevronRight,
-  Plus,
-  Search,
-  Filter as FilterIcon,
-  Calendar,
-  Clock,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  PlusCircle,
-} from 'lucide-react';
-import { formatRelativeTime } from '@/lib/utils';
 
 interface Announcement {
   id: string;
@@ -61,7 +30,40 @@ interface Announcement {
   updatedAt: string;
 }
 
-function AnnouncementsPage() {
+function AnnouncementCard({ announcement }: { announcement: any }) {
+  return (
+    <Card variant="glass" className="flex flex-col">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900 dark:text-white">{announcement.title}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{announcement.body.slice(0, 100)}...</p>
+          </div>
+          <Badge variant={announcement.priority === 'critical' ? 'error' : announcement.priority === 'high' ? 'error' : announcement.priority === 'normal' ? 'default' : 'secondary'}>
+            {announcement.priority}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+          <span>{announcement.target.charAt(0).toUpperCase() + announcement.target.slice(1)}</span>
+          <Badge variant={announcement.status === 'published' ? 'success' : announcement.status === 'scheduled' ? 'secondary' : 'default'}>
+            {announcement.status}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <Avatar src={announcement.author.avatar} alt={announcement.author.name} size="sm" />
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{announcement.author.name}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(announcement.publishAt).toLocaleDateString()}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'scheduled' | 'archived'>('all');
@@ -75,7 +77,6 @@ function AnnouncementsPage() {
   const fetchAnnouncements = async () => {
     setLoading(true);
     try {
-      // Mock data
       setAnnouncements([
         {
           id: '1',
@@ -142,11 +143,18 @@ function AnnouncementsPage() {
     }
   };
 
-  const filteredAnnouncements = announcements.filter((announcement) => {
-    if (filter !== 'all' && announcement.status !== filter) return false;
-    if (search && !announcement.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filteredAnnouncements = announcements.filter((announcement) =>
+    (filter === 'all' || announcement.status === filter) &&
+    (!search || announcement.title.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -166,60 +174,40 @@ function AnnouncementsPage() {
           <div className="flex-1">
             <Input
               placeholder="Search announcements..."
-              value=""
-              onChange={(e) => {}}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               leftIcon={<Search className="w-5 h-5" />}
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {['all', 'published', 'draft', 'scheduled', 'archived'].map((filter) => (
+            {['all', 'published', 'draft', 'scheduled', 'archived'].map((f) => (
               <button
-                key={filter}
-                onClick={() => {}}
+                key={f}
+                onClick={() => setFilter(f as any)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  filter === 'all'
+                  filter === f
                     ? 'bg-primary-500 text-white shadow-md'
                     : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
         </div>
 
-        {loading ? (
+        {filteredAnnouncements.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">No announcements found</p>
+          </div>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-slate-700 h-48 rounded-xl mb-4 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2 animate-pulse" />
-                <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse" />
-              </div>
-            )}
-          ) : (
-            announcements.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">No announcements found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {announcements.map((announcement) => (
-                  <AnnouncementCard key={announcement.id} announcement={announcement} />
-                ))}
-              </div>
-            )}
-          )}
-        </div>
+            {filteredAnnouncements.map((announcement) => (
+              <AnnouncementCard key={announcement.id} announcement={announcement} />
+            ))}
+          </div>
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <AnnouncementsContent />
     </div>
   );
 }
-
-export default AnnouncementsPage;

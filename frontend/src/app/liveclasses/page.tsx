@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, Video, CheckCircle, Clock as ClockIcon, Users as UsersIcon } from 'lucide-react';
+import { Calendar, Clock, Users, Video, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
-import { Calendar, Clock, Users, Video, CheckCircle, Clock as ClockIcon, Users as UsersIcon } from 'lucide-react';
 
 interface LiveClass {
   id: string;
@@ -24,18 +23,92 @@ interface LiveClass {
   maxStudents: number;
 }
 
-function LiveClassesPage() {
+function LiveClassCard({ cls }: { cls: any }) {
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      live: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      ended: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+      cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    };
+    return (
+      <Badge variant={['scheduled', 'live'].includes(status) ? 'default' : 'outline'}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours > 0 ? `${hours}h ` : ''}${mins > 0 ? `${minutes % 60}m` : ''}`;
+  };
+
+  return (
+    <Card variant="glass" className="flex flex-col h-full group">
+      <div className="aspect-video relative overflow-hidden rounded-t-xl">
+        <img
+          src={cls.thumbnail || '/placeholder-live.jpg'}
+          alt={cls.title}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="absolute top-3 right-3">
+          {getStatusBadge(cls.status)}
+        </div>
+        {cls.enrolled && (
+          <div className="absolute top-3 left-3">
+            <Badge variant="success" className="text-xs">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Enrolled
+            </Badge>
+          </div>
+        )}
+      </div>
+      <CardContent className="p-5 flex flex-col flex-1">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{cls.title}</h3>
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+          <Avatar src={cls.instructorAvatar} alt={cls.instructor} size="xs" />
+          <span>{cls.instructor}</span>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2 flex-1">{cls.description}</p>
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatDate(cls.scheduledAt)}</span>
+          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{formatDuration(cls.duration)}</span>
+        </div>
+        <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-slate-700">
+          <span className="text-sm font-medium text-gray-900 dark:text-white">{cls.enrolledCount}/{cls.maxStudents}</span>
+          <Button size="sm" variant={cls.enrolled ? 'secondary' : 'primary'} disabled={cls.status !== 'scheduled'}>
+            {cls.enrolled ? 'View' : 'Enroll'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function LiveClassesPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'live' | 'past'>('all');
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     fetchClasses();
   }, []);
 
   const fetchClasses = async () => {
-    // Mock data for now
     setClasses([
       {
         id: '1',
@@ -107,26 +180,6 @@ function LiveClassesPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-      live: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      ended: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-      cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    };
-    return (
-      <Badge variant={['scheduled', 'live'].includes(status) ? 'default' : 'outline'}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours > 0 ? `${hours}h ` : ''}${mins > 0 ? `${minutes % 60}m` : ''}`;
-  };
-
   const filteredClasses = classes.filter((cls) => {
     if (filter === 'all') return true;
     if (filter === 'upcoming') return cls.status === 'scheduled';
@@ -134,6 +187,14 @@ function LiveClassesPage() {
     if (filter === 'past') return ['ended', 'cancelled'].includes(cls.status);
     return true;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -151,17 +212,17 @@ function LiveClassesPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            {['all', 'upcoming', 'live', 'past'].map((filter) => (
+            {['all', 'upcoming', 'live', 'past'].map((f) => (
               <button
-                key={filter}
-                onClick={() => setFilter(filter)}
+                key={f}
+                onClick={() => setFilter(f as any)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  filter === filter
+                  filter === f
                     ? 'bg-primary-500 text-white shadow-md'
                     : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
@@ -170,18 +231,18 @@ function LiveClassesPage() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">View:</span>
               <div className="flex gap-1 bg-gray-100 dark:bg-slate-800 rounded-xl p-1">
-                {['grid', 'list'].map((view) => (
+                {['grid', 'list'].map((v) => (
                   <button
-                    key={view}
-                    onClick={() => setView(view)}
+                    key={v}
+                    onClick={() => setView(v)}
                     className={`p-2 rounded-lg transition-colors ${
-                      view === view
+                      view === v
                         ? 'bg-primary-500 text-white shadow-sm'
                         : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
-                    aria-label={`${view} view`}
+                    aria-label={`${v} view`}
                   >
-                    {view === 'grid' ? (
+                    {v === 'grid' ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
                         <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
@@ -227,14 +288,6 @@ function LiveClassesPage() {
           )}
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <LiveClassesContent />
     </div>
   );
 }
-
-export default LiveClassesPage;

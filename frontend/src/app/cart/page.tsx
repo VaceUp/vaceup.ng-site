@@ -22,13 +22,14 @@ interface CartItem {
   quantity: number;
 }
 
-function CartPage() {
+function CartContent() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     fetchCart();
@@ -183,7 +184,7 @@ function CartPage() {
                               disabled={item.quantity <= 1}
                               className="px-3 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-l-xl text-gray-600 dark:text-gray-300 disabled:opacity-50"
                             >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                              <Minus className="w-5 h-5" />
                             </button>
                             <span className="w-10 text-center font-medium">{item.quantity}</span>
                             <button
@@ -203,69 +204,70 @@ function CartPage() {
                           </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Order Summary</h2>
-                  <div className="space-y-4">
-                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                      <span>Subtotal ({cartItems.length} items)</span>
-                      <span>{formatCurrency(subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                      <span>Discount</span>
-                      <span className="text-green-600 dark:text-green-400">-{formatCurrency(discount)}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                      <span>Tax (Estimated)</span>
-                      <span>{formatCurrency(subtotal * 0.05)}</span>
-                    </div>
-                    <div className="border-t border-gray-200 dark:border-slate-700 pt-4">
-                      <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white">
-                        <span>Total</span>
-                        <span>{formatCurrency(total + subtotal * 0.05)}</span>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <div className="flex gap-2 mb-4">
-                        <Input
-                          placeholder="Coupon code"
-                          value={coupon}
-                          onChange={(e) => setCoupon(e.target.value)}
-                          className="flex-1"
-                          placeholder="Coupon code"
-                        />
-                        <Button
-                          variant={applyingCoupon ? 'secondary' : 'primary'}
-                          onClick={applyCoupon}
-                          disabled={applyingCoupon || !coupon.trim()}
-                        >
-                          {applyingCoupon ? 'Applying...' : 'Apply'}
-                        </Button>
-                      </div>
-                      {couponError && <p className="text-sm text-red-600 dark:text-red-400">{couponError}</p>}
-                    </div>
-                    <Button
-                      size="lg"
-                      className="w-full"
-                      onClick={() => router.push('/checkout')}
-                      disabled={cartItems.length === 0}
-                    >
-                      Proceed to Checkout
-                      <CreditCard className="w-5 h-5 ml-2" />
-                    </Button>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Order Summary</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Subtotal ({cartItems.length} items)</span>
+                    <span>{formatCurrency(subtotal)}</span>
                   </div>
+                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Discount</span>
+                    <span className="text-green-600 dark:text-green-400">-{formatCurrency(discount)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Tax (Estimated)</span>
+                    <span>{formatCurrency(subtotal * 0.05)}</span>
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-slate-700 pt-4">
+                    <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white">
+                      <span>Total</span>
+                      <span>{formatCurrency(total + subtotal * 0.05)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex gap-2 mb-4">
+                      <Input
+                        placeholder="Coupon code"
+                        value={coupon}
+                        onChange={(e) => setCoupon(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant={applyingCoupon ? 'secondary' : 'primary'}
+                        onClick={applyCoupon}
+                        disabled={applyingCoupon || !coupon.trim()}
+                      >
+                        {applyingCoupon ? 'Applying...' : 'Apply'}
+                      </Button>
+                    </div>
+                    {couponError && <p className="text-sm text-red-600 dark:text-red-400">{couponError}</p>}
+                  </div>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => router.push('/checkout')}
+                    disabled={cartItems.length === 0}
+                  >
+                    Proceed to Checkout
+                    <CreditCard className="w-5 h-5 ml-2" />
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function CartPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <CartContent />

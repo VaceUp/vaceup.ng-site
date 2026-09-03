@@ -5,5 +5,4 @@ compatibility_date = "2026-09-01"
 command = "npm run build"
 cwd = "frontend"
 
-[assets]
-directory = "out"
+pages_build_output_dir = "out"

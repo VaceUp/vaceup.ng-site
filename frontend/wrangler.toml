@@ -6,4 +6,3 @@ command = "npm run build"
 cwd = "frontend"
 [assets]
 directory = "./out"
-pages_build_output_dir = "out"

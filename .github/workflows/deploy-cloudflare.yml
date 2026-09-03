@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: ${{ env.FRONTEND_DIR }}/.next/
+          path: ${{ env.FRONTEND_DIR }}/out/
           retention-days: 1
 
   # Deploy to Cloudflare Pages
@@ -64,15 +64,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: ${{ env.FRONTEND_DIR }}/.next/
+          path: ${{ env.FRONTEND_DIR }}/out/
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: vaceup-frontend
-          directory: ${{ env.FRONTEND_DIR }}/.next
+          projectName: vaceup-ng
+          directory: ${{ env.FRONTEND_DIR }}/out
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref_name }}
 
@@ -105,7 +105,7 @@ jobs:
       - name: Deployment summary
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend: https://vaceup-frontend.pages.dev" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://vaceup-ng.pages.dev" >> $GITHUB_STEP_SUMMARY
           echo "- API Proxy: https://api.vaceup.ng (via Worker)" >> $GITHUB_STEP_SUMMARY
           echo "- Backend: https://api.vaceup.ng (Truehost Cloud)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

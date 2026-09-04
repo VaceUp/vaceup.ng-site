@@ -1,7 +1,4 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -21,7 +18,6 @@ import {
   Shield,
   Globe,
   ArrowLeft,
-  Shield as ShieldIcon,
   CreditCard,
 } from 'lucide-react';
 
@@ -42,57 +38,50 @@ interface Course {
   benefits: string[];
 }
 
-export default function CourseDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const [course, setCourse] = useState<Course | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchCourse = async () => {
-      try {
-        const res = await fetch(`/api/v1/courses/${params.id}/`);
-        if (!res.ok) throw new Error('Course not found');
-        const data = await res.json();
-        setCourse(data);
-      } catch (err) {
-        setError('Failed to load course');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCourse();
-  }, [params.id]);
-
-  const scrollToCourses = () => {
-    router.push('/courses');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
-      </div>
-    );
+async function fetchCourse(id: string): Promise<Course | null> {
+  try {
+    const res = await fetch(`https://api.vaceup.ng/api/v1/courses/${id}/`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    console.error('Failed to fetch course:', e);
+    return null;
   }
+}
+
+export async function generateStaticParams() {
+  try {
+    const res = await fetch('https://api.vaceup.ng/api/v1/courses/?limit=100');
+    if (res.ok) {
+      const data = await res.json();
+      return (data.results || data).map((course: any) => ({
+        id: course.id.toString(),
+      }));
+    }
+  } catch (e) {
+    console.warn('Could not fetch courses for static params:', e);
+  }
+  return [{ id: '1' }, { id: '2' }, { id: '3' }];
+}
+
+export default async function CourseDetailPage({ params }: { params: { id: string } }) {
+  const course = await fetchCourse(params.id);
 
   if (!course) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Course Not Found</h1>
-          <Button onClick={scrollToCourses} variant="primary" className="mt-4">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          <Link href="/courses" className="inline-flex items-center gap-2 px-6 py-3 bg-navy-900 text-white font-semibold rounded-xl hover:bg-navy-800 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             Back to Courses
-          </Button>
+          </Link>
         </div>
       </div>
     );
   }
-
-  const scrollToCourses = () => {
-    router.push('/courses');
-  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
@@ -148,66 +137,59 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                   Share
                 </Button>
               </div>
+            </div>
 
-              <div className="prose prose-gray dark:prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Course Description</h2>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">{course.description}</p>
-              </div>
-
-              <div className="bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">What You'll Learn</h3>
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">What You'll Learn</h2>
+                <ul className="space-y-3">
                   {course.learnings.map((learning, i) => (
                     <li key={i} className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
                       <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                       <span>{learning}</span>
                     </li>
-                  )}
+                  ))}
                 </ul>
               </div>
 
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Course Modules</h3>
-                  <ul className="space-y-3">
-                    {course.modules.map((module, i) => (
-                      <li key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl">
-                        <span className="w-8 h-8 rounded-full bg-navy-100 dark:bg-navy-900/30 flex items-center justify-center text-navy-900 dark:text-navy-100 font-bold text-sm">{i + 1}</span>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{module.title}</p>
-                          {module.topics && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{module.topics.join(', ')}</p>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Benefits</h3>
-                  <ul className="space-y-3">
-                    {course.benefits.map((benefit, i) => (
-                      <li key={i} className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <span>{benefit}</span>
-                      </li>
-                    ))}
-                  </ul>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Course Content</h2>
+                <div className="space-y-4">
+                  {course.modules.map((module, moduleIndex) => (
+                    <div key={moduleIndex} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{moduleIndex + 1}. {module.title}</h3>
+                      {module.topics && (
+                        <ul className="space-y-2 ml-4">
+                          {module.topics.map((topic, topicIndex) => (
+                            <li key={topicIndex} className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                              <span className="w-2 h-2 bg-navy-900 rounded-full flex-shrink-0 mt-2" />
+                              <span>{topic}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 shadow-xl shadow-gray-100/80 sticky top-24">
-                <div className="flex items-center justify-between mb-6">
-                  <span className="text-xl font-black text-navy-950">{course.price}</span>
-                  <Badge variant="secondary" className="text-xs capitalize">{course.level}</Badge>
+          <div className="space-y-6">
+            <Card variant="glass" className="sticky top-24">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <span className="text-3xl font-black text-navy-950">{course.price}</span>
+                    <Badge variant="secondary" className="text-xs capitalize ml-2">{course.level}</Badge>
+                  </div>
                 </div>
 
-                <Button className="w-full py-4 bg-gold-brand text-navy-950 font-bold rounded-xl hover:bg-gold-hover shadow-md hover:shadow-gold-hover transition-all text-lg font-bold">
-                  Enroll Now
-                </Button>
+                <Link href={`/checkout?course_id=${course.id}`}>
+                  <Button className="w-full py-4 bg-gold-brand text-navy-950 font-bold rounded-xl hover:bg-gold-hover shadow-md hover:shadow-gold-hover transition-all text-lg font-bold">
+                    Enroll Now
+                  </Button>
+                </Link>
 
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700 space-y-4 text-sm text-gray-600 dark:text-gray-400">
                   <div className="flex items-center justify-between"><span>Duration</span><span className="font-semibold text-gray-900 dark:text-white">3 Months</span></div>
@@ -229,18 +211,16 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl">
-                  <Shield className="w-5 h-5 text-teal-brand mr-2" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400">30-day money-back guarantee. No questions asked.</p>
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-teal-brand" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">30-day money-back guarantee. No questions asked.</p>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
-    );
-  }
-}
-
-export default function CourseDetailPage({ params }: { params: { id: string } }) {
-  return <CourseDetailClient params={params} />;
+    </div>
+  );
 }

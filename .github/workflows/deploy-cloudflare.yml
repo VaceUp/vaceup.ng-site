@@ -39,10 +39,11 @@ jobs:
       - name: Run linting
         run: npm run lint || true
 
-      - name: Build frontend (static export)
-        run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: https://api.vaceup.ng
+      - - name: Build
+  run: npm run build
+  env:
+    NEXT_PUBLIC_API_URL: https://api.vaceup.ng
+
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

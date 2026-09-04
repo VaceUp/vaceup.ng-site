@@ -1,6 +1,14 @@
-name = "vaceup-ng-site"
-compatibility_date = "2026-09-03"
-main = "./worker.js"
+# Cloudflare Pages Configuration (Static Hosting)
+# NOT a Worker - do not use 'main' or 'worker.js'
 
-[assets]
-directory = "./out"
+name = "vaceup-ng-site"
+compatibility_date = "2026-09-04"
+
+[build]
+command = "npm run build"
+cwd = "."
+
+pages_build_output_dir = "out"
+
+[build.env]
+NEXT_PUBLIC_API_URL = "https://api.vaceup.ng"

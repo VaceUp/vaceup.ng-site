@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
   };
 
   return (
-    <footer className="bg-[#000459] text-white pt-16 pb-8 border-t border-white/10">
+    <footer className="bg-navy-950 text-white pt-16 pb-8 border-t border-white/10">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12">
           
@@ -30,13 +30,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
                 {/* Teal check/arrow */}
                 <path d="M15 30 L40 80 L70 10 L50 10 L38 60 L28 30 Z" fill="#008B8B" />
                 {/* Gold check/arrow */}
-                <path d="M30 30 L45 60 L80 10 L95 25 L55 90 L30 30 Z" fill="#F4C430" />
+                <path d="M30 30 L45 60 L80 10 L95 25 L55 90 L30 30 Z" fill="#FFC72C" />
               </svg>
               <div className="flex flex-col">
-                <span className="text-2xl font-extrabold tracking-tight text-[#00088A] leading-none">
+                <span className="text-2xl font-extrabold tracking-tight text-navy-900 leading-none">
                   VACEUP
                 </span>
-                <span className="text-[11px] font-bold tracking-wider text-[#008B8B] uppercase mt-0.5">
+                <span className="text-[11px] font-bold tracking-wider text-teal-brand uppercase mt-0.5">
                   Digital Academy
                 </span>
               </div>
@@ -48,18 +48,18 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
 
             <div className="space-y-3 text-xs sm:text-sm text-gray-300">
               <div className="flex items-start gap-3">
-                <span className="text-[#FFC72C] mt-0.5">📍</span>
+                <span className="text-gold-brand mt-0.5">📍</span>
                 <span>669, Abeokuta Expressway, Ahmadiya Bus-stop, Ijaiye Ojokoro, Lagos State</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[#FFC72C]">✉️</span>
-                <a href="mailto:vaceupacademy@gmail.com" className="hover:text-[#008B8B] transition-colors">
+                <span className="text-gold-brand">✉️</span>
+                <a href="mailto:vaceupacademy@gmail.com" className="hover:text-teal-brand transition-colors">
                   vaceupacademy@gmail.com
                 </a>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[#FFC72C]">📞</span>
-                <a href="tel:+2348145798943" className="hover:text-[#008B8B] transition-colors">
+                <span className="text-gold-brand">📞</span>
+                <a href="tel:+2348145798943" className="hover:text-teal-brand transition-colors">
                   +234 814 579 8943
                 </a>
               </div>
@@ -68,22 +68,22 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
 
           {/* Quick Links: About */}
           <div className="lg:col-span-2 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C]">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">
               About
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#about" className="hover:text-[#008B8B] transition-colors">
+                <a href="#about" className="hover:text-teal-brand transition-colors">
                   About VaceUp
                 </a>
               </li>
               <li>
-                <button onClick={onNavigateCourses} className="hover:text-[#008B8B] transition-colors text-left">
+                <button onClick={onNavigateCourses} className="hover:text-teal-brand transition-colors text-left">
                   All courses
                 </button>
               </li>
               <li>
-                <button onClick={onNavigateCourses} className="hover:text-[#008B8B] transition-colors text-left">
+                <button onClick={onNavigateCourses} className="hover:text-teal-brand transition-colors text-left">
                   Kids Tech Academy
                 </button>
               </li>
@@ -92,22 +92,22 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
 
           {/* Quick Links: Learn */}
           <div className="lg:col-span-2 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C]">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">
               Learn
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#blog" className="hover:text-[#008B8B] transition-colors">
+                <a href="#blog" className="hover:text-teal-brand transition-colors">
                   Blog
                 </a>
               </li>
               <li>
-                <a href="#resources" className="hover:text-[#008B8B] transition-colors">
+                <a href="#resources" className="hover:text-teal-brand transition-colors">
                   Free Resources
                 </a>
               </li>
               <li>
-                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-[#008B8B] transition-colors text-left">
+                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-teal-brand transition-colors text-left">
                   Student Dashboard
                 </button>
               </li>
@@ -116,17 +116,17 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
 
           {/* Quick Links: Support */}
           <div className="lg:col-span-1 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C]">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">
               Support
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#contact" className="hover:text-[#008B8B] transition-colors">
+                <a href="#contact" className="hover:text-teal-brand transition-colors">
                   Contact Us
                 </a>
               </li>
               <li>
-                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-[#008B8B] transition-colors text-left">
+                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-teal-brand transition-colors text-left">
                   Login
                 </button>
               </li>
@@ -135,7 +135,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
 
           {/* Newsletter Form */}
           <div className="lg:col-span-3 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C]">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">
               Stay Updated
             </h4>
             <p className="text-xs text-gray-300 leading-relaxed">
@@ -145,7 +145,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
             <form onSubmit={handleSubscribe} className="flex items-center gap-2">
               <button
                 type="submit"
-                className="rounded-xl bg-[#FFC72C] px-5 py-3 text-xs font-bold text-[#00088A] hover:bg-[#ebd024] transition-all whitespace-nowrap shadow-md"
+                className="rounded-xl bg-gold-brand px-5 py-3 text-xs font-bold text-navy-950 hover:bg-gold-hover transition-all whitespace-nowrap shadow-md"
               >
                 Subscribe
               </button>
@@ -155,7 +155,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl bg-white px-4 py-3 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#008B8B]"
+                className="w-full rounded-xl bg-white px-4 py-3 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-brand"
               />
             </form>
           </div>
@@ -169,16 +169,16 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
           </p>
 
           <div className="flex items-center gap-3">
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#008B8B] flex items-center justify-center transition-colors text-xs font-bold">
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
               f
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#008B8B] flex items-center justify-center transition-colors text-xs font-bold">
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
               📷
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#008B8B] flex items-center justify-center transition-colors text-xs font-bold">
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
               𝕏
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#008B8B] flex items-center justify-center transition-colors text-xs font-bold">
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
               in
             </a>
           </div>

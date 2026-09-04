@@ -1,51 +1,76 @@
 /**
  * VaceUp Design System
- * Glassmorphism Design System with professional color scheme
+ * Glassmorphism Design System with professional brand color scheme
+ * 
+ * BRAND COLORS:
+ * - Primary Navy: #00088A (Core brand navy)
+ * - Brand Teal: #008B8B (Logo teal, accents)
+ * - Brand Gold: #FFC72C (Primary CTA, highlights)
+ * - Dark Navy BG: #000459 (Dark sections)
+ * - Light Navy BG: #0A1128 (Dark text base)
  */
 
 export const colors = {
-  // Primary brand colors
+  // Primary brand colors - VaceUp Navy
   primary: {
-    50: '#f0f5ff',
-    100: '#e0eaff',
-    200: '#c7d8ff',
-    300: '#a3bfff',
-    400: '#7d9aff',
-    500: '#5a6fff',  // Primary brand color
-    600: '#4353e8',
-    700: '#353ec6',
-    800: '#2d31a0',
-    900: '#252782',
-    950: '#1a1655',
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',    // Indigo-500 (for UI components)
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
+    950: '#1e1b4b',
+    // VaceUp Brand Navy
+    brand: {
+      50: '#e8ebfc',
+      100: '#d1d5f9',
+      200: '#a3a8f3',
+      300: '#757af0',
+      400: '#474ded',
+      500: '#1921e7',
+      600: '#0f16c4',
+      700: '#0b11a1',
+      800: '#070c7e',
+      900: '#00088A',   // VaceUp Brand Navy - PRIMARY
+      950: '#000459',   // Dark Navy BG
+    },
   },
 
-  // Secondary colors
-  secondary: {
-    50: '#fdf4ff',
-    100: '#fae8ff',
-    200: '#f5d0fe',
-    300: '#f0abfc',
-    400: '#e879f9',
-    500: '#d946ef',
-    600: '#c026d3',
-    700: '#a21caf',
-    800: '#86198f',
-    900: '#701a75',
-    950: '#4a044e',
+  // Brand Teal (Logo, accents)
+  teal: {
+    50: '#f0fdfa',
+    100: '#ccfbf1',
+    200: '#99f6e4',
+    300: '#5eead4',
+    400: '#2dd4bf',
+    500: '#14b8a6',
+    600: '#0d9488',
+    700: '#0f766e',
+    800: '#115e59',
+    900: '#134e4a',
+    950: '#042f2e',
+    brand: '#008B8B',  // VaceUp Brand Teal - LOGO/ACCENTS
   },
 
-  // Accent colors
-  accent: {
-    50: '#fff7ed',
-    100: '#ffedd5',
-    200: '#fed7aa',
-    300: '#fdba74',
-    400: '#fb923c',
-    500: '#f97316', // Accent color
-    600: '#ea580c',
-    700: '#c2410c',
-    800: '#9a340d',
-    950: '#431407',
+  // Brand Gold (CTAs, highlights)
+  gold: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+    brand: '#FFC72C',  // VaceUp Brand Gold - PRIMARY CTA
+    hover: '#e8b428',
+    light: '#fff9e6',
   },
 
   // Success colors
@@ -58,8 +83,9 @@ export const colors = {
     500: '#22c55e',
     600: '#16a34a',
     700: '#15803d',
-    800: '#166534',
+    800: '#15803d',
     900: '#14532d',
+    brand: '#10b981',
   },
 
   // Warning colors
@@ -88,6 +114,7 @@ export const colors = {
     700: '#b91c1c',
     800: '#991b1b',
     900: '#7f1d1d',
+    brand: '#ef4444',
   },
 
   // Neutral colors
@@ -122,22 +149,32 @@ export const colors = {
 
   // Light mode background
   light: {
-    bg: '#F8FAFC',
-    bgSecondary: '#F1F5F9',
-    bgTerciary: '#E2E8F0',
-    card: 'rgba(255, 255, 255, 0.85)',
+    bg: '#FFFFFF',
+    bgSecondary: '#F8FAFC',
+    bgTerciary: '#F1F5F9',
+    card: 'rgba(255, 255, 255, 0.9)',
     cardHover: 'rgba(255, 255, 255, 0.95)',
-    border: 'rgba(148, 163, 184, 0.2)',
-    borderHover: 'rgba(148, 163, 184, 0.4)',
-    text: '#0F172A',
+    border: 'rgba(148, 163, 184, 0.15)',
+    borderHover: 'rgba(148, 163, 184, 0.3)',
+    text: '#0A1128',
     textSecondary: '#475569',
     textMuted: '#94A3B8',
   },
 };
 
+// Brand color shortcuts for easy access
+export const brand = {
+  navy: '#00088A',
+  navyDark: '#000459',
+  navyLight: '#0A1128',
+  teal: '#008B8B',
+  gold: '#FFC72C',
+  goldHover: '#e8b428',
+  goldLight: '#fff9e6',
+};
+
 // Glassmorphism utilities
 export const glassmorphism = {
-  // Light glass
   light: {
     background: 'rgba(255, 255, 255, 0.7)',
     backdropFilter: 'blur(20px)',
@@ -150,36 +187,37 @@ export const glassmorphism = {
     border: '1px solid rgba(255, 255, 255, 0.4)',
     boxShadow: '0 12px 40px 0 rgba(31, 38, 135, 0.15)',
   },
-
-  // Dark glass
   dark: {
-    background: 'rgba(20, 24, 34, 0.7)',
+    background: 'rgba(10, 17, 40, 0.7)',
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(100, 116, 139, 0.2)',
     boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
   },
   darkStrong: {
-    background: 'rgba(20, 24, 34, 0.85)',
+    background: 'rgba(10, 17, 40, 0.85)',
     backdropFilter: 'blur(30px)',
     border: '1px solid rgba(100, 116, 139, 0.3)',
     boxShadow: '0 12px 40px 0 rgba(0, 0, 0, 0.4)',
   },
-
-  // Primary brand glass
   primary: {
-    background: 'rgba(90, 111, 255, 0.15)',
+    background: 'rgba(0, 8, 138, 0.15)',
     backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(90, 111, 255, 0.3)',
-    boxShadow: '0 8px 32px 0 rgba(90, 111, 255, 0.2)',
+    border: '1px solid rgba(0, 8, 138, 0.3)',
+    boxShadow: '0 8px 32px 0 rgba(0, 8, 138, 0.2)',
   },
-
-  // Utility classes as Tailwind classes
+  gold: {
+    background: 'rgba(255, 199, 44, 0.15)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 199, 44, 0.3)',
+    boxShadow: '0 8px 32px 0 rgba(255, 199, 44, 0.2)',
+  },
   classes: {
     light: 'bg-white/70 backdrop-blur-xl border-white/30 shadow-glass',
     lightStrong: 'bg-white/85 backdrop-blur-2xl border-white/40 shadow-glass-lg',
-    dark: 'bg-slate-950/70 backdrop-blur-xl border-slate-700/20 shadow-glass-dark',
-    darkStrong: 'bg-slate-950/85 backdrop-blur-2xl border-slate-700/30 shadow-glass-xl',
-    primary: 'bg-primary-500/10 backdrop-blur-xl border-primary-500/30 shadow-glass-primary',
+    dark: 'bg-navy-950/70 backdrop-blur-xl border-slate-700/20 shadow-glass-dark',
+    darkStrong: 'bg-navy-950/85 backdrop-blur-2xl border-slate-700/30 shadow-glass-xl',
+    primary: 'bg-navy-900/10 backdrop-blur-xl border-navy-900/30 shadow-glass-primary',
+    gold: 'bg-gold-500/10 backdrop-blur-xl border-gold-500/30 shadow-glass-gold',
   },
 };
 
@@ -190,7 +228,6 @@ export const typography = {
     mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', 'monospace'],
     display: ['Cal Sans', 'Inter', 'system-ui', 'sans-serif'],
   },
-
   fontSizes: {
     xs: '0.75rem',      // 12px
     sm: '0.875rem',     // 14px
@@ -206,7 +243,6 @@ export const typography = {
     '8xl': '4.5rem',    // 72px
     '9xl': '6rem',      // 96px
   },
-
   fontWeights: {
     thin: 100,
     extralight: 200,
@@ -218,7 +254,6 @@ export const typography = {
     extrabold: 800,
     black: 900,
   },
-
   lineHeights: {
     none: 1,
     tight: 1.1,
@@ -227,7 +262,6 @@ export const typography = {
     relaxed: 1.625,
     loose: 2,
   },
-
   letterSpacings: {
     tighter: '-0.05em',
     tight: '-0.025em',
@@ -288,20 +322,21 @@ export const borderRadius = {
 export const shadows = {
   xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
   sm: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-  smColored: '0 1px 3px 0 rgb(90 111 255 / 0.2)',
-  DEFAULT: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-  DEFAULTColored: '0 4px 6px -1px rgb(90 111 255 / 0.2), 0 2px 4px -2px rgb(90 111 255 / 0.1)',
+  smBrand: '0 1px 3px 0 rgb(0 8 138 / 0.2)',
+  DEFAULT: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 1px 2px -2px rgb(0 0 0 / 0.1)',
+  DEFAULTBrand: '0 4px 6px -1px rgb(0 8 138 / 0.2), 0 2px 4px -2px rgb(0 8 138 / 0.1)',
   md: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-  mdColored: '0 10px 15px -3px rgb(90 111 255 / 0.2), 0 4px 6px -4px rgb(90 111 255 / 0.1)',
+  mdBrand: '0 10px 15px -3px rgb(0 8 138 / 0.2), 0 4px 6px -4px rgb(0 8 138 / 0.1)',
   lg: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-  lgColored: '0 20px 25px -5px rgb(90 111 255 / 0.2), 0 8px 10px -6px rgb(90 111 255 / 0.1)',
+  lgBrand: '0 20px 25px -5px rgb(0 8 138 / 0.2), 0 8px 10px -6px rgb(0 8 138 / 0.1)',
   xl: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-  xlColored: '0 25px 50px -12px rgb(90 111 255 / 0.3)',
+  xlBrand: '0 25px 50px -12px rgb(0 8 138 / 0.3)',
   '2xl': '0 50px 100px -20px rgb(0 0 0 / 0.25)',
   inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
-  glow: '0 0 20px 5px rgb(90 111 255 / 0.4)',
-  glowStrong: '0 0 40px 10px rgb(90 111 255 / 0.5)',
-  glowAccent: '0 0 20px 5px rgb(249 115 22 / 0.4)',
+  glow: '0 0 20px 5px rgb(0 8 138 / 0.4)',
+  glowStrong: '0 0 40px 10px rgb(0 8 138 / 0.5)',
+  glowGold: '0 0 20px 5px rgb(255 199 44 / 0.5)',
+  glowTeal: '0 0 20px 5px rgb(0 139 139 / 0.5)',
   glowSuccess: '0 0 20px 5px rgb(34 197 94 / 0.4)',
   glowError: '0 0 20px 5px rgb(239 68 68 / 0.4)',
 };
@@ -372,7 +407,7 @@ export const animations = {
     '100%': { opacity: '1', transform: 'translateX(0)' },
   },
   slideRight: {
-    '0%': { opacity: '0', transform: 'translateX(20px)' },
+    '0%': { opacity: '0', transform: 'translateX(-20px)' },
     '100%': { opacity: '1', transform: 'translateX(0)' },
   },
   scaleIn: {
@@ -448,7 +483,7 @@ export const motion = {
   slideRight: {
     initial: { opacity: 0, x: -30 },
     animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -30 },
+    exit: { opacity: 0, x: 30 },
     transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
   },
   fade: {
@@ -462,18 +497,19 @@ export const motion = {
 // Tailwind CSS custom properties for CSS variables
 export const cssVariables = {
   light: {
-    '--color-primary': '#5A6FFF',
-    '--color-primary-hover': '#4353E8',
-    '--color-primary-light': '#E0EAFF',
-    '--color-secondary': '#D946EF',
-    '--color-accent': '#F97316',
-    '--color-success': '#22C55E',
-    '--color-warning': '#F59E0B',
-    '--color-error': '#EF4444',
-    '--bg-primary': '#F8FAFC',
-    '--bg-secondary': '#F1F5F9',
-    '--bg-tertiary': '#E2E8F0',
-    '--text-primary': '#0F172A',
+    '--color-primary': '#00088A',
+    '--color-primary-hover': '#000459',
+    '--color-primary-light': '#e8ebfc',
+    '--color-teal': '#008B8B',
+    '--color-gold': '#FFC72C',
+    '--color-gold-hover': '#e8b428',
+    '--color-success': '#10b981',
+    '--color-warning': '#f59e0b',
+    '--color-error': '#ef4444',
+    '--bg-primary': '#FFFFFF',
+    '--bg-secondary': '#F8FAFC',
+    '--bg-tertiary': '#F1F5F9',
+    '--text-primary': '#0A1128',
     '--text-secondary': '#475569',
     '--text-muted': '#94A3B8',
     '--border-color': '#E2E8F0',
@@ -493,8 +529,9 @@ export const cssVariables = {
     '--color-primary': '#7D9AFF',
     '--color-primary-hover': '#A3B8FF',
     '--color-primary-light': '#1E1E3F',
-    '--color-secondary': '#E879F9',
-    '--color-accent': '#FB923C',
+    '--color-teal': '#008B8B',
+    '--color-gold': '#FFC72C',
+    '--color-gold-hover': '#e8b428',
     '--color-success': '#4ADE80',
     '--color-warning': '#FBBF24',
     '--color-error': '#F87171',
@@ -526,7 +563,7 @@ export const componentSizes = {
     sm: { height: '36px', padding: '0 14px', fontSize: '0.875rem', gap: '8px', iconSize: 16 },
     md: { height: '44px', padding: '0 20px', fontSize: '1rem', gap: '10px', iconSize: 18 },
     lg: { height: '52px', padding: '0 28px', fontSize: '1.125rem', gap: '12px', iconSize: 20 },
-    xl: { height: '60px', padding: '0 36px', fontSize: '1.25rem', gap: '14px', iconSize: 20 },
+    xl: { height: '60px', padding: '0 36px', fontSize: '1.125rem', gap: '12px', iconSize: 20 },
     iconOnly: { width: '44px', height: '44px', iconSize: 20 },
     iconOnlySm: { width: '36px', height: '36px', iconSize: 16 },
     iconOnlyLg: { width: '52px', height: '52px', iconSize: 22 },
@@ -573,11 +610,12 @@ export const utils = {
   cssVar: (name: string, fallback?: string) => `var(--${name}${fallback ? `, ${fallback}` : ''})`,
 
   // Generate glassmorphism CSS
-  glass: (variant: 'light' | 'dark' | 'primary' = 'light') => {
+  glass: (variant: 'light' | 'dark' | 'primary' | 'gold' = 'light') => {
     const variants = {
       light: 'bg-white/70 backdrop-blur-xl border-white/30 shadow-glass',
-      dark: 'bg-slate-950/70 backdrop-blur-xl border-slate-700/20 shadow-glass-dark',
-      primary: 'bg-primary-500/10 backdrop-blur-xl border-primary-500/30 shadow-glass-primary',
+      dark: 'bg-navy-950/70 backdrop-blur-xl border-slate-700/20 shadow-glass-dark',
+      primary: 'bg-navy-900/10 backdrop-blur-xl border-navy-900/30 shadow-glass-primary',
+      gold: 'bg-gold-500/10 backdrop-blur-xl border-gold-500/30 shadow-glass-gold',
     };
     return variants[variant];
   },
@@ -585,10 +623,11 @@ export const utils = {
   // Generate focus ring
   focusRing: (color: string = 'primary') => {
     const colors = {
-      primary: 'focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2 focus:ring-offset-white',
+      primary: 'focus:ring-2 focus:ring-navy-900/50 focus:ring-offset-2 focus:ring-offset-white',
       dark: 'focus:ring-2 focus:ring-primary-400/50 focus:ring-offset-2 focus:ring-offset-slate-950',
       error: 'focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2 focus:ring-offset-white',
       success: 'focus:ring-2 focus:ring-green-500/50 focus:ring-offset-2 focus:ring-offset-white',
+      gold: 'focus:ring-2 focus:ring-gold-500/50 focus:ring-offset-2 focus:ring-offset-white',
     };
     return colors[color as keyof typeof colors] || colors.primary;
   },
@@ -634,6 +673,7 @@ export const utils = {
 // Export everything
 export default {
   colors,
+  brand,
   glassmorphism,
   typography,
   spacing,

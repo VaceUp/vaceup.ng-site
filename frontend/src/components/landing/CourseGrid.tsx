@@ -144,7 +144,7 @@ export const COURSES: Course[] = [
       { title: 'Module 5 — Branding & Visual Identity' },
       { title: 'Module 6 — Social Media Design' },
       { title: 'Module 7 — Marketing & Promotional Design' },
-      { title: 'Module 8 — Professional Design Workflow' },
+      { title: 'Module 7 — Professional Design Workflow' },
     ],
     benefits: ['Live design reviews', 'Real brand briefs', 'Portfolio setup', 'Freelance guidance', 'Certificate of Completion'],
   },
@@ -258,7 +258,7 @@ export const COURSES: Course[] = [
       'Understanding app structure and user goals',
       'Idea generation & problem solving',
       'Interface sketching and wireframing',
-      'Prototyping interactive app screens',
+      'Prototyping interactive app prototypes',
     ],
     modules: [
       { title: 'Module 1 — What Are Apps & Websites?' },
@@ -348,16 +348,16 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
   );
 
   return (
-    <section id="courses" className="bg-white py-20 text-[#00088A]">
+    <section id="courses" className="bg-white py-20 text-navy-950">
       <div className="mx-auto max-w-7xl px-6">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-[#008B8B]">
+            <span className="text-xs font-bold uppercase tracking-widest text-teal-brand">
               OUR PROGRAMMES
             </span>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#00088A] tracking-tight mt-2">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight mt-2">
               Build skills that move your <br className="hidden sm:block" /> career & future forward
             </h2>
             <p className="text-sm text-gray-600 mt-3 max-w-xl">
@@ -365,8 +365,8 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
             </p>
           </div>
 
-          {/* Replaced Kids Tab with 'All courses ->' Button */}
-          <button className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-6 py-3 text-xs font-bold text-[#00088A] shadow-sm hover:bg-gray-50 hover:shadow transition-all self-start md:self-auto">
+          {/* View All Courses Button */}
+          <button className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-6 py-3 text-xs font-bold text-navy-950 shadow-sm hover:bg-gray-50 hover:shadow transition-all self-start md:self-auto">
             <span>All courses</span>
             <span>→</span>
           </button>
@@ -380,13 +380,13 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
               className="flex flex-col justify-between overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-100/80 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl"
             >
               {/* Thumbnail Image */}
-              <div className="relative h-48 w-full bg-gradient-to-br from-blue-900 to-[#00088A] overflow-hidden">
+              <div className="relative h-48 w-full bg-gradient-to-br from-navy-900 to-navy-900 overflow-hidden">
                 <img
                   src={course.image}
                   alt={course.title}
                   className="h-full w-full object-cover opacity-90 transition-transform duration-500 hover:scale-105"
                 />
-                <span className="absolute top-4 left-4 rounded-full bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold tracking-wide uppercase text-[#00088A] shadow-sm">
+                <span className="absolute top-4 left-4 rounded-full bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold tracking-wide uppercase text-navy-950 shadow-sm">
                   {course.category === 'kids' ? 'Kids Tech' : 'Professional Track'}
                 </span>
               </div>
@@ -394,18 +394,18 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
               {/* Card Body */}
               <div className="p-6 flex-1 flex flex-col justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold text-[#00088A]">{course.title}</h3>
+                  <h3 className="text-2xl font-bold text-navy-950">{course.title}</h3>
                   <p className="text-xs text-gray-500 mt-2 leading-relaxed">
                     {course.tagline}
                   </p>
 
                   <div className="mt-6 space-y-2 text-xs font-medium text-gray-600">
                     <div className="flex items-center gap-2">
-                      <span className="text-[#008B8B]">📊</span>
+                      <span className="text-teal-brand">📊</span>
                       <span>{course.level}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[#008B8B]">⏱</span>
+                      <span className="text-teal-brand">⏱</span>
                       <span>{course.duration}</span>
                     </div>
                   </div>
@@ -413,10 +413,10 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
 
                 {/* Footer */}
                 <div className="mt-8 flex items-center justify-between pt-4 border-t border-gray-100">
-                  <span className="text-xl font-black text-[#00088A]">{course.price}</span>
+                  <span className="text-xl font-black text-navy-950">{course.price}</span>
                   <button
                     onClick={() => onViewCourse(course)}
-                    className="rounded-xl bg-[#FFC72C] px-5 py-2.5 text-xs font-bold text-[#00088A] shadow-md hover:bg-[#ebd024] transition-all"
+                    className="rounded-xl bg-gold-brand px-5 py-2.5 text-xs font-bold text-navy-950 shadow-md hover:bg-gold-hover transition-all"
                   >
                     View Course
                   </button>
@@ -430,3 +430,5 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
     </section>
   );
 };
+
+export default CourseGrid;

@@ -1,12 +1,26 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, Search, MoreVertical, Paperclip, Mic, Camera, Smile } from 'lucide-react';
-import { Avatar } from '@/components/ui/Avatar';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Avatar } from '@/components/ui/Avatar';
 import { Input } from '@/components/ui/Input';
 import { ScrollArea } from '@/components/ui/ScrollArea';
 import { cn } from '@/lib/utils';
+import {
+  MessageSquare,
+  Send,
+  Search,
+  MoreVertical,
+  Paperclip,
+  Mic,
+  Camera,
+  Smile,
+  ChevronLeft,
+} from 'lucide-react';
 
 interface Message {
   id: string;
@@ -33,9 +47,9 @@ interface Conversation {
 }
 
 export default function MessagingPage() {
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -45,46 +59,63 @@ export default function MessagingPage() {
 
   const fetchConversations = async () => {
     setLoading(true);
-    setConversations([
-      {
-        id: '1',
-        participant: {
+    try {
+      const res = await fetch('/api/v1/messaging/conversations/', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConversations(data.results || data);
+        if (data.results?.[0]) setActiveConversation(data.results[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err);
+      setConversations([
+        {
           id: '1',
-          name: 'Sarah Johnson',
-          avatar: '/avatars/sarah.jpg',
-          online: true,
+          participant: { id: '1', name: 'Sarah Johnson', avatar: '/avatars/sarah.jpg', online: true },
+          lastMessage: 'Great job on the project!',
+          timestamp: '2024-01-15T10:30:00Z',
+          unreadCount: 2,
         },
-        lastMessage: 'Great job on the project!',
-        timestamp: '2024-01-15T10:30:00Z',
-        unreadCount: 2,
-      },
-      {
-        id: '2',
-        participant: {
+        {
           id: '2',
-          name: 'Mike Chen',
-          avatar: '/avatars/mike.jpg',
-          online: false,
+          participant: { id: '2', name: 'Mike Chen', avatar: '/avatars/mike.jpg', online: false },
+          lastMessage: 'Thanks for the feedback',
+          timestamp: '2024-01-14T15:45:00Z',
+          unreadCount: 0,
         },
-        lastMessage: 'Thanks for the feedback',
-        timestamp: '2024-01-14T15:45:00Z',
-        unreadCount: 0,
-      },
-      {
-        id: '3',
-        participant: {
+        {
           id: '3',
-          name: 'Emily Davis',
-          avatar: '/avatars/emily.jpg',
-          online: true,
+          participant: { id: '3', name: 'Emily Davis', avatar: '/avatars/emily.jpg', online: true },
+          lastMessage: 'Can we schedule a call?',
+          timestamp: '2024-01-13T09:15:00Z',
+          unreadCount: 1,
         },
-        lastMessage: 'Can we schedule a call?',
-        timestamp: '2024-01-13T09:15:00Z',
-        unreadCount: 1,
-      },
-    ]);
-    setLoading(false);
+      ]);
+      if (conversations[0]) setActiveConversation(conversations[0].id);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchMessages = async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/v1/messaging/conversations/${conversationId}/messages/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.results || data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeConversation) fetchMessages(activeConversation);
+  }, [activeConversation]);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -106,22 +137,27 @@ export default function MessagingPage() {
     }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim() || !activeConversation) return;
-    setMessages(prev => [...prev, {
-      id: Date.now().toString(),
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      isOwn: true,
-      read: false,
-    }]);
-    setNewMessage('');
+    try {
+      const newMsg = {
+        id: Date.now().toString(),
+        content: newMessage,
+        timestamp: new Date().toISOString(),
+        isOwn: true,
+        read: false,
+      };
+      setMessages(prev => [...prev, newMsg]);
+      setNewMessage('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
       </div>
     );
   }
@@ -154,7 +190,7 @@ export default function MessagingPage() {
                   onClick={() => setActiveConversation(conversation.id)}
                   className={`w-full px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 ${
                     activeConversation === conversation.id
-                      ? 'bg-primary-50 dark:bg-primary-900/30 border-r-2 border-primary-500'
+                      ? 'bg-navy-50 dark:bg-navy-900/30 border-r-2 border-navy-900'
                       : 'hover:bg-gray-50 dark:hover:bg-slate-800/50'
                   }`}
                 >
@@ -178,7 +214,7 @@ export default function MessagingPage() {
                         {conversation.lastMessage}
                       </p>
                       {conversation.unreadCount > 0 && (
-                        <span className="w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center text-center">
+                        <span className="w-5 h-5 bg-navy-900 text-white text-xs rounded-full flex items-center justify-center text-center">
                           {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
                         </span>
                       )}
@@ -215,7 +251,7 @@ export default function MessagingPage() {
                 </div>
               </div>
               <div className="flex-1 flex flex-col overflow-hidden">
-                <ScrollArea className="flex-1 p-4 space-y-4">
+                <div className="flex-1 p-4 space-y-4 overflow-y-auto">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -224,7 +260,7 @@ export default function MessagingPage() {
                       <div className={cn(
                         'max-w-[70%] rounded-2xl px-4 py-2',
                         message.isOwn
-                          ? 'bg-primary-500 text-white rounded-tr-none'
+                          ? 'bg-navy-900 text-white rounded-tr-none'
                           : 'bg-gray-100 dark:bg-slate-800 rounded-tl-none'
                       )}>
                         <p className="text-sm">{message.content}</p>
@@ -234,7 +270,7 @@ export default function MessagingPage() {
                       </div>
                     </div>
                   ))}
-                </ScrollArea>
+                </div>
                 <div className="p-4 border-t border-gray-200 dark:border-slate-700">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 relative">
@@ -257,7 +293,7 @@ export default function MessagingPage() {
                           </svg>
                         </button>
                         <button
-                          className="px-4 py-2 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50"
+                          className="px-4 py-2 bg-navy-900 text-white rounded-xl font-medium hover:bg-navy-950 transition-colors disabled:opacity-50"
                           onClick={sendMessage}
                           disabled={!newMessage.trim()}
                         >
@@ -266,20 +302,14 @@ export default function MessagingPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <MessageSquare className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Select a conversation</h3>
-                <p className="text-gray-500 dark:text-gray-400">Choose a conversation from the sidebar to start messaging</p>
-              </div>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 }
+
+export default MessagingPage;

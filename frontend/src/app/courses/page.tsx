@@ -41,7 +41,7 @@ function CourseCard({ course }: { course: any }) {
           <Badge variant="outline" className="text-xs capitalize">{course.category}</Badge>
           <div className="flex items-center gap-1 text-sm text-yellow-500">
             <span className="font-bold">{course.rating}</span>
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034a1 1 0 00-1.175 0L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
           </div>
         </div>
         <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{course.title}</h3>
@@ -61,7 +61,7 @@ function CourseCard({ course }: { course: any }) {
   );
 }
 
-function CoursesContent() {
+export default function CoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -99,7 +99,13 @@ function CoursesContent() {
     }
   };
 
-  const categories = ['all', 'development', 'design', 'business', 'marketing', 'data-science'];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -139,7 +145,7 @@ function CoursesContent() {
                 <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2 animate-pulse" />
                 <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2 animate-pulse" />
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -167,20 +173,14 @@ function CoursesContent() {
                   Load More
                 </button>
               </div>
-            )}
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function CoursesPage() {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <CoursesContent />
-    </div>
-  );
+export default function CoursesPage() {
+  return <CoursesPageContent />;
 }
-
-export default CoursesPage;

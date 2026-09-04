@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Award, Download, Eye, Share2, Copy, CheckCircle, Calendar } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { Award, Download, Eye, Share2, Copy, CheckCircle, Calendar, Globe, ArrowRight } from 'lucide-react';
 
 interface Certificate {
   id: string;
@@ -23,59 +24,7 @@ interface Certificate {
   grade: string;
 }
 
-function CertificateCard({ certificate }: { certificate: any }) {
-  return (
-    <Card variant="glass" className="flex flex-col">
-      <div className="aspect-video relative overflow-hidden rounded-t-xl">
-        <img
-          src={certificate.courseThumbnail || '/placeholder-course.jpg'}
-          alt={certificate.courseTitle}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute top-3 right-3">
-          <Badge variant={certificate.status === 'issued' ? 'success' : certificate.status === 'pending' ? 'secondary' : 'error'}>
-            {certificate.status.charAt(0).toUpperCase() + certificate.status.slice(1)}
-          </Badge>
-        </div>
-      </div>
-      <CardContent className="p-6">
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1">{certificate.courseTitle}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{certificate.studentName}</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {certificate.skills.slice(0, 4).map((skill) => (
-            <Badge key={skill} variant="outline" className="text-xs">{skill}</Badge>
-          ))}
-        </div>
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
-          <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Issued</p>
-            <p className="font-medium text-gray-900 dark:text-white">{new Date(certificate.issuedAt).toLocaleDateString()}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Grade</p>
-            <p className="font-bold text-gray-900 dark:text-white">{certificate.grade}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-          <Button variant="ghost" size="sm" className="flex-1">
-            <Download className="w-4 h-4 mr-1" />
-            Download
-          </Button>
-          <Button variant="ghost" size="sm" className="flex-1">
-            <Eye className="w-4 h-4 mr-1" />
-            View
-          </Button>
-          <Button variant="ghost" size="sm" className="flex-1">
-            <Share2 className="w-4 h-4 mr-1" />
-            Share
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CertificatesContent() {
+export default function CertificatesPage() {
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'issued' | 'pending' | 'revoked'>('all');
@@ -85,8 +34,17 @@ function CertificatesContent() {
   }, []);
 
   const fetchCertificates = async () => {
-    setLoading(true);
     try {
+      const res = await fetch('/api/v1/certificates/my/', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCertificates(data.results || data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch certificates:', err);
+      // Fallback mock data
       setCertificates([
         {
           id: '1',
@@ -131,9 +89,7 @@ function CertificatesContent() {
           grade: 'A+',
         },
       ]);
-      setLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch certificates:', error);
+    } finally {
       setLoading(false);
     }
   };
@@ -146,7 +102,7 @@ function CertificatesContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
       </div>
     );
   }
@@ -168,7 +124,7 @@ function CertificatesContent() {
               onClick={() => setFilter(f as any)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 filter === f
-                  ? 'bg-primary-500 text-white shadow-md'
+                  ? 'bg-navy-900 text-white shadow-md'
                   : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
               }`}
             >
@@ -193,12 +149,61 @@ function CertificatesContent() {
   );
 }
 
-function CertificatesPage() {
+function CertificateCard({ certificate }: { certificate: any }) {
+  const getStatusBadge = (status: string) => {
+    return (
+      <Badge variant={status === 'issued' ? 'success' : status === 'pending' ? 'secondary' : 'error'}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <CertificatesContent />
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-xl shadow-gray-100/80 flex flex-col h-full group">
+      <div className="aspect-video relative overflow-hidden rounded-t-xl">
+        <img
+          src={certificate.courseThumbnail || '/placeholder-course.jpg'}
+          alt={certificate.courseTitle}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="absolute top-3 right-3">
+          {getStatusBadge(certificate.status)}
+        </div>
+      </div>
+      <div className="p-6 flex flex-col flex-1">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1">{certificate.courseTitle}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{certificate.studentName}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {certificate.skills.slice(0, 4).map((skill) => (
+            <Badge key={skill} variant="outline" className="text-xs">{skill}</Badge>
+          ))}
+        </div>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Issued</p>
+            <p className="font-medium text-gray-900 dark:text-white">{new Date(certificate.issuedAt).toLocaleDateString()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Grade</p>
+            <p className="font-bold text-gray-900 dark:text-white">{certificate.grade}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Eye className="w-4 h-4 mr-1" />
+            View
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Download className="w-4 h-4 mr-1" />
+            Download
+          </Button>
+          <Button variant="ghost" size="sm" className="flex-1">
+            <Share2 className="w-4 h-4 mr-1" />
+            Share
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default CertificatesPage;

@@ -1,70 +1,20 @@
-# Cloudflare Pages Configuration with Functions for API Proxy
-# This file configures Cloudflare Pages with Functions for API proxying
+# Cloudflare Pages Configuration
+# This file configures Cloudflare Pages for the VaceUp frontend
 # 
-# IMPORTANT: Cloudflare Pages with static assets doesn't support Worker env vars.
-# Solution: Use Cloudflare Pages Functions for API proxy (supports env vars)
-# 
-# Setup in Cloudflare Dashboard:
-# 1. Pages > Create Project > Connect Git > Select repo
-# 2. Build settings:
-#    - Build command: npm run build
-#    - Build output directory: frontend/out
-#    - Root directory: frontend
-# 3. Settings > Functions > Enable Functions
-# 4. Settings > Environment Variables (add these):
-#    - BACKEND_URL = https://api.vaceup.ng
-#    - NEXT_PUBLIC_API_URL = https://api.vaceup.ng/api/v1
-#    - NEXT_PUBLIC_WS_URL = wss://api.vaceup.ng/ws
-#    - NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY = pk_test_xxx
-#    - NEXT_PUBLIC_LIVEKIT_URL = wss://livekit.vaceup.ng
-#    - NEXT_PUBLIC_APP_NAME = VaceUp
-#    - NEXT_PUBLIC_APP_URL = https://vaceup.ng
-#    - NEXT_PUBLIC_API_URL = https://api.vaceup.ng/api/v1
+# IMPORTANT: This is for Cloudflare Pages (static hosting), NOT Workers
+# The Worker for API proxy is configured separately in wrangler-worker.toml
 
 name = "vaceup-frontend"
 compatibility_date = "2026-09-04"
-compatibility_flags = ["nodejs_compat"]
 
-# Build configuration
 [build]
 command = "npm run build"
 cwd = "frontend"
 
-# Pages Functions configuration
-[functions]
-# Enable Pages Functions for API proxy
-enabled = true
+pages_build_output_dir = "out"
 
-# Build output directory for static assets
-[build.upload]
-dir = "frontend/out"
+[build.env]
+NEXT_PUBLIC_API_URL = "https://api.vaceup.ng"
 
-# Build configuration
-[build]
-command = "npm run build"
-cwd = "frontend"
-
-# Pages Functions directory
-functions = "frontend/functions"
-
-# Output directory for static assets
-output_dir = "frontend/out"
-
-# Compatibility date
-compatibility_date = "2026-09-04"
-
-# Node.js compatibility
-node_compat = true
-
-# Build command for Cloudflare Pages
-# This runs in the Cloudflare build environment
-# Make sure to set environment variables in Cloudflare Dashboard > Pages > Settings > Environment variables
-# Required environment variables (set in Cloudflare Dashboard > Pages > Settings > Environment variables):
-# BACKEND_URL = https://api.vaceup.ng
-# NEXT_PUBLIC_API_URL = https://api.vaceup.ng/api/v1
-# NEXT_PUBLIC_WS_URL = wss://api.vaceup.ng/ws
-# NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY = pk_test_xxx
-# NEXT_PUBLIC_LIVEKIT_URL = wss://livekit.vaceup.ng
-# NEXT_PUBLIC_APP_NAME = VaceUp
-# NEXT_PUBLIC_APP_URL = https://vaceup.ng
-# NEXT_PUBLIC_API_URL = https://api.vaceup.ng/api/v1
+[vars]
+BACKEND_URL = "https://api.vaceup.ng"

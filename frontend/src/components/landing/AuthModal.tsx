@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -10,18 +12,46 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModalProps) {
+  const { login, register } = useAuth();
   const [isSignUp, setIsSignUp] = useState(mode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (isSignUp) {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      if (isSignUp) {
+        await register({ email, password, full_name: name });
+      } else {
+        await login({ email, password });
+      }
+      onSuccess();
+    } catch (error: any) {
+      setError(error.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate successful authentication/signup flow
-    onSuccess();
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -35,7 +65,7 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
         </button>
 
         <div className="text-center space-y-2 mb-6">
-          <h3 className="text-2xl font-black">
+          <h3 className="text-2xl font-black text-navy-950">
             {isSignUp ? 'Create Your Account' : 'Welcome Back'}
           </h3>
           <p className="text-xs text-gray-500">
@@ -55,7 +85,7 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
                 placeholder="Abubakar Aminu"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-[#F4F4F9] border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00088A]"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
               />
             </div>
           )}
@@ -68,7 +98,7 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#F4F4F9] border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00088A]"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
             />
           </div>
 
@@ -80,15 +110,46 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#F4F4F9] border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#00088A]"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
             />
           </div>
 
+          {isSignUp && (
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Confirm Password</label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
+              />
+            </div>
+          )}
+
+          {error && (
+            <div className="text-red-500 text-xs text-center bg-red-50 px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full py-3.5 bg-[#00088A] text-white font-bold rounded-xl hover:bg-[#000666] transition-all shadow-md mt-2"
+            disabled={isLoading}
+            className="w-full py-3.5 bg-navy-900 text-white font-bold rounded-xl hover:bg-navy-950 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSignUp ? 'Proceed to Enrollment & Payment →' : 'Sign In to Dashboard →'}
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {isSignUp ? 'Creating Account...' : 'Signing In...'}
+              </span>
+            ) : (
+              isSignUp ? 'Proceed to Enrollment & Payment →' : 'Sign In to Dashboard →'
+            )}
           </button>
         </form>
 
@@ -99,18 +160,18 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
               <button
                 type="button"
                 onClick={() => setIsSignUp(false)}
-                className="text-[#008B8B] font-bold hover:underline"
+                className="text-teal-brand font-bold hover:underline"
               >
                 Sign In
               </button>
             </p>
           ) : (
             <p>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
                 onClick={() => setIsSignUp(true)}
-                className="text-[#008B8B] font-bold hover:underline"
+                className="text-teal-brand font-bold hover:underline"
               >
                 Sign Up
               </button>

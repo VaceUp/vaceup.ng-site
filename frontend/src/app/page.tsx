@@ -2,162 +2,396 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { Player } from '@lordicon/react';
-import { ArrowRight, CheckCircle, Play, Star, Users, Clock, Zap, Heart, Rocket, Target } from 'lucide-react';
+import { Navbar } from '@/components/ui/Navbar';
+import { Footer } from '@/components/ui/Footer';
+import { 
+  Sparkles, 
+  Code2, 
+  Brain, 
+  Globe, 
+  Palette, 
+  Gamepad2, 
+  Laptop,
+  Shield,
+  Award,
+  Users,
+  Star,
+  ArrowRight,
+  Play,
+  CheckCircle,
+  Zap,
+  Heart,
+  Rocket,
+  Target
+} from 'lucide-react';
 
-interface Course {
-  id: string;
-  title: string;
-  description: string;
-  instructor: string;
-  price: number;
-  image: string;
-  category: string;
-  level: string;
-  duration: string;
-  students: number;
-  rating: number;
-}
+const programs = [
+  {
+    id: 'coding',
+    title: 'Coding for Kids',
+    description: 'Learn to code with Scratch, Python, and JavaScript. Build games, animations, and interactive stories.',
+    age: 'Ages 8-14',
+    duration: '8 weeks',
+    level: 'Beginner',
+    price: '₦60,000',
+    icon: Code2,
+    color: 'from-blue-500 to-blue-600',
+    outcomes: ['Scratch Programming', 'Python Basics', 'Game Creation', 'Problem Solving'],
+    popular: true,
+  },
+  {
+    id: 'ai',
+    title: 'AI & Robotics',
+    description: 'Explore artificial intelligence and robotics. Build and program robots, learn machine learning basics.',
+    age: 'Ages 10-16',
+    duration: '10 weeks',
+    level: 'Intermediate',
+    price: '₦85,000',
+    icon: Brain,
+    color: 'from-purple-500 to-purple-600',
+    outcomes: ['Robot Building', 'AI Fundamentals', 'Sensor Programming', 'Automation'],
+    popular: false,
+  },
+  {
+    id: 'digital-literacy',
+    title: 'Digital Literacy',
+    description: 'Essential computer skills for the digital age. Typing, internet safety, productivity tools, and creativity.',
+    age: 'Ages 6-12',
+    duration: '6 weeks',
+    level: 'Beginner',
+    price: '₦45,000',
+    icon: Globe,
+    color: 'from-green-500 to-green-600',
+    outcomes: ['Computer Basics', 'Internet Safety', 'Google Workspace', 'Digital Citizenship'],
+    popular: true,
+  },
+  {
+    id: 'design',
+    title: 'Creative Design',
+    description: 'Unleash creativity with digital art and design. Learn Canva, Figma basics, and visual storytelling.',
+    age: 'Ages 9-15',
+    duration: '8 weeks',
+    level: 'Beginner',
+    price: '₦65,000',
+    icon: Palette,
+    color: 'from-pink-500 to-pink-600',
+    outcomes: ['Digital Illustration', 'Graphic Design Basics', 'Brand Identity', 'Portfolio Creation'],
+    popular: false,
+  },
+  {
+    id: 'game-dev',
+    title: 'Game Development',
+    description: 'Create your own video games! Learn Unity, C#, game mechanics, and publish your first game.',
+    age: 'Ages 10-16',
+    duration: '10 weeks',
+    level: 'Intermediate',
+    price: '₦90,000',
+    icon: Gamepad2,
+    color: 'from-orange-500 to-orange-600',
+    outcomes: ['Unity Engine', 'C# Programming', 'Game Mechanics', 'Publishing Games'],
+    popular: true,
+  },
+  {
+    id: 'web-design',
+    title: 'Web Design Basics',
+    description: 'Build beautiful websites with HTML, CSS, and modern design principles. Create your personal portfolio.',
+    age: 'Ages 12-17',
+    duration: '8 weeks',
+    level: 'Beginner',
+    price: '₦70,000',
+    icon: Laptop,
+    color: 'from-teal-500 to-teal-600',
+    outcomes: ['HTML & CSS', 'Responsive Design', 'UI/UX Basics', 'Portfolio Website'],
+    popular: false,
+  },
+];
 
-function CourseCard({ course }: { course: Course }) {
+const features = [
+  { icon: Shield, title: 'Safe Environment', desc: 'Moderated classes, background-checked instructors, secure platform with parent controls.' },
+  { icon: Award, title: 'Verified Certificates', desc: 'Every child receives a blockchain-verified certificate upon completion.' },
+  { icon: Users, title: 'Small Classes', desc: 'Maximum 12 students per instructor for personalized attention.' },
+  { icon: Star, title: 'Expert Instructors', desc: 'Industry professionals with experience teaching children and teens.' },
+  { icon: Zap, title: 'Live & Interactive', desc: 'Real-time classes with hands-on coding, not just videos.' },
+  { icon: Heart, title: 'Parent Dashboard', desc: 'Track progress, view projects, communicate with instructors.' },
+];
+
+const trustStats = [
+  { value: '5,000+', label: 'Young Coders', icon: '👨‍💻' },
+  { value: '50+', label: 'Expert Mentors', icon: '👨‍🏫' },
+  { value: '15+', label: 'Programs', icon: '📚' },
+  { value: '99%', label: 'Parent Satisfaction', icon: '⭐' },
+];
+
+export default function HomePage() {
   return (
-    <Card variant="glass" className="flex flex-col h-full group">
-      <div className="aspect-video relative overflow-hidden rounded-t-xl">
-        <div className="w-full h-full bg-gradient-to-br from-navy-900/20 to-teal-brand/20 flex items-center justify-center">
-          <Player src="https://cdn.lordicon.com/tdrtiskw.json" trigger="hover" colors="primary:#FFC72C,secondary:#00088A" style={{ width: 48, height: 48 }} />
-        </div>
-        <div className="absolute top-3 right-3">
-          <Badge variant="secondary" className="text-xs capitalize">{course.level}</Badge>
-        </div>
-      </div>
-      <CardContent className="p-5 flex flex-col flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant="outline" className="text-xs capitalize">{course.category}</Badge>
-          <div className="flex items-center gap-1 text-sm text-yellow-500">
-            <span className="font-bold">{course.rating}</span>
-            <Player src="https://cdn.lordicon.com/gqnhovrq.json" trigger="hover" colors="primary:#FFC72C" style={{ width: 16, height: 16 }} />
+    <>
+      <Navbar />
+      <main className="pt-28">
+        {/* Hero Section */}
+        <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden" aria-labelledby="hero-title">
+          <div className="absolute inset-0 bg-gradient-to-br from-navy-950 via-navy-900 to-purple-900/20 opacity-5" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gold-brand/5 via-transparent to-purple-500/5" />
+          
+          <div className="relative max-w-7xl mx-auto px-6 py-20">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+              <div className="text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold-brand/10 text-gold-brand text-sm font-semibold mb-6">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold-brand opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-gold-brand"></span>
+                  </span>
+                  New Term Starts January 20th • Limited Spots
+                </div>
+                
+                <h1 
+                  id="hero-title" 
+                  className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-[1.1] tracking-tight mb-6"
+                >
+                  Preparing Young Minds{' '}
+                  <span className="text-gold-brand">for the Future</span>
+                </h1>
+                
+                <p className="text-lg sm:text-xl text-navy-200 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+                  Fun, engaging technology programs for children ages 6-17. 
+                  Coding, AI, Robotics, Game Development, and Creative Design. 
+                  Building Africa's next generation of tech innovators.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-16">
+                  <Link href="/apply">
+                    <Button size="lg" variant="kids" className="w-full sm:w-auto gap-2">
+                      <span>Explore Programs</span>
+                      <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/about">
+                    <Button variant="outline" size="lg" className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 gap-2">
+                      <Play className="w-5 h-5" />
+                      <span>Watch How It Works</span>
+                    </Button>
+                  </Link>
+                </div>
+                
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-8 text-sm">
+                  <div className="flex items-center gap-2 text-navy-300">
+                    <span className="w-4 h-4 text-green-500">✓</span>
+                    <span>No prior experience needed</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-navy-300">
+                    <span className="w-4 h-4 text-green-500">✓</span>
+                    <span>Flexible schedules</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-navy-300">
+                    <span className="w-4 h-4 text-green-500">✓</span>
+                    <span>Parent dashboard included</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="relative">
+                <div className="relative aspect-[4/3] lg:aspect-[16/9] rounded-3xl overflow-hidden bg-gradient-to-br from-navy-900 to-purple-900/30 shadow-2xl shadow-navy-950/50">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center p-8">
+                      <div className="w-24 h-24 mx-auto mb-6 rounded-full border-4 border-gold-brand/30 flex items-center justify-center">
+                        <Play className="w-10 h-10 text-gold-brand ml-1" />
+                      </div>
+                      <p className="text-navy-300 text-lg">Watch Kids in Action</p>
+                      <p className="text-navy-400 text-sm mt-1">3:22 min</p>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-navy-950 to-transparent" />
+                </div>
+                
+                <div className="absolute -bottom-6 left-6 right-6 md:-left-10 md:-right-10 grid grid-cols-3 gap-4 md:gap-6">
+                  <StatCard value="5,000+" label="Young Coders" icon="👨‍💻" />
+                  <StatCard value="99%" label="Parent Satisfaction" icon="⭐" />
+                  <StatCard value="15+" label="Programs Offered" icon="📚" />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{course.title}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2 flex-1">{course.description}</p>
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-3">
-          <span>{course.instructor}</span>
-          <span>{course.duration}</span>
-        </div>
-        <div className="flex items_center justify-between pt-3 border-t border-gray-200 dark:border-slate-700">
-          <div className="font-bold text-lg text-gray-900 dark:text-white">
-            {course.price === 0 ? 'Free' : `₦${course.price.toLocaleString()}`}
+          
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <ArrowRight className="w-6 h-6 text-navy-400 rotate-90" />
           </div>
-          <Button size="sm" variant="primary">Enroll</Button>
-        </div>
-      </CardContent>
-    </Card>
+        </section>
+
+        {/* Trust Stats */}
+        <section className="py-16 bg-white border-y border-gray-100" aria-label="Trust Statistics">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {trustStats.map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className={cn(
+                    'text-center p-6 rounded-2xl transition-all duration-300 hover:scale-105',
+                    index % 2 === 0 ? 'bg-navy-50' : 'bg-gray-50'
+                  )}
+                >
+                  <div className="text-4xl mb-3">{stat.icon}</div>
+                  <div className="text-4xl sm:text-5xl font-black text-navy-950 mb-1">{stat.value}</div>
+                  <div className="text-gray-600 font-medium">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Programs Section */}
+        <section className="py-20 bg-gray-50" aria-labelledby="programs-heading">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+              <span className="inline-block px-4 py-2 rounded-full bg-gold-brand/10 text-gold-brand text-sm font-semibold mb-4">
+                Our Programs
+              </span>
+              <h2 id="programs-heading" className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Programs for Every Young Innovator
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 max-w-3xl mx-auto text-lg">
+                Age-appropriate, hands-on curriculum designed by educators and tech professionals. 
+                Every program builds real skills through creative projects.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {programs.map((program) => (
+                <ProgramCard key={program.id} program={program} />
+              ))}
+            </div>
+
+            <div className="text-center mt-12">
+              <Link href="/programs">
+                <Button variant="outline" size="lg" className="w-full lg:w-auto">
+                  View All Programs
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Why Choose Us */}
+        <section className="py-20 bg-white" aria-labelledby="why-heading">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+              <h2 id="why-heading" className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Why Parents Choose VaceUp Kids
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 max-w-3xl mx-auto text-lg">
+                We don't just teach technology—we inspire the next generation of innovators. 
+                Every aspect of our academy is designed around your child's success and safety.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((feature, index) => (
+                <div
+                  key={feature.title}
+                  className={cn(
+                    'group p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all duration-500 border border-gray-100',
+                    index % 2 === 0 ? 'border-navy-100' : 'border-transparent'
+                  )}
+                >
+                  <div className="w-14 h-14 rounded-xl bg-navy-100 flex items-center justify-center mb-6 group-hover:bg-navy-900 group-hover:text-white transition-all duration-300">
+                    <feature.icon className="w-7 h-7 text-navy-900 group-hover:text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{feature.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-20 bg-navy-950" aria-labelledby="cta-heading">
+          <div className="max-w-7xl mx-auto px-6 text-center">
+            <h2 id="cta-heading" className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Ready to Start Your Child's Tech Journey?
+            </h2>
+            <p className="text-navy-300 max-w-3xl mx-auto text-lg mb-8">
+              Join thousands of parents who trust VaceUp Kids to prepare their children for the digital future.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/apply">
+                <Button size="lg" variant="kids" className="w-full sm:w-auto gap-2 text-lg px-8 py-4">
+                  <span>Enroll Now</span>
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+              <Link href="/contact">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 gap-2 text-lg px-8 py-4">
+                  <span>Talk to Us</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <Footer />
+      </main>
+    </>
   );
 }
 
-export default function Home() {
-  const router = useRouter();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-
-  useEffect(() => {
-    fetchCourses();
-  }, [page, search, category]);
-
-  const fetchCourses = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '12',
-        ...(search && { search }),
-        ...(category !== 'all' && { category }),
-      });
-      const res = await fetch(`/api/v1/courses?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (page === 1) {
-          setCourses(data.results);
-        } else {
-          setCourses(prev => [...prev, ...data.results]);
-        }
-        setHasMore(data.next !== null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch courses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
-      </div>
-    );
-  }
-
+function StatCard({ value, label, icon }: { value: string; label: string; icon: string }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Explore Courses</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Discover courses to advance your career and skills
-          </p>
-        </div>
+    <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6 text-center hover:border-gold-brand/50 transition-all duration-300">
+      <div className="text-4xl mb-2">{icon}</div>
+      <div className="text-3xl sm:text-4xl font-black text-white mb-1">{value}</div>
+      <div className="text-navy-300 text-sm">{label}</div>
+    </div>
+  );
+}
 
-        <div className="flex flex-col md:flex-row gap-6 mb-8">
-          <div className="flex-1">
-            <Input
-              placeholder="Search courses..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              leftElement={<Player src="https://cdn.lordicon.com/tdrtiskw.json" trigger="hover" colors="primary:#00088A" style={{ width: 20, height: 20 }} />}
-            />
+function ProgramCard({ program }: { program: typeof programs[0] }) {
+  const Icon = program.icon;
+  return (
+    <Card variant={program.id === 'coding' ? 'kids-blue' : program.id === 'ai' ? 'kids-purple' : program.id === 'digital-literacy' ? 'kids-green' : program.id === 'design' ? 'kids-pink' : program.id === 'game-dev' ? 'kids-orange' : 'kids'} className="flex flex-col h-full group relative">
+      <div className="relative aspect-video overflow-hidden">
+        <div className="w-full h-full bg-gradient-to-br {program.color} flex items-center justify-center">
+          <div className="text-center p-8">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <Icon className="w-10 h-10 text-white" />
+            </div>
           </div>
-          <select
-            value={category}
-            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-            className="w-full md:w-48 px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-colors bg-white dark:bg-slate-800"
-          >
-            {['all', 'development', 'design', 'business', 'marketing', 'data-science'].map(cat => (
-              <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-            ))}
-          </select>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {courses.map((course) => (
-            <CourseCard key={course.id} course={course} />
-          ))}
+        <div className="absolute top-3 right-3">
+          <Badge variant={program.id === 'coding' ? 'kids-blue' : program.id === 'ai' ? 'kids-purple' : program.id === 'digital-literacy' ? 'kids-green' : program.id === 'design' ? 'kids-pink' : program.id === 'game-dev' ? 'kids-orange' : 'kids'} className="text-xs capitalize">{program.level}</Badge>
         </div>
-
-        {courses.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">No courses found.</p>
-          </div>
-        )}
-
-        {hasMore && (
-          <div className="mt-8 text-center">
-            <Button onClick={() => setPage(p => p + 1)} variant="outline" disabled={loading}>
-              Load More
-            </Button>
+        {program.popular && (
+          <div className="absolute top-3 left-3">
+            <Badge variant="kids" className="text-xs">Most Popular</Badge>
           </div>
         )}
       </div>
-    </div>
+      <CardContent className="p-5 flex flex-col flex-1">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1 group-hover:text-navy-900 transition-colors">{program.title}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2 flex-1">{program.description}</p>
+        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <span className="flex items-center gap-1"><Icon className="w-4 h-4" />{program.age}</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-4">⏱️</span>{program.duration}</span>
+        </div>
+        <ul className="space-y-2 mb-4 flex-1">
+          {program.outcomes.map((outcome, i) => (
+            <li key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              <span>{outcome}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div className="font-bold text-lg text-navy-950">{program.price}</div>
+          <Link href={`/programs/${program.id}`}>
+            <Button size="sm" variant="primary">View Details</Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

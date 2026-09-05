@@ -10,9 +10,9 @@ export const metadata = {
   title: 'VaceUp Digital Academy | Practical Tech Education',
   description: 'Empowering future tech leaders through hands-on cohorts, live masterclasses, and career training.',
   icons: {
-    icon: '/logo.webp',
-    shortcut: '/logo.webp',
-    apple: '/logo.webp',
+    icon: '/logo.webp.png',
+    shortcut: '/logo.webp.png',
+    apple: '/logo.webp.png',
   },
 };
 

@@ -19,7 +19,7 @@ export function Logo({ className, size = 'md' }: LogoProps) {
   return (
     <Link href="/" className={cn('flex items-center gap-2', className)} aria-label="VaceUp Home">
       <Image
-        src="/logo.webp"
+        src="/logo.webp.png"
         alt="VaceUp Digital Academy"
         width={size === 'sm' ? 32 : size === 'md' ? 40 : 48}
         height={size === 'sm' ? 32 : size === 'md' ? 40 : 48}

@@ -76,3 +76,7 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+# Build outputs
+.next/
+out/
+node_modules/

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { Play, ArrowRight } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 export function Hero() {
   return (
@@ -40,12 +40,12 @@ export function Hero() {
               <Link href="/apply">
                 <Button size="lg" className="w-full sm:w-auto gap-2">
                   <span>Explore Courses</span>
-                  <ArrowRight className="w-5 h-5" />
+                  <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" />
                 </Button>
               </Link>
               <Link href="/about">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 gap-2">
-                  <Play className="w-5 h-5" />
+                  <LordIconComponent src={LordIcons.play} size={20} colors="primary:#ffffff" />
                   <span>Watch How It Works</span>
                 </Button>
               </Link>
@@ -72,7 +72,7 @@ export function Hero() {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center p-8">
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full border-4 border-gold-brand/30 flex items-center justify-center">
-                    <Play className="w-10 h-10 text-gold-brand ml-1" />
+                    <LordIconComponent src={LordIcons.play} size={40} colors="primary:#FFC72C" className="ml-1" />
                   </div>
                   <p className="text-navy-300 text-lg">Watch Our Story</p>
                   <p className="text-navy-400 text-sm mt-1">2:34 min</p>
@@ -91,9 +91,7 @@ export function Hero() {
       </div>
       
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-        <svg className="w-6 h-6 text-navy-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-        </svg>
+        <LordIconComponent src={LordIcons.chevronDown} size={24} colors="primary:#94A3B8" />
       </div>
     </section>
   );

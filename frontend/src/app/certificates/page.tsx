@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
-import { Award, Download, Eye, Share2, Copy, CheckCircle, Calendar, Globe, ArrowRight } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Certificate {
   id: string;
@@ -135,6 +135,7 @@ export default function CertificatesPage() {
 
         {filteredCertificates.length === 0 ? (
           <div className="text-center py-12">
+            <LordIconComponent src={LordIcons.certificate} size={64} className="text-gray-300 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No certificates found</p>
           </div>
         ) : (
@@ -190,15 +191,15 @@ function CertificateCard({ certificate }: { certificate: any }) {
         </div>
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
           <Button variant="ghost" size="sm" className="flex-1">
-            <Eye className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.eye} size={16} className="mr-1" />
             View
           </Button>
           <Button variant="ghost" size="sm" className="flex-1">
-            <Download className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.download} size={16} className="mr-1" />
             Download
           </Button>
           <Button variant="ghost" size="sm" className="flex-1">
-            <Share2 className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.share} size={16} className="mr-1" />
             Share
           </Button>
         </div>
@@ -206,4 +207,3 @@ function CertificateCard({ certificate }: { certificate: any }) {
     </div>
   );
 }
-

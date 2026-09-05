@@ -5,16 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
-import {
-  Play,
-  Download,
-  Copy,
-  Maximize2,
-  Minimize2,
-  FileText,
-  RefreshCw,
-  Loader2,
-} from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const languages = [
   { id: 'python', label: 'Python', extension: 'py' },
@@ -166,16 +157,16 @@ export default function CodeEditorPage() {
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={formatCode} title="Format Code (Shift+Alt+F)">
-              <FileText className="w-4 h-5" />
+              <LordIconComponent src={LordIcons.file} size={20} />
             </Button>
             <Button variant="ghost" size="sm" onClick={copyCode} title="Copy Code">
-              <Copy className="w-4 h-4" />
+              <LordIconComponent src={LordIcons.copy} size={20} />
             </Button>
             <Button variant="ghost" size="sm" onClick={downloadCode} title="Download Code">
-              <Download className="w-4 h-4" />
+              <LordIconComponent src={LordIcons.download} size={20} />
             </Button>
             <Button variant="ghost" size="sm" onClick={clearOutput} title="Clear Output">
-              <RefreshCw className="w-4 h-4" />
+              <LordIconComponent src={LordIcons.refresh} size={20} />
             </Button>
             <div className="w-px h-8 bg-gray-200 dark:bg-slate-700 mx-2" />
             <Button
@@ -187,18 +178,18 @@ export default function CodeEditorPage() {
             >
               {running ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <LordIconComponent src={LordIcons.loader} size={20} className="animate-spin" />
                   Running...
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 mr-2" />
+                  <LordIconComponent src={LordIcons.play} size={20} className="mr-2" />
                   Run Code
                 </>
               )}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowOutput(!showOutput)}>
-              {showOutput ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              {showOutput ? <LordIconComponent src={LordIcons.minimize} size={20} /> : <LordIconComponent src={LordIcons.maximize} size={20} />}
             </Button>
           </div>
         </div>
@@ -230,7 +221,7 @@ export default function CodeEditorPage() {
                     : 'hover:bg-gray-100 dark:hover:bg-slate-800'
                 }`}
               >
-                <FileText className="w-4 h-4 mr-2" />
+                <LordIconComponent src={LordIcons.file} size={16} className="mr-2" />
                 <span className="truncate flex-1 text-sm">{file.name}</span>
               </button>
             ))}
@@ -282,7 +273,7 @@ export default function CodeEditorPage() {
                 <h3 className="font-semibold text-gray-900 dark:text-white">Output</h3>
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" onClick={clearOutput}>
-                    <RefreshCw className="w-4 h-4" />
+                    <LordIconComponent src={LordIcons.refresh} size={16} className="mr-1" />
                     Clear
                   </Button>
                 </div>

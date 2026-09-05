@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
 import { Button } from './Button';
 import { cn } from '@/lib/utils';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { LordIconComponent, LordIcons } from './LordIcon';
 
 const navItems = [
   { href: '/', label: 'Home' },
@@ -20,9 +20,9 @@ const navItems = [
 ];
 
 const topBarInfo = [
-  { icon: '📞', text: '+234 800 123 4567', href: 'tel:+2348001234567' },
-  { icon: '✉️', text: 'hello@vaceup.ng', href: 'mailto:hello@vaceup.ng' },
-  { icon: '💬', text: 'WhatsApp', href: 'https://wa.me/2348001234567', external: true },
+  { icon: LordIcons.phone, text: '+234 800 123 4567', href: 'tel:+2348001234567' },
+  { icon: LordIcons.mail, text: 'hello@vaceup.ng', href: 'mailto:hello@vaceup.ng' },
+  { icon: LordIcons.whatsapp, text: 'WhatsApp', href: 'https://wa.me/2348001234567', external: true },
 ];
 
 export function Navbar() {
@@ -59,17 +59,27 @@ export function Navbar() {
               target={item.external ? '_blank' : undefined}
               rel={item.external ? 'noopener noreferrer' : undefined}
             >
-              <span>{item.icon}</span>
+              <LordIconComponent src={item.icon} size={14} colors="primary:#FFC72C,secondary:#ffffff" />
               <span>{item.text}</span>
             </a>
           ))}
         </div>
         <div className="flex items-center gap-4">
-          <a href="https://facebook.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">📘</a>
-          <a href="https://twitter.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">🐦</a>
-          <a href="https://linkedin.com/company/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">💼</a>
-          <a href="https://instagram.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">📷</a>
-          <a href="https://youtube.com/@vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">▶️</a>
+          <a href="https://facebook.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">
+            <LordIconComponent src={LordIcons.facebook} size={16} colors="primary:#ffffff" />
+          </a>
+          <a href="https://twitter.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">
+            <LordIconComponent src={LordIcons.twitter} size={16} colors="primary:#ffffff" />
+          </a>
+          <a href="https://linkedin.com/company/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">
+            <LordIconComponent src={LordIcons.linkedin} size={16} colors="primary:#ffffff" />
+          </a>
+          <a href="https://instagram.com/vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">
+            <LordIconComponent src={LordIcons.instagram} size={16} colors="primary:#ffffff" />
+          </a>
+          <a href="https://youtube.com/@vaceup" target="_blank" rel="noopener noreferrer" className="hover:text-gold-brand transition-colors">
+            <LordIconComponent src={LordIcons.youtube} size={16} colors="primary:#ffffff" />
+          </a>
         </div>
       </div>
 
@@ -91,7 +101,7 @@ export function Navbar() {
               >
                 {item.label}
                 {item.href === '/courses' && (
-                  <ChevronDown className="w-4 h-4 ml-1 inline-block" />
+                  <LordIconComponent src={LordIcons.chevronDown} size={16} className="ml-1 inline-block" />
                 )}
               </Link>
             ))}
@@ -112,7 +122,7 @@ export function Navbar() {
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? <LordIconComponent src={LordIcons.close} size={24} /> : <LordIconComponent src={LordIcons.menu} size={24} />}
           </button>
         </div>
       </nav>

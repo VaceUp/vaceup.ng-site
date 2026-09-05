@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Star, Quote, Linkedin } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const testimonials = [
   {
@@ -46,10 +46,10 @@ function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[0] 
     )}>
       <div className="flex items-center gap-1 mb-4">
         {[...Array(testimonial.rating)].map((_, i) => (
-          <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+          <LordIconComponent key={i} src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={20} />
         ))}
       </div>
-      <Quote className="w-10 h-10 text-navy-900/10 mb-4" />
+      <LordIconComponent src={LordIcons.quote} size={40} colors="primary:#00088A" className="opacity-10 mb-4" />
       <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6 flex-1">"{testimonial.text}"</p>
       <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-navy-900 to-teal-brand flex items-center justify-center text-white font-bold text-lg">
@@ -87,7 +87,7 @@ export function SuccessStories() {
         <div className="text-center mt-12">
           <a href="/testimonials" className="inline-flex items-center gap-2 text-navy-900 font-semibold hover:text-gold-brand transition-colors">
             View All Success Stories
-            <span className="w-5 h-5">→</span>
+            <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" />
           </a>
         </div>
       </div>

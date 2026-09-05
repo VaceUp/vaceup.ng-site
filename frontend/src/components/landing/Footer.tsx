@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface FooterProps {
   onNavigateCourses?: () => void;
@@ -28,9 +29,7 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-white px-4 py-2.5 rounded-xl inline-flex items-center gap-3 shadow-md">
               <svg className="h-9 w-9 flex-shrink-0" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Teal check/arrow */}
                 <path d="M15 30 L40 80 L70 10 L50 10 L38 60 L28 30 Z" fill="#008B8B" />
-                {/* Gold check/arrow */}
                 <path d="M30 30 L45 60 L80 10 L95 25 L55 90 L30 30 Z" fill="#FFC72C" />
               </svg>
               <div className="flex flex-col">
@@ -49,17 +48,35 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
 
             <div className="space-y-3 text-xs sm:text-sm text-gray-300">
               <div className="flex items-start gap-3">
-                <span className="text-gold-brand mt-0.5">📍</span>
+                <LordIconComponent
+                  src={LordIcons.location}
+                  trigger="loop"
+                  colors="primary:#FFC72C,secondary:#008B8B"
+                  size={20}
+                  className="flex-shrink-0 mt-0.5"
+                />
                 <span>669, Abeokuta Expressway, Ahmadiya Bus-stop, Ijaiye Ojokoro, Lagos State</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-gold-brand">✉️</span>
-                <a href="mailto:vaceupacademy@gmail.com" className="hover:text-teal-brand transition-colors">
-                  vaceupacademy@gmail.com
+                <LordIconComponent
+                  src={LordIcons.mail}
+                  trigger="loop"
+                  colors="primary:#FFC72C,secondary:#008B8B"
+                  size={20}
+                  className="flex-shrink-0"
+                />
+                <a href="mailto:info@vaceup.ng" className="hover:text-teal-brand transition-colors">
+                  info@vaceup.ng
                 </a>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-gold-brand">📞</span>
+                <LordIconComponent
+                  src={LordIcons.phone}
+                  trigger="loop"
+                  colors="primary:#FFC72C,secondary:#008B8B"
+                  size={20}
+                  className="flex-shrink-0"
+                />
                 <a href="tel:+2348145798943" className="hover:text-teal-brand transition-colors">
                   +234 814 579 8943
                 </a>
@@ -144,12 +161,6 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
             </p>
 
             <form onSubmit={handleSubscribe} className="flex items-center gap-2">
-              <button
-                type="submit"
-                className="rounded-xl bg-gold-brand px-5 py-3 text-xs font-bold text-navy-950 hover:bg-gold-hover transition-all whitespace-nowrap shadow-md"
-              >
-                Subscribe
-              </button>
               <input
                 type="email"
                 required
@@ -158,6 +169,12 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl bg-white px-4 py-3 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-brand"
               />
+              <button
+                type="submit"
+                className="rounded-xl bg-gold-brand px-5 py-3 text-xs font-bold text-navy-950 hover:bg-gold-hover transition-all whitespace-nowrap shadow-md"
+              >
+                Subscribe
+              </button>
             </form>
           </div>
 
@@ -170,17 +187,45 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
           </p>
 
           <div className="flex items-center gap-3">
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
-              f
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="Facebook">
+              <LordIconComponent
+                src={LordIcons.facebook}
+                trigger="hover"
+                colors="primary:#ffffff"
+                size={18}
+              />
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
-              📷
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="Instagram">
+              <LordIconComponent
+                src={LordIcons.instagram}
+                trigger="hover"
+                colors="primary:#ffffff"
+                size={18}
+              />
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
-              𝕏
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="Twitter">
+              <LordIconComponent
+                src={LordIcons.twitter}
+                trigger="hover"
+                colors="primary:#ffffff"
+                size={18}
+              />
             </a>
-            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors text-xs font-bold">
-              in
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="LinkedIn">
+              <LordIconComponent
+                src={LordIcons.linkedin}
+                trigger="hover"
+                colors="primary:#ffffff"
+                size={18}
+              />
+            </a>
+            <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="YouTube">
+              <LordIconComponent
+                src={LordIcons.youtube}
+                trigger="hover"
+                colors="primary:#ffffff"
+                size={18}
+              />
             </a>
           </div>
         </div>

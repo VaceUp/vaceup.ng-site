@@ -10,17 +10,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Input } from '@/components/ui/Input';
 import { ScrollArea } from '@/components/ui/ScrollArea';
 import { cn } from '@/lib/utils';
-import {
-  MessageSquare,
-  Send,
-  Search,
-  MoreVertical,
-  Paperclip,
-  Mic,
-  Camera,
-  Smile,
-  ChevronLeft,
-} from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Message {
   id: string;
@@ -190,16 +180,14 @@ export default function MessagingPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Messages</h2>
               <Button variant="ghost" size="sm" className="p-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+                <LordIconComponent src={LordIcons.add} size={20} />
               </Button>
             </div>
           </div>
           <div className="relative flex-1 overflow-y-auto">
             <Input
               placeholder="Search messages..."
-              leftIcon={<Search className="w-4 h-4" />}
+              leftIcon={<LordIconComponent src={LordIcons.search} size={16} />}
               className="mb-4"
             />
             <div className="space-y-1">
@@ -244,7 +232,7 @@ export default function MessagingPage() {
               <div className="p-4 border-b border-gray-200 dark:border-slate-700">
                 <div className="flex items-center gap-3">
                   <button onClick={() => setActiveConversation(null)} className="md:hidden p-2">
-                    <ChevronLeft className="w-5 h-5" />
+                    <LordIconComponent src={LordIcons.chevronLeft} size={20} />
                   </button>
                   <Avatar
                     src={conversations.find(c => c.id === activeConversation)?.participant.avatar}
@@ -290,10 +278,10 @@ export default function MessagingPage() {
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="p-2"><Paperclip className="w-5 h-5" /></Button>
-                  <Button variant="ghost" size="icon" className="p-2"><Camera className="w-5 h-5" /></Button>
-                  <Button variant="ghost" size="icon" className="p-2"><Mic className="w-5 h-5" /></Button>
-                  <Button variant="ghost" size="icon" className="p-2"><Smile className="w-5 h-5" /></Button>
+                  <Button variant="ghost" size="icon" className="p-2"><LordIconComponent src={LordIcons.paperclip} size={20} /></Button>
+                  <Button variant="ghost" size="icon" className="p-2"><LordIconComponent src={LordIcons.camera} size={20} /></Button>
+                  <Button variant="ghost" size="icon" className="p-2"><LordIconComponent src={LordIcons.mic} size={20} /></Button>
+                  <Button variant="ghost" size="icon" className="p-2"><LordIconComponent src={LordIcons.smile} size={20} /></Button>
                   <Input
                     placeholder="Type a message..."
                     value={newMessage}
@@ -302,7 +290,7 @@ export default function MessagingPage() {
                     className="flex-1"
                   />
                   <Button onClick={sendMessage} disabled={!newMessage.trim()} variant="primary" size="icon" className="p-2">
-                    <Send className="w-5 h-5" />
+                    <LordIconComponent src={LordIcons.send} size={20} colors="primary:#ffffff" />
                   </Button>
                 </div>
               </div>
@@ -310,7 +298,7 @@ export default function MessagingPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <MessageSquare className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <LordIconComponent src={LordIcons.messageSquare} size={64} className="text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No conversation selected</h3>
                 <p className="text-gray-500 dark:text-gray-400">Select a conversation from the sidebar to start messaging</p>
               </div>

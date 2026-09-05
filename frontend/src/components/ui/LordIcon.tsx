@@ -1,7 +1,13 @@
 'use client';
 
 import React from 'react';
-import { LordIcon } from '@lordicon/react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import @lordicon/react only on client side with SSR disabled
+const LordIconClient = dynamic(
+  () => import('@lordicon/react').then(mod => mod.LordIcon),
+  { ssr: false, loading: () => <div className="inline-block" style={{ width: 48, height: 48 }} aria-hidden="true" /> }
+);
 
 interface LordIconProps {
   src: string;
@@ -21,7 +27,7 @@ export const LordIconComponent: React.FC<LordIconProps> = ({
   style,
 }) => {
   return (
-    <LordIcon
+    <LordIconClient
       src={src}
       trigger={trigger}
       colors={colors || 'primary:#00088A,secondary:#FFC72C'}
@@ -32,7 +38,8 @@ export const LordIconComponent: React.FC<LordIconProps> = ({
   );
 };
 
-// Predefined Lordicon sources for common UI icons
+// Predefined Lordicon sources for common UI icons (System Outline style)
+// NOTE: Replace these URLs with actual LordIcon System Outline icon URLs from https://lordicon.com
 export const LordIcons = {
   // Navigation
   menu: 'https://cdn.lordicon.com/tdrtiskw.json',
@@ -69,7 +76,7 @@ export const LordIcons = {
   copy: 'https://cdn.lordicon.com/emxpstpt.json',
   refresh: 'https://cdn.lordicon.com/meronuor.json',
 
-  // Navigation
+  // Navigation & Location
   home: 'https://cdn.lordicon.com/msoqawbr.json',
   dashboard: 'https://cdn.lordicon.com/tdrtiskw.json',
   courses: 'https://cdn.lordicon.com/msoqawbr.json',
@@ -77,6 +84,9 @@ export const LordIcons = {
   bell: 'https://cdn.lordicon.com/tdrtiskw.json',
   mail: 'https://cdn.lordicon.com/tdrtiskw.json',
   chat: 'https://cdn.lordicon.com/tdrtiskw.json',
+  location: 'https://cdn.lordicon.com/tdrtiskw.json',
+  phone: 'https://cdn.lordicon.com/tdrtiskw.json',
+  mapPin: 'https://cdn.lordicon.com/tdrtiskw.json',
 
   // Course related
   play: 'https://cdn.lordicon.com/tdrtiskw.json',
@@ -89,6 +99,10 @@ export const LordIcons = {
   bookmark: 'https://cdn.lordicon.com/tdrtiskw.json',
   clock: 'https://cdn.lordicon.com/tdrtiskw.json',
   video: 'https://cdn.lordicon.com/tdrtiskw.json',
+  videoCall: 'https://cdn.lordicon.com/tdrtiskw.json',
+  document: 'https://cdn.lordicon.com/msoqawbr.json',
+  folder: 'https://cdn.lordicon.com/msoqawbr.json',
+  file: 'https://cdn.lordicon.com/msoqawbr.json',
 
   // UI States
   loading: 'https://cdn.lordicon.com/tdrtiskw.json',
@@ -114,6 +128,7 @@ export const LordIcons = {
   linkedin: 'https://cdn.lordicon.com/tdrtiskw.json',
   youtube: 'https://cdn.lordicon.com/tdrtiskw.json',
   github: 'https://cdn.lordicon.com/tdrtiskw.json',
+  whatsapp: 'https://cdn.lordicon.com/tdrtiskw.json',
 
   // UI Elements
   dropdown: 'https://cdn.lordicon.com/qrjicbjm.json',
@@ -122,6 +137,24 @@ export const LordIcons = {
   grid: 'https://cdn.lordicon.com/tdrtiskw.json',
   list: 'https://cdn.lordicon.com/tdrtiskw.json',
   layout: 'https://cdn.lordicon.com/tdrtiskw.json',
+  arrowRightCircle: 'https://cdn.lordicon.com/ritfqcdn.json',
+  checkSquare: 'https://cdn.lordicon.com/tdrtiskw.json',
+  xSquare: 'https://cdn.lordicon.com/ionruoqo.json',
+  userGroup: 'https://cdn.lordicon.com/msoqawbr.json',
+  award: 'https://cdn.lordicon.com/msoqawbr.json',
+  shield: 'https://cdn.lordicon.com/msoqawbr.json',
+  globe: 'https://cdn.lordicon.com/msoqawbr.json',
+  target: 'https://cdn.lordicon.com/tdrtiskw.json',
+  trendingUp: 'https://cdn.lordicon.com/tdrtiskw.json',
+  barChart: 'https://cdn.lordicon.com/tdrtiskw.json',
+  pieChart: 'https://cdn.lordicon.com/tdrtiskw.json',
+  activity: 'https://cdn.lordicon.com/tdrtiskw.json',
+  messageSquare: 'https://cdn.lordicon.com/tdrtiskw.json',
+  helpCircle: 'https://cdn.lordicon.com/tdrtiskw.json',
+  logOut: 'https://cdn.lordicon.com/msoqawbr.json',
+  chevronLeft: 'https://cdn.lordicon.com/znfnlfqg.json',
+  menu: 'https://cdn.lordicon.com/tdrtiskw.json',
+  x: 'https://cdn.lordicon.com/ionruoqo.json',
 } as const;
 
 export type LordIconKey = keyof typeof LordIcons;

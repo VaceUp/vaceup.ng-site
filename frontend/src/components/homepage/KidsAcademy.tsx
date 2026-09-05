@@ -4,15 +4,15 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
-import { Code, Brain, Globe, Palette, MousePointer, Laptop } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const kidsPrograms = [
-  { icon: Code, title: 'Coding for Kids', age: 'Ages 8-14', duration: '8 weeks', color: 'from-blue-500 to-blue-600' },
-  { icon: Brain, title: 'AI & Robotics', age: 'Ages 10-16', duration: '10 weeks', color: 'from-purple-500 to-purple-600' },
-  { icon: Globe, title: 'Digital Literacy', age: 'Ages 6-12', duration: '6 weeks', color: 'from-green-500 to-green-600' },
-  { icon: Palette, title: 'Creative Design', age: 'Ages 9-15', duration: '8 weeks', color: 'from-pink-500 to-pink-600' },
-  { icon: MousePointer, title: 'Game Development', age: 'Ages 10-16', duration: '10 weeks', color: 'from-orange-500 to-orange-600' },
-  { icon: Laptop, title: 'Web Design Basics', age: 'Ages 12-17', duration: '8 weeks', color: 'from-teal-500 to-teal-600' },
+  { icon: LordIcons.code, title: 'Coding for Kids', age: 'Ages 8-14', duration: '8 weeks', color: 'from-blue-500 to-blue-600' },
+  { icon: LordIcons.brain, title: 'AI & Robotics', age: 'Ages 10-16', duration: '10 weeks', color: 'from-purple-500 to-purple-600' },
+  { icon: LordIcons.globe, title: 'Digital Literacy', age: 'Ages 6-12', duration: '6 weeks', color: 'from-green-500 to-green-600' },
+  { icon: LordIcons.palette, title: 'Creative Design', age: 'Ages 9-15', duration: '8 weeks', color: 'from-pink-500 to-pink-600' },
+  { icon: LordIcons.mousePointer, title: 'Game Development', age: 'Ages 10-16', duration: '10 weeks', color: 'from-orange-500 to-orange-600' },
+  { icon: LordIcons.laptop, title: 'Web Design Basics', age: 'Ages 12-17', duration: '8 weeks', color: 'from-teal-500 to-teal-600' },
 ];
 
 export function KidsAcademy() {
@@ -41,7 +41,7 @@ export function KidsAcademy() {
             >
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br {program.color} flex items-center justify-center mb-4">
-                  <program.icon className="w-7 h-7 text-white" />
+                  <LordIconComponent src={program.icon} size={28} colors="primary:#ffffff" />
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">{program.title}</h3>
                 <div className="flex items-center gap-4 text-sm text-navy-300 mb-4">
@@ -65,21 +65,21 @@ export function KidsAcademy() {
         <div className="grid md:grid-cols-3 gap-8 mb-12">
           <div className="text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gold-brand/10 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">🛡️</span>
+              <LordIconComponent src={LordIcons.shield} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Safe Learning Environment</h3>
             <p className="text-navy-400">Moderated classes, background-checked instructors, and secure platform.</p>
           </div>
           <div className="text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gold-brand/10 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">📜</span>
+              <LordIconComponent src={LordIcons.certificate} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Certificates of Completion</h3>
             <p className="text-navy-400">Every child receives a verified certificate to celebrate their achievement.</p>
           </div>
           <div className="text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gold-brand/10 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">👨‍👩‍👧‍👦</span>
+              <LordIconComponent src={LordIcons.userGroup} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Parent Dashboard</h3>
             <p className="text-navy-400">Track progress, view projects, and communicate with instructors.</p>
@@ -90,7 +90,7 @@ export function KidsAcademy() {
           <Link href="/kids-academy">
             <Button size="lg" variant="primary" className="bg-gold-brand text-navy-950 hover:bg-gold-hover">
               Explore Kids Academy
-              <span className="w-5 h-5 ml-2">→</span>
+              <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" className="ml-2" />
             </Button>
           </Link>
         </div>

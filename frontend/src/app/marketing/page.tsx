@@ -6,29 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
-import {
-  Mail,
-  Users,
-  Filter,
-  Send,
-  BarChart2,
-  TrendingUp,
-  MailCheck,
-  DollarSign,
-  ArrowRight,
-  ChevronRight,
-  Plus,
-  Search,
-  Filter as FilterIcon,
-  Calendar,
-  Clock,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  PlusCircle,
-} from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Campaign {
   id: string;
@@ -117,15 +96,15 @@ function CampaignCard({ campaign }: { campaign: any }) {
         </div>
         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
           <Button variant="ghost" size="sm" className="flex-1">
-            <Eye className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.eye} size={16} className="mr-1" />
             View
           </Button>
           <Button variant="ghost" size="sm" className="flex-1">
-            <Edit className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.edit} size={16} className="mr-1" />
             Edit
           </Button>
           <Button variant="ghost" size="sm" className="flex-1 text-red-600 hover:text-red-700">
-            <Trash2 className="w-4 h-4 mr-1" />
+            <LordIconComponent src={LordIcons.delete} size={16} className="mr-1" />
             Delete
           </Button>
         </div>
@@ -289,7 +268,7 @@ export default function MarketingPage() {
             <p className="text-gray-600 dark:text-gray-400 mt-1">Create and manage email marketing campaigns</p>
           </div>
           <Button onClick={() => setShowCreateModal(true)} className="ml-auto">
-            <PlusCircle className="w-5 h-5 mr-2" />
+            <LordIconComponent src={LordIcons.add} size={20} className="mr-2" />
             Create Campaign
           </Button>
         </div>
@@ -300,7 +279,7 @@ export default function MarketingPage() {
               placeholder="Search campaigns..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              leftIcon={<Search className="w-5 h-5" />}
+              leftIcon={<LordIconComponent src={LordIcons.search} size={20} />}
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -322,6 +301,7 @@ export default function MarketingPage() {
 
         {filteredCampaigns.length === 0 ? (
           <div className="text-center py-12">
+            <LordIconComponent src={LordIcons.mail} size={64} className="text-gray-300 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No campaigns found</p>
           </div>
         ) : (

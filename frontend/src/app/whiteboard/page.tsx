@@ -3,17 +3,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { Plus, Minus, Trash2, Download, Image, Type, Square, PenTool, Eraser, Hand, Pan, Undo, Redo, Save, Share2 } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const tools = [
-  { id: 'select', icon: '👆', label: 'Select', shortcut: 'V' },
-  { id: 'pen', icon: '✏️', label: 'Pen', shortcut: 'P' },
-  { id: 'eraser', icon: '🧽', label: 'Eraser', shortcut: 'E' },
-  { id: 'shape', icon: '🔷', label: 'Shapes', shortcut: 'S' },
-  { id: 'text', icon: 'T', label: 'Text', shortcut: 'T' },
-  { id: 'image', icon: '🖼️', label: 'Image', shortcut: 'I' },
-  { id: 'sticky', icon: '📝', label: 'Sticky Note', shortcut: 'N' },
-  { id: 'pen-tool', icon: '✒️', label: 'Pen Tool', shortcut: 'P' },
+  { id: 'select', icon: LordIcons.mousePointer, label: 'Select', shortcut: 'V' },
+  { id: 'pen', icon: LordIcons.pen, label: 'Pen', shortcut: 'P' },
+  { id: 'eraser', icon: LordIcons.eraser, label: 'Eraser', shortcut: 'E' },
+  { id: 'shape', icon: LordIcons.shape, label: 'Shapes', shortcut: 'S' },
+  { id: 'text', icon: LordIcons.type, label: 'Text', shortcut: 'T' },
+  { id: 'image', icon: LordIcons.image, label: 'Image', shortcut: 'I' },
+  { id: 'sticky', icon: LordIcons.stickyNote, label: 'Sticky Note', shortcut: 'N' },
+  { id: 'pen-tool', icon: LordIcons.penTool, label: 'Pen Tool', shortcut: 'P' },
 ];
 
 export default function WhiteboardPage() {
@@ -45,7 +45,7 @@ export default function WhiteboardPage() {
                   }`}
                   title={`${tool.label} (${tool.shortcut})`}
                 >
-                  <span className="text-xl">{tool.icon}</span>
+                  <LordIconComponent src={tool.icon} size={24} />
                   <span className="hidden sm:inline ml-1 text-xs font-medium">{tool.label.split(' ')[0]}</span>
                 </button>
               ))}
@@ -55,20 +55,20 @@ export default function WhiteboardPage() {
           {/* Center: Canvas Actions */}
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="p-2" aria-label="Undo">
-              <Undo className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.undo} size={20} />
             </Button>
             <Button variant="ghost" size="sm" className="p-2" aria-label="Redo">
-              <Redo className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.redo} size={20} />
             </Button>
             <div className="w-px h-6 bg-gray-200 dark:bg-slate-700 mx-2" />
             <Button variant="ghost" size="sm" className="p-2" aria-label="Save">
-              <Save className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.save} size={20} />
             </Button>
             <Button variant="ghost" size="sm" className="p-2" aria-label="Share">
-              <Share2 className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.share} size={20} />
             </Button>
             <Button variant="ghost" size="sm" className="p-2" aria-label="Download">
-              <Download className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.download} size={20} />
             </Button>
           </div>
 
@@ -76,11 +76,11 @@ export default function WhiteboardPage() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 rounded-xl p-1">
               <Button variant="ghost" size="sm" className="p-2" aria-label="Zoom Out">
-                <Minus className="w-5 h-5" />
+                <LordIconComponent src={LordIcons.minus} size={20} />
               </Button>
               <span className="px-3 text-sm font-medium text-gray-700 dark:text-gray-300">{Math.round(zoom * 100)}%</span>
               <Button variant="ghost" size="sm" className="p-2" aria-label="Zoom In">
-                <Plus className="w-5 h-5" />
+                <LordIconComponent src={LordIcons.plus} size={20} />
               </Button>
             </div>
             <Button
@@ -90,7 +90,7 @@ export default function WhiteboardPage() {
               onClick={() => setShowGrid(!showGrid)}
               aria-label="Toggle Grid"
             >
-              <Square className="w-5 h-5" />
+              <LordIconComponent src={LordIcons.grid} size={20} />
             </Button>
           </div>
         </div>

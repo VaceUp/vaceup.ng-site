@@ -4,35 +4,20 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import {
-  LayoutDashboard,
-  BookOpen,
-  Award,
-  MessageSquare,
-  Bell,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  Menu,
-  X,
-  User,
-  CreditCard,
-  Calendar,
-  HelpCircle,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Courses', href: '/dashboard/courses', icon: BookOpen },
-  { name: 'Live Classes', href: '/dashboard/live-classes', icon: Calendar },
-  { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
-  { name: 'Certificates', href: '/dashboard/certificates', icon: Award },
-  { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-  { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Dashboard', href: '/dashboard', icon: LordIcons.dashboard },
+  { name: 'My Courses', href: '/dashboard/courses', icon: LordIcons.book },
+  { name: 'Live Classes', href: '/dashboard/live-classes', icon: LordIcons.videoCall },
+  { name: 'Messages', href: '/dashboard/messages', icon: LordIcons.messageSquare },
+  { name: 'Certificates', href: '/dashboard/certificates', icon: LordIcons.certificate },
+  { name: 'Notifications', href: '/dashboard/notifications', icon: LordIcons.bell },
+  { name: 'Billing', href: '/dashboard/billing', icon: LordIcons.creditCard },
+  { name: 'Settings', href: '/dashboard/settings', icon: LordIcons.settings },
 ];
 
 export default function DashboardLayout({
@@ -109,7 +94,12 @@ export default function DashboardLayout({
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-white'
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <LordIconComponent
+                    src={item.icon}
+                    trigger="hover"
+                    colors="primary:#00088A,secondary:#FFC72C"
+                    size={20}
+                  />
                   {item.name}
                 </Link>
               );
@@ -125,7 +115,12 @@ export default function DashboardLayout({
                 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30'
               )}
             >
-              <LogOut className="h-5 w-5" />
+              <LordIconComponent
+                src={LordIcons.logOut}
+                trigger="hover"
+                colors="primary:#ef4444,secondary:#ffffff"
+                size={20}
+              />
               Sign Out
             </button>
           </div>
@@ -138,7 +133,12 @@ export default function DashboardLayout({
         onClick={() => setSidebarOpen(true)}
         aria-label="Open menu"
       >
-        <Menu className="h-6 w-6" />
+        <LordIconComponent
+          src={LordIcons.menu}
+          trigger="hover"
+          colors="primary:#ffffff,secondary:#FFC72C"
+          size={24}
+        />
       </button>
 
       {/* Main content */}

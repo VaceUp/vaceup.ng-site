@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, CheckCircle, Clock, X, Filter, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Application {
   id: string;
@@ -168,6 +168,7 @@ function ApplicationsContent() {
 
         {filteredApplications.length === 0 ? (
           <div className="text-center py-12">
+            <LordIconComponent src={LordIcons.file} size={64} className="text-gray-300 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No applications found</p>
           </div>
         ) : (

@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2, Plus, Minus, CreditCard, Lock, Shield, Truck, RotateCcw } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface CartItem {
   id: string;
@@ -134,9 +134,7 @@ function CartContent() {
         {cartItems.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-              <svg className="w-12 h-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v9m5-8a4 4 0 11-8 0 4 4 0 018 0v10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-3" />
-              </svg>
+              <LordIconComponent src={LordIcons.shoppingCart} size={48} className="text-gray-400 dark:text-gray-500" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your cart is empty</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">Looks like you haven't added any courses yet.</p>
@@ -184,14 +182,14 @@ function CartContent() {
                               disabled={item.quantity <= 1}
                               className="px-3 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-l-xl text-gray-600 dark:text-gray-300 disabled:opacity-50"
                             >
-                              <Minus className="w-5 h-5" />
+                              <LordIconComponent src={LordIcons.minus} size={20} />
                             </button>
                             <span className="w-10 text-center font-medium">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
                               className="p-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-r-xl text-gray-600 dark:text-gray-300"
                             >
-                              <Plus className="w-5 h-5" />
+                              <LordIconComponent src={LordIcons.plus} size={20} />
                             </button>
                           </div>
                           <Button
@@ -200,7 +198,7 @@ function CartContent() {
                             onClick={() => removeItem(item.id)}
                             className="text-red-600 hover:text-red-700 dark:text-red-400 hover:text-red-500"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <LordIconComponent src={LordIcons.trash2} size={20} />
                           </Button>
                         </div>
                       </div>
@@ -255,7 +253,7 @@ function CartContent() {
                     disabled={cartItems.length === 0}
                   >
                     Proceed to Checkout
-                    <CreditCard className="w-5 h-5 ml-2" />
+                    <LordIconComponent src={LordIcons.creditCard} size={20} className="ml-2" />
                   </Button>
                 </div>
               </div>

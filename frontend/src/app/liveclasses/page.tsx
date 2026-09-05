@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
-import { Calendar, Clock, Users, Video, CheckCircle, PlayCircle, ChevronRight, Download, Share2 } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface LiveClass {
   id: string;
@@ -69,7 +69,7 @@ function LiveClassCard({ cls }: { cls: LiveClass }) {
         {cls.enrolled && (
           <div className="absolute top-3 left-3">
             <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
-              <CheckCircle className="w-3 h-3 mr-1" /> Enrolled
+              <LordIconComponent src={LordIcons.checkCircle} size={14} colors="primary:#10b981" className="mr-1" /> Enrolled
             </span>
           </div>
         )}
@@ -82,8 +82,8 @@ function LiveClassCard({ cls }: { cls: LiveClass }) {
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{cls.description}</p>
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
-          <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatDate(cls.scheduledAt)}</span>
-          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{formatDuration(cls.duration)}</span>
+          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.calendar} size={14} />{formatDate(cls.scheduledAt)}</span>
+          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.clock} size={14} />{formatDuration(cls.duration)}</span>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-slate-700">
           <span className="text-sm font-medium text-gray-900 dark:text-white">{cls.enrolledCount}/{cls.maxStudents}</span>
@@ -195,7 +195,7 @@ export default function LiveClassesPage() {
               <p className="text-gray-600 dark:text-gray-400 mt-1">Join live interactive sessions with expert instructors</p>
             </div>
             <Button variant="primary" size="lg">
-              <Calendar className="w-5 h-5 mr-2" />
+              <LordIconComponent src={LordIcons.calendar} size={20} colors="primary:#ffffff" className="mr-2" />
               Schedule Class
             </Button>
           </div>
@@ -232,18 +232,9 @@ export default function LiveClassesPage() {
                     aria-label={`${v} view`}
                   >
                     {v === 'grid' ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                        <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                        <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                        <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                      </svg>
+                      <LordIconComponent src={LordIcons.grid} size={20} />
                     ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <rect x="3" y="3" width="18" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                        <rect x="3" y="14" width="18" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                        <rect x="3" y="21" width="18" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                      </svg>
+                      <LordIconComponent src={LordIcons.list} size={20} />
                     )}
                   </button>
                 ))}
@@ -262,6 +253,7 @@ export default function LiveClassesPage() {
 
           {filteredClasses.length === 0 && (
             <div className="text-center py-12">
+              <LordIconComponent src={LordIcons.calendar} size={64} className="text-gray-300 mb-4" />
               <div className="text-gray-500 dark:text-gray-400">
                 No classes found matching your filters.
               </div>

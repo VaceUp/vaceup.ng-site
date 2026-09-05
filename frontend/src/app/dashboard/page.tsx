@@ -9,17 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import { api, DashboardStats, DashboardCourse } from '@/lib/api';
-import {
-  LayoutDashboard,
-  BookOpen,
-  Users,
-  Award,
-  BookMarked,
-  Clock,
-  TrendingUp,
-  ArrowRight,
-  ChevronRight,
-} from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 function StatCard({ icon, title, value, change, color }: any) {
   const colors = {
@@ -94,9 +84,15 @@ function RecommendationCard({ title, instructor, duration, level, rating, studen
         <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{title}</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{instructor}</p>
         <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
-          <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{duration}</span>
-          <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>{rating}</span>
-          <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>{students.toLocaleString()}</span>
+          <span className="flex items-center gap-1">
+            <LordIconComponent src={LordIcons.clock} size={16} />{duration}
+          </span>
+          <span className="flex items-center gap-1">
+            <LordIconComponent src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={16} />{rating}
+          </span>
+          <span className="flex items-center gap-1">
+            <LordIconComponent src={LordIcons.userGroup} size={16} />{students.toLocaleString()}
+          </span>
         </div>
         <button className="w-full py-2 border border-gray-300 dark:border-slate-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">View Course</button>
       </div>
@@ -185,53 +181,41 @@ export default function DashboardPage() {
               <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">Day Streak</span>
             </div>
             <button className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#ffffff" />
               Continue Learning
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 shadow-xl shadow-gray-100/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Courses Enrolled</p>
-                <p className="text-3xl font-bold mt-1 text-navy-950">5</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">+2 this month</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary-100 dark:bg-primary-900/30"><svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253v-13Z" /></svg></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 shadow-xl shadow-gray-100/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Hours Learned</p>
-                <p className="text-3xl font-bold mt-1 text-navy-950">24h</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">+5h this week</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-100 dark:bg-green-900/30"><svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 shadow-xl shadow-gray-100/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Certificates</p>
-                <p className="text-3xl font-bold mt-1 text-navy-950">2</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">+1 this month</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-yellow-100 dark:bg-yellow-900/30"><svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-6 shadow-xl shadow-gray-100/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Streak</p>
-                <p className="text-3xl font-bold mt-1 text-navy-950">7 days</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Personal best!</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary-100 dark:bg-primary-900/30"><svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></div>
-            </div>
-          </div>
+          <StatCard
+            icon={<LordIconComponent src={LordIcons.book} size={24} colors="primary:#00088A,secondary:#FFC72C" />}
+            title="Courses Enrolled"
+            value="5"
+            change="+2 this month"
+            color="primary"
+          />
+          <StatCard
+            icon={<LordIconComponent src={LordIcons.clock} size={24} colors="primary:#10b981,secondary:#ffffff" />}
+            title="Hours Learned"
+            value="24h"
+            change="+5h this week"
+            color="success"
+          />
+          <StatCard
+            icon={<LordIconComponent src={LordIcons.certificate} size={24} colors="primary:#f59e0b,secondary:#ffffff" />}
+            title="Certificates"
+            value="2"
+            change="+1 this month"
+            color="warning"
+          />
+          <StatCard
+            icon={<LordIconComponent src={LordIcons.trendingUp} size={24} colors="primary:#00088A,secondary:#FFC72C" />}
+            title="Streak"
+            value="7 days"
+            change="Personal best!"
+            color="primary"
+          />
         </div>
 
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -252,8 +236,14 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-bold text-navy-950">Frontend Engineering & React</h3>
                 <p className="text-xs text-gray-500 mt-2 leading-relaxed">State Management with Redux</p>
                 <div className="mt-6 space-y-2 text-xs font-medium text-gray-600">
-                  <div className="flex items-center gap-2"><span>📊</span><span>Intermediate → Advanced</span></div>
-                  <div className="flex items-center gap-2"><span>⏱</span><span>12h 30m remaining</span></div>
+                  <div className="flex items-center gap-2">
+                    <LordIconComponent src={LordIcons.barChart} size={14} colors="primary:#008B8B" />
+                    <span>Intermediate → Advanced</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <LordIconComponent src={LordIcons.clock} size={14} colors="primary:#008B8B" />
+                    <span>12h 30m remaining</span>
+                  </div>
                 </div>
               </div>
               <div className="mt-8 flex items-center justify-between pt-4 border-t border-gray-100">

@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Announcement {
   id: string;
@@ -165,7 +165,7 @@ export default function AnnouncementsPage() {
             <p className="text-gray-600 dark:text-gray-400 mt-1">Manage and track platform-wide announcements</p>
           </div>
           <Button onClick={() => {}} className="ml-auto">
-            <Plus className="w-5 h-5 mr-2" />
+            <LordIconComponent src={LordIcons.add} size={20} className="mr-2" />
             Create Announcement
           </Button>
         </div>
@@ -176,7 +176,7 @@ export default function AnnouncementsPage() {
               placeholder="Search announcements..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              leftIcon={<Search className="w-5 h-5" />}
+              leftIcon={<LordIconComponent src={LordIcons.search} size={20} />}
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -198,6 +198,7 @@ export default function AnnouncementsPage() {
 
         {filteredAnnouncements.length === 0 ? (
           <div className="text-center py-12">
+            <LordIconComponent src={LordIcons.bell} size={64} className="text-gray-300 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No announcements found</p>
           </div>
         ) : (

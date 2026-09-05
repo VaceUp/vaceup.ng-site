@@ -1,14 +1,15 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const stats = [
-  { value: '30,000+', label: 'Students Trained', icon: '🎓' },
-  { value: '5+', label: 'Expert Instructors', icon: '👨‍🏫' },
-  { value: '8+', label: 'Courses & Programs', icon: '📚' },
-  { value: '98%', label: 'Student Satisfaction', icon: '⭐' },
-  { value: '3', label: 'Countries Reached', icon: '🌍' },
-  { value: '500+', label: 'Projects Completed', icon: '💼' },
+  { value: '30,000+', label: 'Students Trained', icon: LordIcons.graduation },
+  { value: '5+', label: 'Expert Instructors', icon: LordIcons.userGroup },
+  { value: '8+', label: 'Courses & Programs', icon: LordIcons.book },
+  { value: '98%', label: 'Student Satisfaction', icon: LordIcons.star },
+  { value: '3', label: 'Countries Reached', icon: LordIcons.globe },
+  { value: '500+', label: 'Projects Completed', icon: LordIcons.award },
 ];
 
 export function Stats() {
@@ -18,13 +19,13 @@ export function Stats() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
           {stats.map((stat, index) => (
             <div
-              key={label}
+              key={stat.label}
               className={cn(
                 'text-center p-6 rounded-2xl transition-all duration-300 hover:scale-105',
                 index % 2 === 0 ? 'bg-navy-50' : 'bg-gray-50'
               )}
             >
-              <div className="text-4xl mb-3">{stat.icon}</div>
+              <LordIconComponent src={stat.icon} size={48} colors="primary:#00088A,secondary:#FFC72C" className="mb-3" />
               <div className="text-4xl sm:text-5xl font-black text-navy-950 mb-1">{stat.value}</div>
               <div className="text-gray-600 font-medium">{stat.label}</div>
             </div>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import { Star, Users, Clock, ArrowRight, CheckCircle } from 'lucide-react';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const courses = [
   {
@@ -101,14 +101,14 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2 flex-1">{course.description}</p>
         <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
           <div className="flex items-center gap-1 text-yellow-500">
-            <Star className="w-4 h-4 fill-current" />
+            <LordIconComponent src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={16} />
             <span className="font-bold">{course.rating}</span>
             <span className="text-gray-400">({course.students.toLocaleString()})</span>
           </div>
         </div>
         <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{course.duration}</span>
-          <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{course.students.toLocaleString()} students</span>
+          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.clock} size={14} />{course.duration}</span>
+          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.userGroup} size={14} />{course.students.toLocaleString()} students</span>
         </div>
         <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
           <div className="font-bold text-lg text-navy-950">{course.price}</div>
@@ -138,7 +138,7 @@ export function FeaturedCourses() {
           <Link href="/courses">
             <Button variant="outline" size="lg" className="w-full lg:w-auto">
               View All Courses
-              <ArrowRight className="w-5 h-5 ml-2" />
+              <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" className="ml-2" />
             </Button>
           </Link>
         </div>

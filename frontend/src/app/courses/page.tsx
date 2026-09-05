@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface Course {
   id: string;
@@ -38,8 +38,13 @@ function CourseCard({ course }: { course: Course }) {
         <div className="flex items-center gap-2 mb-2">
           <Badge variant="outline" className="text-xs capitalize">{course.category}</Badge>
           <div className="flex items-center gap-1 text-sm text-yellow-500">
+            <LordIconComponent
+              src={LordIcons.star}
+              trigger="hover"
+              colors="primary:#f59e0b,secondary:#ffffff"
+              size={16}
+            />
             <span className="font-bold">{course.rating}</span>
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034a1 1 0 00-1.175 0L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
           </div>
         </div>
         <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-primary-500 transition-colors">{course.title}</h3>
@@ -86,7 +91,7 @@ export default function CoursesPage() {
         if (page === 1) {
           setCourses(data.results);
         } else {
-          setCourses(prev => [...prev, ...data.results]);
+          setCourses((prev) => [...prev, ...data.results]);
         }
         setHasMore(data.next !== null);
       }
@@ -100,7 +105,7 @@ export default function CoursesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-navy-900 border-t-transparent" />
       </div>
     );
   }
@@ -121,7 +126,7 @@ export default function CoursesPage() {
               placeholder="Search courses..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              leftIcon={<Search className="w-5 h-5" />}
+              leftIcon={<LordIconComponent src={LordIcons.search} size={20} />}
             />
           </div>
           <select
@@ -129,7 +134,7 @@ export default function CoursesPage() {
             onChange={(e) => { setCategory(e.target.value); setPage(1); }}
             className="w-full md:w-48 px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-colors bg-white dark:bg-slate-800"
           >
-            {['all', 'development', 'design', 'business', 'marketing', 'data-science'].map(cat => (
+            {['all', 'development', 'design', 'business', 'marketing', 'data-science'].map((cat) => (
               <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
             ))}
           </select>
@@ -143,13 +148,14 @@ export default function CoursesPage() {
 
         {courses.length === 0 && (
           <div className="text-center py-12">
+            <LordIconComponent src={LordIcons.book} size={64} className="text-gray-300 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No courses found.</p>
           </div>
         )}
 
         {hasMore && (
           <div className="mt-8 text-center">
-            <Button onClick={() => setPage(p => p + 1)} variant="outline" disabled={loading}>
+            <Button onClick={() => setPage((p) => p + 1)} variant="outline" disabled={loading}>
               Load More
             </Button>
           </div>

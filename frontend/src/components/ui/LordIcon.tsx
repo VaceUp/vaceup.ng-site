@@ -1,13 +1,6 @@
 'use client';
 
-import React from 'react';
-import dynamic from 'next/dynamic';
-
-// Dynamically import @lordicon/react only on client side with SSR disabled
-const LordIconClient = dynamic(
-  () => import('@lordicon/react').then(mod => mod.LordIcon),
-  { ssr: false, loading: () => <div className="inline-block" style={{ width: 48, height: 48 }} aria-hidden="true" /> }
-);
+import React, { useEffect, useRef, useState } from 'react';
 
 interface LordIconProps {
   src: string;
@@ -26,8 +19,36 @@ export const LordIconComponent: React.FC<LordIconProps> = ({
   className = '',
   style,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [lordIconLoaded, setLordIconLoaded] = useState(false);
+  const [LordIcon, setLordIcon] = useState<React.ComponentType<any> | null>(null);
+
+  useEffect(() => {
+    // Dynamically import @lordicon/react only on client side
+    import('@lordicon/react')
+      .then((mod) => {
+        setLordIcon(() => mod.LordIcon);
+        setLordIconLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Failed to load LordIcon:', err);
+      });
+  }, []);
+
+  if (!lordIconLoaded || !LordIcon) {
+    return (
+      <div
+        ref={containerRef}
+        className={className}
+        style={{ width: size, height: size, ...style }}
+        aria-hidden="true"
+      />
+    );
+  }
+
   return (
-    <LordIconClient
+    <LordIcon
+      ref={containerRef}
       src={src}
       trigger={trigger}
       colors={colors || 'primary:#00088A,secondary:#FFC72C'}

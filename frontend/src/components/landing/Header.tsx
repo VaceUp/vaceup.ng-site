@@ -1,12 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
 
-interface HeaderProps {
-  onOpenAuth: (mode: 'signin' | 'signup') => void;
-}
-
-export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
+export const Header = () => {
+  const { openAuth } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   return (
@@ -46,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
         <div className="hidden md:flex items-center gap-3">
           <button
             type="button"
-            onClick={() => onOpenAuth('signup')}
+            onClick={() => useAuth().openAuth('signup')}
             className="rounded-lg bg-gold-brand px-5 py-2 text-sm font-bold text-navy-950 shadow-md hover:shadow-gold-hover transition-all active:scale-95"
           >
             Sign In
@@ -69,24 +67,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAuth }) => {
           </svg>
         </button>
       </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden border-b border-gray-200 bg-white px-6 py-4 space-y-3">
-          <a href="#courses" className="block text-sm font-medium text-gray-700">Courses</a>
-          <a href="#kids" className="block text-sm font-medium text-gray-700">Kids Tech</a>
-          <a href="#about" className="block text-sm font-medium text-gray-700">About Us</a>
-          <div className="pt-2 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => { onOpenAuth('signup'); setIsMobileMenuOpen(false); }}
-              className="w-full text-center py-2 text-sm font-semibold bg-gold-brand text-navy-950 rounded-lg"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

@@ -1,79 +1,31 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api, User, LoginRequest, RegisterRequest, AuthResponse } from '@/lib/api';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (data: LoginRequest) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  isOpen: boolean;
+  mode: 'signin' | 'signup';
+  openAuth: (mode: 'signin' | 'signup') => void;
+  closeAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 
-  // Check auth status on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        try {
-          const userData = await api.getMe();
-          setUser(userData);
-        } catch (error) {
-          localStorage.removeItem('auth_token');
-          setUser(null);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    initAuth();
-  }, []);
-
-  const login = async (data: LoginRequest) => {
-    const response = await api.login(data);
-    setUser(response.user);
+  const openAuth = (mode: 'signin' | 'signup') => {
+    setMode(mode);
+    setIsOpen(true);
   };
 
-  const register = async (data: RegisterRequest) => {
-    const response = await api.register(data);
-    setUser(response.user);
-  };
-
-  const logout = async () => {
-    await api.logout();
-    setUser(null);
-  };
-
-  const refreshUser = async () => {
-    try {
-      const userData = await api.getMe();
-      setUser(userData);
-    } catch (error) {
-      setUser(null);
-    }
+  const closeAuth = () => {
+    setIsOpen(false);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={{ isOpen, mode, openAuth, closeAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -81,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

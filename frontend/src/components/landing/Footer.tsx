@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
 
 interface FooterProps {
-  onOpenAuth?: (mode: 'signin' | 'signup') => void;
   onNavigateCourses?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses }) => {
+export const Footer = ({ onNavigateCourses }: FooterProps) => {
+  const { openAuth } = useAuth();
   const [email, setEmail] = useState('');
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -107,7 +108,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
                 </a>
               </li>
               <li>
-                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-teal-brand transition-colors text-left">
+                <button onClick={() => useAuth().openAuth('signin')} className="hover:text-teal-brand transition-colors text-left">
                   Student Dashboard
                 </button>
               </li>
@@ -126,7 +127,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth, onNavigateCourses })
                 </a>
               </li>
               <li>
-                <button onClick={() => onOpenAuth?.('signin')} className="hover:text-teal-brand transition-colors text-left">
+                <button onClick={() => useAuth().openAuth('signin')} className="hover:text-teal-brand transition-colors text-left">
                   Login
                 </button>
               </li>

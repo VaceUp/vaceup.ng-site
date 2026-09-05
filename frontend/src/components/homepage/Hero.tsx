@@ -33,7 +33,7 @@ export function Hero() {
             
             <p className="text-lg sm:text-xl text-navy-200 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
               Practical digital skills training designed to prepare you for global opportunities 
-              and real-world success. Join 30,000+ students building careers in tech.
+              and real-world success. Join 30+ students building careers in tech.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-16">
@@ -82,8 +82,8 @@ export function Hero() {
             </div>
             
             <div className="absolute -bottom-6 -left-6 -right-6 grid grid-cols-3 gap-4 md:gap-6">
-              <StatCard value="30,000+" label="Students Trained" />
-              <StatCard value="5+" label="Expert Instructors" />
+              <StatCard value="30+" label="Students Trained" />
+              <StatCard value="15+" label="Expert Instructors" />
               <StatCard value="98%" label="Satisfaction Rate" />
             </div>
           </div>

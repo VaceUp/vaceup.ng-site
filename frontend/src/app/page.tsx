@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { Player } from '@lordicon/react';
 import { ArrowRight, CheckCircle, Play, Star, Users, Clock, Zap, Heart, Rocket, Target } from 'lucide-react';

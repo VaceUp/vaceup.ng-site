@@ -112,7 +112,7 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
         </div>
         <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
           <div className="font-bold text-lg text-navy-950">{course.price}</div>
-          <Link href={`/courses/${course.slug}`}>
+          <Link href={`/courses/${course.id}`}>
             <Button size="sm" variant="primary">View Course</Button>
           </Link>
         </div>

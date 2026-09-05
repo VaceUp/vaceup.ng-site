@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import Link from 'next/link';
 
 interface Course {
   id: string;
@@ -57,7 +58,14 @@ function CourseCard({ course }: { course: Course }) {
           <div className="font-bold text-lg text-gray-900 dark:text-white">
             {course.price === 0 ? 'Free' : `$${course.price}`}
           </div>
-          <Button size="sm" variant="primary">Enroll</Button>
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-slate-700">
+          <div className="font-bold text-lg text-gray-900 dark:text-white">
+            {course.price === 0 ? 'Free' : `$${course.price}`}
+          </div>
+          <Link href={`/courses/${course.id}`}>
+            <Button size="sm" variant="primary">View Course</Button>
+          </Link>
+        </div>
         </div>
       </CardContent>
     </Card>

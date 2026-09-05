@@ -4,39 +4,26 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/landing/Header';
 import { Hero } from '@/components/landing/Hero';
-import { CourseGrid, Course } from '@/components/landing/CourseGrid';
-import { CourseDetailView } from '@/components/landing/CourseDetailView';
-import { WhyChooseUs } from '@/components/landing/WhyChooseUs'; 
-import { KidsAcademyBanner } from '@/components/landing/KidsAcademyBanner';
-import { StudentStories } from '@/components/landing/StudentStories';
-import { FAQSection } from '@/components/landing/FAQSection';
+import { FeaturedCourses } from '@/components/homepage/FeaturedCourses';
+import { WhyVaceUp } from '@/components/homepage/WhyVaceUp';
+import { KidsAcademy } from '@/components/homepage/KidsAcademy';
+import { SuccessStories } from '@/components/homepage/SuccessStories';
+import { Stats } from '@/components/homepage/Stats';
 import { Footer } from '@/components/landing/Footer';
 import AuthModal from '@/components/landing/AuthModal';
 
 export default function Home() {
   const router = useRouter();
-  const [activeCourseView, setActiveCourseView] = useState<Course | null>(null);
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'signin' | 'signup' }>({
     isOpen: false,
     mode: 'signin',
   });
 
-  const scrollToCourses = () => {
-    setActiveCourseView(null);
-    setTimeout(() => {
-      const element = document.getElementById('courses');
-      element?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
-
   const handleAuthSuccess = () => {
     setAuthModal({ ...authModal, isOpen: false });
     
-    // Redirect cleanly to the separate /dashboard page route
-    const courseTitle = activeCourseView?.title || 'Frontend Engineering & React';
-    const coursePrice = activeCourseView?.price || 150000;
-    
-    router.push(`/dashboard?course=${encodeURIComponent(courseTitle)}&price=${coursePrice}&paymentPending=true`);
+    // Redirect to dashboard with course info
+    router.push(`/dashboard?paymentPending=true`);
   };
 
   return (
@@ -45,38 +32,23 @@ export default function Home() {
         <Header onOpenAuth={(mode: 'signin' | 'signup') => setAuthModal({ isOpen: true, mode })} />
 
         <main>
-          {activeCourseView ? (
-            <CourseDetailView
-              course={activeCourseView}
-              onBack={() => setActiveCourseView(null)}
-              onEnroll={() => {
-                setAuthModal({ isOpen: true, mode: 'signup' });
-              }}
-            />
-          ) : (
-            <>
-              <Hero
-                onOpenAuth={(mode: 'signin' | 'signup') => setAuthModal({ isOpen: true, mode })}
-              />
-              <CourseGrid
-                onViewCourse={(course) => setActiveCourseView(course)}
-                showKidsCourses={false}
-              />
-              <WhyChooseUs />
-              <KidsAcademyBanner
-                onEnrollChild={() => setAuthModal({ isOpen: true, mode: 'signup' })}
-                onExploreKids={scrollToCourses}
-              />
-              <StudentStories />
-              <FAQSection onEnrollNow={() => setAuthModal({ isOpen: true, mode: 'signup' })} />
-            </>
-          )}
+          <Hero
+            onOpenAuth={(mode: 'signin' | 'signup') => setAuthModal({ isOpen: true, mode })}
+          />
+          <Stats />
+          <FeaturedCourses
+            onOpenAuth={(mode: 'signin' | 'signup') => setAuthModal({ isOpen: true, mode })}
+          />
+          <WhyVaceUp />
+          <KidsAcademy
+            onEnrollChild={() => setAuthModal({ isOpen: true, mode: 'signup' })}
+          />
+          <SuccessStories />
         </main>
       </div>
 
       <Footer
         onOpenAuth={(mode: 'signin' | 'signup') => setAuthModal({ isOpen: true, mode })}
-        onNavigateCourses={scrollToCourses}
       />
 
       <AuthModal

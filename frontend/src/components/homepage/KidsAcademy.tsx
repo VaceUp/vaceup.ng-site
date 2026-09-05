@@ -23,10 +23,10 @@ export function KidsAcademy() {
           <span className="inline-block px-4 py-2 rounded-full bg-gold-brand/10 text-gold-brand text-sm font-semibold mb-6">
             VaceUp Kids Tech Academy
           </span>
-          <h2 id="kids-heading" className="text-3xl sm:text-4xl font-bold text-white mb-4">
+          <h2 id="kids-heading" className="text-3xl sm:text-4xl font-black text-white mb-4">
             Preparing Young Minds for the Future
           </h2>
-          <p className="text-navy-300 max-w-3xl mx-auto text-lg">
+          <p className="text-navy-200 max-w-3xl mx-auto text-lg">
             Fun, engaging technology programs designed specifically for children and teenagers. 
             Building the next generation of African tech innovators.
           </p>
@@ -36,24 +36,23 @@ export function KidsAcademy() {
           {kidsPrograms.map((program) => (
             <Card 
               key={program.title} 
-              variant="glass" 
-              className="bg-navy-900/50 border-navy-800 h-full"
+              className="bg-white border-gray-200 h-full hover:shadow-xl transition-all duration-300"
             >
               <CardContent className="p-6">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br {program.color} flex items-center justify-center mb-4">
                   <LordIconComponent src={program.icon} size={28} colors="primary:#ffffff" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">{program.title}</h3>
-                <div className="flex items-center gap-4 text-sm text-navy-300 mb-4">
+                <h3 className="text-xl font-bold text-navy-950 mb-2">{program.title}</h3>
+                <div className="flex items-center gap-4 text-sm text-navy-600 mb-4">
                   <span>{program.age}</span>
                   <span>•</span>
                   <span>{program.duration}</span>
                 </div>
-                <p className="text-navy-400 text-sm mb-6">
+                <p className="text-navy-600 text-sm mb-6">
                   Hands-on, age-appropriate curriculum designed by educators and tech professionals.
                 </p>
                 <Link href="/kids-academy">
-                  <Button variant="outline" size="sm" className="w-full border-navy-700 text-navy-300 hover:bg-navy-800 hover:border-gold-brand hover:text-gold-brand">
+                  <Button variant="outline" size="sm" className="w-full border-navy-200 text-navy-700 hover:bg-navy-50 hover:border-gold-brand hover:text-gold-brand">
                     Learn More
                   </Button>
                 </Link>
@@ -68,21 +67,21 @@ export function KidsAcademy() {
               <LordIconComponent src={LordIcons.shield} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Safe Learning Environment</h3>
-            <p className="text-navy-400">Moderated classes, background-checked instructors, and secure platform.</p>
+            <p className="text-navy-300">Moderated classes, background-checked instructors, and secure platform.</p>
           </div>
           <div className="text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gold-brand/10 flex items-center justify-center mx-auto mb-4">
               <LordIconComponent src={LordIcons.certificate} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Certificates of Completion</h3>
-            <p className="text-navy-400">Every child receives a verified certificate to celebrate their achievement.</p>
+            <p className="text-navy-300">Every child receives a verified certificate to celebrate their achievement.</p>
           </div>
           <div className="text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gold-brand/10 flex items-center justify-center mx-auto mb-4">
               <LordIconComponent src={LordIcons.userGroup} size={32} colors="primary:#FFC72C" />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Parent Dashboard</h3>
-            <p className="text-navy-400">Track progress, view projects, and communicate with instructors.</p>
+            <p className="text-navy-300">Track progress, view projects, and communicate with instructors.</p>
           </div>
         </div>
 

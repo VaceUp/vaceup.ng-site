@@ -21,31 +21,22 @@ export const Header = () => {
             alt="VaceUp Digital Academy" 
             className="h-9 w-9 object-contain"
           />
-
-          <div className="flex flex-col">
-            <span className="text-2xl font-extrabold tracking-tight text-navy-900 leading-none">
-              VACEUP
-            </span>
-            <span className="text-[11px] font-bold tracking-wider text-teal-brand uppercase">
-              Digital Academy
-            </span>
-          </div>
         </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-gray-700">
-          <Link href="/" className="hover:text-gold-brand transition-colors">Home</Link>
-          <Link href="/courses" className="hover:text-gold-brand transition-colors">Courses</Link>
-          <Link href="/kids-academy" className="hover:text-gold-brand transition-colors">Kids Academy</Link>
-          <Link href="/about" className="hover:text-gold-brand transition-colors">About</Link>
-          <Link href="/events" className="hover:text-gold-brand transition-colors">Events</Link>
-          <Link href="/blog" className="hover:text-gold-brand transition-colors">Blog</Link>
-          <Link href="/resources" className="hover:text-gold-brand transition-colors">Resources</Link>
-          <Link href="/contact" className="hover:text-gold-brand transition-colors">Contact</Link>
+        {/* Desktop Navigation - visible at all breakpoints with responsive spacing */}
+        <nav className="hidden sm:flex items-center gap-4 sm:gap-6 lg:gap-8 text-xs sm:text-sm font-semibold text-gray-700 flex-wrap">
+          <Link href="/" className="hover:text-gold-brand transition-colors whitespace-nowrap">Home</Link>
+          <Link href="/courses" className="hover:text-gold-brand transition-colors whitespace-nowrap">Courses</Link>
+          <Link href="/kids-academy" className="hover:text-gold-brand transition-colors whitespace-nowrap">Kids Academy</Link>
+          <Link href="/about" className="hover:text-gold-brand transition-colors whitespace-nowrap">About</Link>
+          <Link href="/events" className="hover:text-gold-brand transition-colors whitespace-nowrap">Events</Link>
+          <Link href="/blog" className="hover:text-gold-brand transition-colors whitespace-nowrap">Blog</Link>
+          <Link href="/resources" className="hover:text-gold-brand transition-colors whitespace-nowrap">Resources</Link>
+          <Link href="/contact" className="hover:text-gold-brand transition-colors whitespace-nowrap">Contact</Link>
         </nav>
 
         {/* Action Buttons */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 sm:gap-3">
           <Link href="/login">
             <button
               type="button"

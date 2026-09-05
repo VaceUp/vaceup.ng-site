@@ -41,23 +41,22 @@ const testimonials = [
 function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[0] }) {
   return (
     <div className={cn(
-      'flex flex-col h-full p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-lg transition-all duration-300',
-      'border border-gray-100'
+      'flex flex-col h-full p-8 rounded-2xl bg-white border border-gray-100 hover:shadow-xl transition-all duration-300'
     )}>
       <div className="flex items-center gap-1 mb-4">
         {[...Array(testimonial.rating)].map((_, i) => (
-          <LordIconComponent key={i} src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={20} />
+          <LordIconComponent key={i} src={LordIcons.star} colors="primary:#FFC72C" size={20} />
         ))}
       </div>
       <LordIconComponent src={LordIcons.quote} size={40} colors="primary:#00088A" className="opacity-10 mb-4" />
-      <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6 flex-1">"{testimonial.text}"</p>
+      <p className="text-navy-900 leading-relaxed mb-6 flex-1">"{testimonial.text}"</p>
       <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-navy-900 to-teal-brand flex items-center justify-center text-white font-bold text-lg">
           {testimonial.name.split(' ').map(n => n[0]).join('')}
         </div>
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white">{testimonial.name}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">{testimonial.role}</div>
+          <div className="font-bold text-navy-950">{testimonial.name}</div>
+          <div className="text-sm text-navy-700">{testimonial.role}</div>
           <div className="text-xs text-gold-brand font-medium">{testimonial.course} Graduate</div>
         </div>
       </div>
@@ -67,13 +66,13 @@ function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[0] 
 
 export function SuccessStories() {
   return (
-    <section className="py-20 bg-gray-50" aria-labelledby="stories-heading">
+    <section className="py-20 bg-white" aria-labelledby="stories-heading">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 id="stories-heading" className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h2 id="stories-heading" className="text-3xl sm:text-4xl font-black text-navy-950 mb-4">
             Success Stories
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-3xl mx-auto text-lg">
+          <p className="text-navy-700 max-w-3xl mx-auto text-lg">
             Real students. Real results. See how VaceUp alumni are building careers in tech across the globe.
           </p>
         </div>
@@ -85,7 +84,7 @@ export function SuccessStories() {
         </div>
 
         <div className="text-center mt-12">
-          <a href="/testimonials" className="inline-flex items-center gap-2 text-navy-900 font-semibold hover:text-gold-brand transition-colors">
+          <a href="/testimonials" className="inline-flex items-center gap-2 text-navy-900 font-bold hover:text-gold-brand transition-colors">
             View All Success Stories
             <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" />
           </a>

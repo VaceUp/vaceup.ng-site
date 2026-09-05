@@ -48,13 +48,13 @@ const features = [
 
 export function WhyVaceUp() {
   return (
-    <section className="py-20 bg-white" aria-labelledby="why-heading">
+    <section className="py-20 bg-gray-50" aria-labelledby="why-heading">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 id="why-heading" className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h2 id="why-heading" className="text-3xl sm:text-4xl font-black text-navy-950 mb-4">
             Why Choose VaceUp?
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-3xl mx-auto text-lg">
+          <p className="text-navy-700 max-w-3xl mx-auto text-lg">
             We don't just teach technology—we prepare you for a career in it. Every aspect of our academy 
             is designed around your success.
           </p>
@@ -65,11 +65,10 @@ export function WhyVaceUp() {
             <div
               key={feature.title}
               className={cn(
-                'group p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition-all duration-500 border border-gray-100',
-                index % 2 === 0 ? 'border-navy-100' : 'border-transparent'
+                'group p-8 rounded-2xl bg-white border border-gray-100 hover:shadow-xl hover:border-gold-brand/30 transition-all duration-500'
               )}
             >
-              <div className="w-14 h-14 rounded-xl bg-navy-100 flex items-center justify-center mb-6 group-hover:bg-navy-900 group-hover:text-white transition-all duration-300">
+              <div className="w-14 h-14 rounded-xl bg-navy-50 flex items-center justify-center mb-6 group-hover:bg-navy-900 group-hover:text-white transition-all duration-300">
                 <LordIconComponent 
                   src={feature.icon} 
                   size={28} 
@@ -77,8 +76,8 @@ export function WhyVaceUp() {
                   className="group-hover:text-white"
                 />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{feature.title}</h3>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{feature.description}</p>
+              <h3 className="text-xl font-bold text-navy-950 mb-3">{feature.title}</h3>
+              <p className="text-navy-700 leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>

@@ -82,38 +82,36 @@ const courses = [
 
 function CourseCard({ course }: { course: typeof courses[0] }) {
   return (
-    <Card variant="glass" className="flex flex-col h-full group">
+    <Card className="flex flex-col h-full group bg-white border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
       <div className="relative aspect-video overflow-hidden rounded-t-xl">
-        <div className="w-full h-full bg-gradient-to-br from-navy-900/20 to-teal-brand/20 flex items-center justify-center">
-          <div className="text-center p-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/10 flex items-center justify-center">
-              <span className="text-3xl">{course.id === '1' ? '💼' : course.id === '2' ? '📊' : course.id === '3' ? '🎨' : course.id === '4' ? '🎭' : '💻'}</span>
-            </div>
-          </div>
-        </div>
+        <img
+          src={course.image}
+          alt={course.title}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
         <div className="absolute top-3 right-3">
           <Badge variant="secondary" className="text-xs capitalize">{course.level}</Badge>
         </div>
       </div>
       <CardContent className="p-5 flex flex-col flex-1">
-        <Badge variant="outline" className="text-xs capitalize mb-3 w-fit">{course.category}</Badge>
-        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-1 group-hover:text-navy-900 transition-colors">{course.title}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2 flex-1">{course.description}</p>
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-          <div className="flex items-center gap-1 text-yellow-500">
-            <LordIconComponent src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={16} />
-            <span className="font-bold">{course.rating}</span>
+        <Badge variant="outline" className="text-xs capitalize mb-3 w-fit text-navy-900 border-navy-200 bg-navy-50">{course.category}</Badge>
+        <h3 className="font-bold text-navy-950 mb-2 line-clamp-1 group-hover:text-gold-brand transition-colors">{course.title}</h3>
+        <p className="text-sm text-gray-600 mb-4 line-clamp-2 flex-1">{course.description}</p>
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <div className="flex items-center gap-1 text-gold-brand">
+            <LordIconComponent src={LordIcons.star} colors="primary:#FFC72C" size={16} />
+            <span className="font-bold text-navy-900">{course.rating}</span>
             <span className="text-gray-400">({course.students.toLocaleString()})</span>
           </div>
         </div>
-        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.clock} size={14} />{course.duration}</span>
-          <span className="flex items-center gap-1"><LordIconComponent src={LordIcons.userGroup} size={14} />{course.students.toLocaleString()} students</span>
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <span className="flex items-center gap-1 text-navy-700"><LordIconComponent src={LordIcons.clock} size={14} />{course.duration}</span>
+          <span className="flex items-center gap-1 text-navy-700"><LordIconComponent src={LordIcons.userGroup} size={14} />{course.students.toLocaleString()} students</span>
         </div>
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <div className="font-bold text-lg text-navy-950">{course.price}</div>
           <Link href={`/courses/${course.id}`}>
-            <Button size="sm" variant="primary">View Course</Button>
+            <Button size="sm" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">View Course</Button>
           </Link>
         </div>
       </CardContent>
@@ -127,16 +125,16 @@ export function FeaturedCourses() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-12">
           <div>
-            <h2 id="courses-heading" className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">
+            <h2 id="courses-heading" className="text-3xl sm:text-4xl font-black text-navy-950 mb-3">
               Featured Courses
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 max-w-2xl">
+            <p className="text-gray-600 max-w-2xl">
               Practical, career-focused programs designed by industry experts. Each course includes live sessions, 
               hands-on projects, and career support.
             </p>
           </div>
           <Link href="/courses">
-            <Button variant="outline" size="lg" className="w-full lg:w-auto">
+            <Button variant="outline" size="lg" className="w-full lg:w-auto border-navy-200 text-navy-900 hover:bg-navy-50 hover:border-navy-300">
               View All Courses
               <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" className="ml-2" />
             </Button>

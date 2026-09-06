@@ -110,7 +110,7 @@ export function AdminHome() {
     instructor_id: '',
     description: '',
     level: 'beginner',
-    price: '100000',
+    price: '',
     is_published: false,
   });
 
@@ -316,7 +316,7 @@ export function AdminHome() {
         instructor_id: '',
         description: '',
         level: 'beginner',
-        price: '100000',
+        price: '',
         is_published: false,
       });
       setShowCreate(false);
@@ -413,26 +413,6 @@ export function AdminHome() {
 
   return (
     <div className="space-y-6">
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTabAndHash(t.id)}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm font-bold transition-all',
-              tab === t.id
-                ? 'bg-navy-950 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-navy-50'
-            )}
-          >
-            <i className={cn('bi', `bi-${t.icon}`, 'mr-1.5')} aria-hidden="true" />
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {/* ═══ Overview ═══ */}
       {tab === 'overview' && (
         <div className="space-y-6">
@@ -737,15 +717,20 @@ export function AdminHome() {
                     <option value="intermediate">Intermediate</option>
                     <option value="advanced">Advanced</option>
                   </select>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    placeholder="Price (₦)"
-                    value={newCourse.price}
-                    onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                    className={inputCls}
-                  />
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">
+                      Price (₦)
+                    </span>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      placeholder="e.g. 100000"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                      className={inputCls}
+                    />
+                  </label>
                   <label className="flex items-center gap-2 text-sm font-semibold text-navy-950">
                     <input
                       type="checkbox"

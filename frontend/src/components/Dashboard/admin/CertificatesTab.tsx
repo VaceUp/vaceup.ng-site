@@ -20,11 +20,68 @@ interface CertificateT {
   status?: string;
 }
 
+const inputCls =
+  'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm transition-all focus:border-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-900/20';
+
 export function CertificatesTab() {
   const [certs, setCerts] = useState<CertificateT[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
   const [search, setSearch] = useState('');
+
+  // Issue studio
+  const [students, setStudents] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
+  const [issueSel, setIssueSel] = useState({ student_id: '', course_id: '' });
+  const [issuing, setIssuing] = useState(false);
+  const [issueMsg, setIssueMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    api
+      .request('/admin/dashboard/users/?role=student')
+      .then((res: any) => setStudents(res.results ?? res ?? []))
+      .catch(() => undefined);
+    api
+      .request('/admin/dashboard/courses/')
+      .then((res: any) => setCourses(res.results ?? res ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  const selStudent = students.find((s) => s.id === issueSel.student_id);
+  const selCourse = courses.find((c) => c.id === issueSel.course_id);
+
+  const handleIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIssueMsg(null);
+    if (!issueSel.student_id || !issueSel.course_id) {
+      setIssueMsg({ ok: false, text: 'Select the student and the course.' });
+      return;
+    }
+    setIssuing(true);
+    try {
+      const res = await fetch(`${api.baseUrl}/admin/dashboard/certificates/issue/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${api.getToken()}`,
+        },
+        body: JSON.stringify(issueSel),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error?.detail || 'Issuing failed.');
+      }
+      setIssueMsg({
+        ok: true,
+        text: `Certificate ${data.certificate_number} issued to ${data.student_name}.`,
+      });
+      load();
+    } catch (err: any) {
+      setIssueMsg({ ok: false, text: err.message });
+    } finally {
+      setIssuing(false);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -82,6 +139,74 @@ export function CertificatesTab() {
         </a>
       </div>
 
+      {/* ═══ Issue Certificate studio ═══ */}
+      <div className="mb-10 grid gap-6 lg:grid-cols-2">
+        <form onSubmit={handleIssue} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-1 font-black text-navy-950">Issue a Certificate</h3>
+          <p className="mb-5 text-xs text-gray-500">
+            Select the student and the course — the preview updates live, then issue it.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Student</label>
+              <select required value={issueSel.student_id}
+                onChange={(e) => setIssueSel({ ...issueSel, student_id: e.target.value })}
+                className={inputCls}>
+                <option value="">Select student...</option>
+                {students.map((st) => (
+                  <option key={st.id} value={st.id}>{st.full_name || st.email}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Course</label>
+              <select required value={issueSel.course_id}
+                onChange={(e) => setIssueSel({ ...issueSel, course_id: e.target.value })}
+                className={inputCls}>
+                <option value="">Select course...</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" disabled={issuing}
+              className="w-full rounded-xl bg-gold-brand py-3.5 font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover disabled:opacity-60">
+              {issuing ? 'Issuing...' : 'Issue Certificate'}
+            </button>
+            {issueMsg && (
+              <p className={cn('rounded-xl px-4 py-3 text-xs',
+                issueMsg.ok ? 'bg-teal-brand/10 text-teal-700' : 'bg-red-50 text-red-700')}>
+                {issueMsg.text}
+              </p>
+            )}
+          </div>
+        </form>
+
+        {/* Live preview */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-gray-400">Live preview</p>
+          <div className={cn('rounded-lg border-8 border-navy-950 bg-white p-1', selStudent && selCourse ? '' : 'opacity-60')}>
+            <div className="border-4 border-gold-brand p-6 text-center">
+              <img src="/logo.webp" alt="VaceUp" className="mx-auto mb-3 h-14 w-14 object-contain" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-navy-900">Certificate of Completion</p>
+              <p className="mt-4 text-[10px] uppercase tracking-widest text-gray-400">This is to certify that</p>
+              <p className="mt-1 text-2xl font-black text-navy-950">{selStudent?.full_name || 'Student Name'}</p>
+              <p className="mt-2 text-xs text-gray-500">has successfully completed</p>
+              <p className="mt-1 text-lg font-bold text-teal-700">{selCourse?.title || 'Course Title'}</p>
+              <div className="mt-5 flex items-end justify-between border-t border-gray-200 pt-3 text-[9px] text-gray-400">
+                <span>Issued {new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                <span className="text-right">
+                  <span className="block border-t border-gray-300 pt-1 font-bold text-navy-900">Director Mercy</span>
+                  Director, VaceUp Digital Academy
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-xs text-gray-400">Verify URL: vaceup.ng/verify?code=...</p>
+        </div>
+      </div>
+
+      {/* ═══ Issued certificates list ═══ */}
       {loading ? (
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => (

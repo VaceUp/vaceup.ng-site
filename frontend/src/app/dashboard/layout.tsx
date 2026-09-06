@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
-import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 interface NavItem {
   name: string;
@@ -45,11 +44,16 @@ const ADMIN_NAV: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: 'grid-1x2' },
   { name: 'Users', href: '/dashboard#users', icon: 'people' },
   { name: 'Courses', href: '/dashboard#courses', icon: 'book' },
+  { name: 'Content', href: '/dashboard#content', icon: 'folder-open' },
+  { name: 'Live Classes', href: '/dashboard#liveclasses', icon: 'camera-video' },
+  { name: 'Assignments', href: '/dashboard#assignments', icon: 'file-earmark-text' },
+  { name: 'Certificates', href: '/dashboard#certificates', icon: 'award' },
+  { name: 'Enrollments', href: '/dashboard#enrollments', icon: 'person-check' },
+  { name: 'Payments', href: '/dashboard#payments', icon: 'cash-coin' },
+  { name: 'Applications', href: '/dashboard#applications', icon: 'file-earmark-text' },
   { name: 'Announcements', href: '/dashboard#announcements', icon: 'megaphone' },
-  { name: 'Marketing', href: '/dashboard#marketing', icon: 'send' },
   { name: 'Feature Flags', href: '/dashboard#flags', icon: 'toggles' },
-  { name: 'Messages', href: '/messaging', icon: 'chat-dots' },
-  { name: 'Site Admin', href: 'https://api.vaceup.ng/admin/', icon: 'shield-lock' },
+  { name: 'Marketing', href: '/dashboard#marketing', icon: 'send' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -66,20 +70,33 @@ export default function DashboardLayout({
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [hash, setHash] = useState('');
+
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    onHash();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   const role = (user as any)?.role as string | undefined;
   const navigation =
     role === 'admin' ? ADMIN_NAV : role === 'instructor' ? INSTRUCTOR_NAV : STUDENT_NAV;
 
-  const isActive = (href: string) => {
-    const base = href.split('#')[0];
-    if (base === '/dashboard') return pathname === '/dashboard';
+  const isItemActive = (item: NavItem) => {
+    const [base, section] = item.href.split('#');
+    if (base === '/dashboard') {
+      const current = hash.replace('#', '');
+      if (section) return current === section;
+      return !current || current === 'overview';
+    }
     return pathname === base || pathname.startsWith(base + '/');
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar overlay */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -90,71 +107,90 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 transform bg-navy-950 text-white transition-transform duration-300 lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex flex-col bg-navy-950 text-white transition-all duration-300 lg:translate-x-0',
+          collapsed ? 'w-20' : 'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex items-center gap-3 border-b border-white/10 p-5">
-            <img src="/logo.webp" alt="VaceUp" className="h-9 w-9 rounded-lg object-contain" />
-            <div className="ml-1 flex flex-col">
-              <span className="text-lg font-extrabold tracking-tight">VACEUP</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gold-brand">
-                {ROLE_LABELS[role ?? ''] || 'Member'}
+        {/* Logo + collapse toggle */}
+        <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <Link href="/" className="flex items-center gap-3 overflow-hidden" aria-label="VaceUp home">
+            <img src="/logo.webp" alt="VaceUp" className="h-9 w-9 flex-shrink-0 rounded-lg object-contain" />
+            {!collapsed && (
+              <span className="whitespace-nowrap">
+                <span className="block text-lg font-extrabold leading-none tracking-tight">VACEUP</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-gold-brand">
+                  {ROLE_LABELS[role ?? ''] || 'Member'}
+                </span>
               </span>
-            </div>
-          </div>
+            )}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="hidden rounded-lg p-1.5 text-navy-200 transition-colors hover:bg-white/10 hover:text-white lg:block"
+          >
+            <i className={cn('bi', collapsed ? 'bi-chevron-right' : 'bi-chevron-left')} aria-hidden="true" />
+          </button>
+        </div>
 
-          {/* User Profile */}
-          <div className="border-b border-white/10 px-5 py-4">
-            <div className="flex items-center gap-3">
-              <Avatar
-                src={(user as any)?.avatar}
-                alt={user?.full_name || 'User'}
-                size="lg"
-                fallback={user?.full_name?.charAt(0).toUpperCase()}
-              />
+        {/* Profile */}
+        <div className={cn('border-b border-white/10 px-4 py-4', collapsed && 'px-2')}>
+          <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
+            <Avatar
+              src={(user as any)?.avatar}
+              alt={user?.full_name || 'User'}
+              size="lg"
+              fallback={user?.full_name?.charAt(0).toUpperCase()}
+            />
+            {!collapsed && (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{user?.full_name || 'User'}</p>
                 <p className="truncate text-xs text-navy-300">{user?.email}</p>
               </div>
-            </div>
+            )}
           </div>
+        </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-            {navigation.map((item) => {
-              const active = item.href.startsWith('#') ? false : isActive(item.href);
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
-                    active
-                      ? 'bg-gold-brand font-bold text-navy-950'
-                      : 'text-navy-100 hover:bg-white/10 hover:text-white'
-                  )}
-                >
-                  <i className={cn('bi', `bi-${item.icon}`)} aria-hidden="true" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {navigation.map((item) => {
+            const active = isItemActive(item);
+            return (
+              <Link
+                key={item.name + item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                title={item.name}
+                className={cn(
+                  'flex items-center rounded-xl text-sm font-medium transition-all',
+                  collapsed ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5',
+                  active
+                    ? 'bg-gold-brand font-bold text-navy-950'
+                    : 'text-navy-100 hover:bg-white/10 hover:text-white'
+                )}
+              >
+                <i className={cn('bi', `bi-${item.icon}`)} aria-hidden="true" />
+                {!collapsed && <span className="truncate">{item.name}</span>}
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* Bottom Actions */}
-          <div className="space-y-2 border-t border-white/10 p-4">
-            <button
-              onClick={() => logout()}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-300 transition-all hover:bg-red-500/10 hover:text-red-200"
-            >
-              <i className="bi bi-box-arrow-right" aria-hidden="true" />
-              Sign Out
-            </button>
-          </div>
+        {/* Bottom */}
+        <div className="space-y-2 border-t border-white/10 p-4">
+          <button
+            onClick={() => logout()}
+            title="Sign Out"
+            className={cn(
+              'flex w-full items-center rounded-xl text-sm font-medium text-red-300 transition-all hover:bg-red-500/10 hover:text-red-200',
+              collapsed ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'
+            )}
+          >
+            <i className="bi bi-box-arrow-right" aria-hidden="true" />
+            {!collapsed && 'Sign Out'}
+          </button>
         </div>
       </aside>
 
@@ -167,8 +203,15 @@ export default function DashboardLayout({
         <i className="bi bi-list text-xl" aria-hidden="true" />
       </button>
 
-      {/* Main content */}
-      <main className="min-h-screen lg:ml-64">{children}</main>
+      {/* Content */}
+      <main
+        className={cn(
+          'min-h-screen transition-all duration-300',
+          collapsed ? 'lg:ml-20' : 'lg:ml-64'
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

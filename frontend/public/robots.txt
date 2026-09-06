@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /checkout
+Disallow: /settings
+Disallow: /messaging
+
+Sitemap: https://vaceup.ng/sitemap.xml

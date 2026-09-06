@@ -55,6 +55,20 @@ GET /api/v1/certificates/verify/{code}/   → 200 { student_name, course, issued
 ```
 Build notes: `AllowAny` + throttle, returns only public fields.
 
+### 4. Community testimonials & reviews — `apps.testimonials` (new)
+Used by: `/testimonials` page + homepage success stories (`lib/testimonials.ts`).
+Current frontend behaviour: fully functional — reviews (with resized photo, rating,
+role, course, career outcome) persist in the reviewer's browser and render
+instantly. `submitReview()` in `lib/testimonials.ts` is the single switch-point.
+```
+GET  /api/v1/testimonials/                     → paginated published reviews
+POST /api/v1/testimonials/                     { name, role, course, rating, text, outcome?, photo? }
+POST /api/v1/uploads/testimonial-photo/        multipart → { url }
+```
+Build notes: moderate submissions (status: pending → published), rate-limit 3/hr,
+photo via pre-signed S3/R2 upload; when live, flip `submitReview()` and
+`getCommunityReviews()` to the API and seed `FEATURED_STORIES` server-side.
+
 ## 🔎 Verify after backend redeploy
 
 - `POST /submissions/` payload shape (assignment submit) — confirm against `/api/schema/`.

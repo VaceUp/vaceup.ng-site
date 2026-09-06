@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -123,6 +125,33 @@ const resources = [
 const categories = ['All', 'Development', 'Data Science', 'Design', 'Career', 'Remote Work'];
 
 export default function ResourcesPage() {
+  const router = useRouter();
+
+  // Downloads require an account — visitors are sent to login first.
+  const handleDownload = (resource: (typeof resources)[number]) => {
+    if (!api.getToken()) {
+      router.push('/login?next=/resources');
+      return;
+    }
+    const content = [
+      `${resource.title}`,
+      `VaceUp Digital Academy — Free Resource`,
+      ``,
+      resource.description,
+      ``,
+      `Category: ${resource.category}`,
+      ``,
+      `Need help using this resource? Join the community: https://vaceup.ng/contact`,
+      `Explore courses: https://vaceup.ng/courses`,
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${resource.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
@@ -200,7 +229,7 @@ export default function ResourcesPage() {
                         <span>{resources[0].rating}/5.0</span>
                       </div>
                     </div>
-                    <Button size="lg" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                    <Button size="lg" onClick={() => handleDownload(resources[0])} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                       Download Free
                       <LordIconComponent src={LordIcons.download} size={20} className="ml-2" />
                     </Button>
@@ -304,7 +333,7 @@ export default function ResourcesPage() {
                         </div>
                         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                           <span className="font-medium text-navy-900">{formatNumber(resource.downloads)}+ downloads</span>
-                          <Button size="sm" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                          <Button size="sm" onClick={() => handleDownload(resource)} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                             Download
                           </Button>
                         </div>
@@ -350,7 +379,7 @@ export default function ResourcesPage() {
                             </div>
                           </div>
                           <div className="flex-shrink-0 md:w-48">
-                            <Button className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                            <Button onClick={() => handleDownload(resource)} className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                               Download
                             </Button>
                           </div>

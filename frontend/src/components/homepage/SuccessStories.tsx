@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
@@ -83,11 +84,21 @@ export function SuccessStories() {
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <a href="/testimonials" className="inline-flex items-center gap-2 text-navy-900 font-bold hover:text-gold-brand transition-colors">
+        <div className="text-center mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link
+            href="/testimonials"
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-navy-900 px-6 py-3 text-sm font-bold text-navy-900 transition-colors hover:bg-navy-50"
+          >
             View All Success Stories
             <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" />
-          </a>
+          </Link>
+          <Link
+            href="/testimonials#share"
+            className="inline-flex items-center gap-2 rounded-xl bg-gold-brand px-6 py-3 text-sm font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover active:scale-95"
+          >
+            <i className="bi bi-pencil-square" aria-hidden="true" />
+            Share Your Story
+          </Link>
         </div>
       </div>
     </section>

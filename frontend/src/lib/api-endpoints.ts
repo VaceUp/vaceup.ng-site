@@ -313,6 +313,13 @@ export const PENDING_ENDPOINTS = {
     // Public, unauthenticated certificate verification (QR code target on certificates)
     verify: 'GET /api/v1/certificates/verify/{code}/',
   },
+  testimonials: {
+    // Community reviews (lib/testimonials.ts) — submissions persist in the
+    // reviewer's browser today; switch submitReview() to POST once built.
+    list: 'GET /api/v1/testimonials/',
+    create: 'POST /api/v1/testimonials/',
+    uploadPhoto: 'POST /api/v1/uploads/testimonial-photo/',
+  },
   liveClasses: {
     // Class reminders / calendar invites (PRD §9.5) — verify whether shipped
     // with apps.liveclasses or still pending.

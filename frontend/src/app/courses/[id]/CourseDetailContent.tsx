@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
@@ -30,6 +32,68 @@ interface CourseDetailContentProps {
 }
 
 export function CourseDetailContent({ course }: CourseDetailContentProps) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+
+  // Gate: syllabus downloads require an account
+  const handleDownloadSyllabus = () => {
+    if (!api.getToken()) {
+      router.push(`/login?next=/courses/${course.id}`);
+      return;
+    }
+    const lines = [
+      `${course.title} — Course Syllabus`,
+      `${course.tagline}`,
+      ``,
+      `Level: ${course.level}   Duration: ${course.duration}   Price: ${course.price}`,
+      ``,
+      `WHAT YOU'LL LEARN`,
+      ...course.learnings.map((l) => `  • ${l}`),
+      ``,
+      `CURRICULUM`,
+      ...course.modules.flatMap((m, i) => [
+        `  Module ${i + 1}: ${m.title}`,
+        ...(m.topics ?? []).map((t) => `     - ${t}`),
+      ]),
+      ``,
+      `INCLUDED`,
+      ...course.benefits.map((b) => `  • ${b}`),
+      ``,
+      `Enroll at https://vaceup.ng/apply?course=${course.id}`,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${course.slug || course.id}-syllabus.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/courses/${course.id}`;
+    const data = { title: `${course.title} — VaceUp Digital Academy`, text: course.tagline, url };
+    if (navigator.share) {
+      try {
+        await navigator.share(data);
+        return;
+      } catch {
+        /* user cancelled */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const handleEnroll = () => {
+    router.push(`/apply?course=${course.id}`);
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <nav className="mb-8" aria-label="Breadcrumb">
@@ -71,17 +135,17 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
               </div>
 
               <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-                <Button size="lg" className="flex-1 sm:w-auto bg-gold-brand text-navy-950 font-bold hover:bg-gold-hover shadow-md hover:shadow-gold-hover">
+                <Button size="lg" onClick={handleEnroll} className="flex-1 sm:w-auto bg-gold-brand text-navy-950 font-bold hover:bg-gold-hover shadow-md hover:shadow-gold-hover">
                   <LordIconComponent src={LordIcons.play} size={20} colors="primary:#00088A,secondary:#FFC72C" />
                   Enroll Now - {course.price}
                 </Button>
-                <Button variant="outline" className="w-full sm:w-auto">
+                <Button variant="outline" onClick={handleDownloadSyllabus} className="w-full sm:w-auto">
                   <LordIconComponent src={LordIcons.download} size={20} />
                   Download Syllabus
                 </Button>
-                <Button variant="ghost" className="w-full sm:w-auto">
+                <Button variant="ghost" onClick={handleShare} className="w-full sm:w-auto">
                   <LordIconComponent src={LordIcons.share} size={20} />
-                  Share
+                  {copied ? 'Link Copied!' : 'Share'}
                 </Button>
               </div>
             </div>

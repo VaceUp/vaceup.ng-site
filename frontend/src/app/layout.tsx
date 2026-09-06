@@ -9,12 +9,23 @@ import AuthModal from '@/components/landing/AuthModal';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
+  metadataBase: new URL('https://vaceup.ng'),
   title: 'VaceUp Digital Academy | Practical Tech Education',
   description: 'Empowering future tech leaders through hands-on cohorts, live masterclasses, and career training.',
   icons: {
     icon: '/logo.webp',
     shortcut: '/logo.webp',
     apple: '/logo.webp',
+  },
+  // Google Search Console — replace with the token from the GSC dashboard
+  verification: {
+    google: 'REPLACE_WITH_GSC_VERIFICATION_TOKEN',
+  },
+  openGraph: {
+    siteName: 'VaceUp Digital Academy',
+    type: 'website',
+    locale: 'en_NG',
+    url: 'https://vaceup.ng',
   },
 };
 

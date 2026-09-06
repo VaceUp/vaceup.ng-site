@@ -61,8 +61,9 @@ export default function RegisterPage() {
         full_name: formData.fullName.trim(),
         phone_number: formData.phone.trim(),
       });
-      // Account created — continue into the admission flow
-      router.push('/apply?registered=true');
+      // Account created — continue where the user was headed (e.g. application)
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.push(next && next.startsWith('/') ? next : '/apply?registered=true');
     } catch (err: any) {
       setError(err?.message || 'Unable to create your account right now. Please try again.');
     } finally {

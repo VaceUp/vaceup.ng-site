@@ -190,6 +190,14 @@ export const Footer = () => {
             © {new Date().getFullYear()} VaceUp. All rights reserved.
           </p>
 
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
+            <Link href="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
+            <Link href="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
+            <Link href="/faq" className="hover:text-white transition-colors">FAQs</Link>
+          </div>
+
           <div className="flex items-center gap-3">
             <a href="#" className="w-8 h-8 rounded-full bg-white/10 hover:bg-teal-brand flex items-center justify-center transition-colors" aria-label="Facebook">
               <LordIconComponent

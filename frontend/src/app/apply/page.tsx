@@ -11,12 +11,11 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 const FALLBACK_COURSES = [
-  { id: '1', title: 'Frontend Engineering & React', price: 150000, duration: '12 weeks' },
-  { id: '2', title: 'Backend Engineering with Django', price: 180000, duration: '10 weeks' },
-  { id: '3', title: 'Data Science & Machine Learning', price: 200000, duration: '14 weeks' },
-  { id: '4', title: 'UI/UX Design Fundamentals', price: 120000, duration: '8 weeks' },
-  { id: '5', title: 'Graphic Design', price: 100000, duration: '8 weeks' },
-  { id: '6', title: 'Web Development', price: 180000, duration: '12 weeks' },
+  { id: '1', title: 'Virtual Assistant', price: 80000, duration: '6 weeks' },
+  { id: '2', title: 'Data Analysis', price: 150000, duration: '10 weeks' },
+  { id: '3', title: 'UI/UX Design', price: 120000, duration: '8 weeks' },
+  { id: '4', title: 'Graphic Design', price: 100000, duration: '8 weeks' },
+  { id: '5', title: 'Web Development', price: 180000, duration: '12 weeks' },
 ];
 
 const steps = [
@@ -50,6 +49,21 @@ export default function ApplyPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // BUSINESS RULE: registration comes before application/payment
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !api.getToken()) {
+      const next = encodeURIComponent('/apply' + window.location.search);
+      router.replace('/register?next=' + next);
+    }
+  }, [router]);
+
+  // Preselect a course when arriving via Enroll buttons (/apply?course=ID)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get('course');
+    if (preset) setSelectedCourse(preset);
+  }, []);
 
   // Load the live course catalog; fall back to the static list if the API is unreachable
   useEffect(() => {
@@ -112,9 +126,11 @@ export default function ApplyPage() {
     e.preventDefault();
     if (!validateStep(4)) return;
 
-    // Applications belong to an account — send unauthenticated users to login first
+    // BUSINESS RULE: register before paying — captures leads for admin
+    // marketing campaigns and keeps payments tied to real accounts.
     if (!api.getToken()) {
-      router.push('/login?next=/apply');
+      const next = encodeURIComponent('/apply' + window.location.search);
+      router.push('/register?next=' + next);
       return;
     }
 

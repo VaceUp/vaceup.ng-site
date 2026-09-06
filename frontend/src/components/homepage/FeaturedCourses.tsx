@@ -108,11 +108,16 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
           <span className="flex items-center gap-1 text-navy-700"><LordIconComponent src={LordIcons.clock} size={14} />{course.duration}</span>
           <span className="flex items-center gap-1 text-navy-700"><LordIconComponent src={LordIcons.userGroup} size={14} />{course.students.toLocaleString()} students</span>
         </div>
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-between gap-2 pt-4 border-t border-gray-100">
           <div className="font-bold text-lg text-navy-950">{course.price}</div>
-          <Link href={`/courses/${course.id}`}>
-            <Button size="sm" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">View Course</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/courses/${course.id}`}>
+              <Button size="sm" variant="outline" className="border-navy-200 text-navy-900">View Course</Button>
+            </Link>
+            <Link href={`/apply?course=${course.id}`}>
+              <Button size="sm" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">Enroll</Button>
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -121,7 +126,7 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
 
 export function FeaturedCourses() {
   return (
-    <section className="py-20 bg-gray-50" aria-labelledby="courses-heading">
+    <section id="courses" className="py-20 bg-gray-50 scroll-mt-24" aria-labelledby="courses-heading">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-12">
           <div>

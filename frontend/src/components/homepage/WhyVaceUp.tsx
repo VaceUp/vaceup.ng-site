@@ -5,42 +5,42 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const features = [
   {
-    icon: LordIcons.code,
+    biIcon: 'code-slash',
     title: 'Practical Training',
     description: 'Students work on real-world projects that simulate actual industry challenges. Every module includes hands-on exercises.',
   },
   {
-    icon: LordIcons.userGroup,
+    biIcon: 'people',
     title: 'Live & Interactive Classes',
     description: 'Learn directly from instructors in real-time. Ask questions, participate in discussions, and get immediate feedback.',
   },
   {
-    icon: LordIcons.award,
+    biIcon: 'mortarboard',
     title: 'Expert Mentors',
     description: 'Industry professionals with 10+ years experience guide your learning journey. They\'ve built products you use daily.',
   },
   {
-    icon: LordIcons.briefcase,
+    biIcon: 'briefcase',
     title: 'Career Support',
     description: 'Resume reviews, mock interviews, portfolio building, and job referrals. We\'re invested in your career success.',
   },
   {
-    icon: LordIcons.globe,
+    biIcon: 'globe',
     title: 'Global Certification',
     description: 'Earn verifiable digital certificates recognized by employers worldwide. Each certificate has a unique verification code.',
   },
   {
-    icon: LordIcons.clock,
+    biIcon: 'clock',
     title: 'Flexible Learning',
     description: 'Evening and weekend classes accommodate working professionals. Recorded sessions available for review anytime.',
   },
   {
-    icon: LordIcons.book,
+    biIcon: 'star',
     title: 'Community Access',
     description: 'Join our growing community of learners. Network, collaborate, and grow with peers across Africa.',
   },
   {
-    icon: LordIcons.shield,
+    biIcon: 'folder-check',
     title: 'Project-Based Learning',
     description: 'Graduate with a portfolio of real projects. Show employers what you can do, not just what you know.',
   },
@@ -68,12 +68,10 @@ export function WhyVaceUp() {
                 'group p-8 rounded-2xl bg-white border border-gray-100 hover:shadow-xl hover:border-gold-brand/30 transition-all duration-500'
               )}
             >
-              <div className="w-14 h-14 rounded-xl bg-navy-50 flex items-center justify-center mb-6 group-hover:bg-navy-900 group-hover:text-white transition-all duration-300">
-                <LordIconComponent 
-                  src={feature.icon} 
-                  size={28} 
-                  colors="primary:#00088A,secondary:#FFC72C" 
-                  className="group-hover:text-white"
+              <div className="w-14 h-14 rounded-xl bg-navy-50 flex items-center justify-center mb-6 group-hover:bg-navy-900 transition-all duration-300">
+                <i
+                  className={`bi bi-${feature.biIcon} text-2xl text-navy-900 group-hover:text-white transition-colors duration-300`}
+                  aria-hidden="true"
                 />
               </div>
               <h3 className="text-xl font-bold text-navy-950 mb-3">{feature.title}</h3>

@@ -112,7 +112,7 @@ export default function LoginPage() {
                 <motion.div variants={fieldItem}>
                   <div className="flex items-center justify-between mb-2">
                     <label htmlFor="password" className="block text-sm font-semibold text-navy-900">Password</label>
-                    <Link href="/contact" className="text-sm text-navy-600 hover:text-gold-brand transition-colors">
+                    <Link href="/forgot-password" className="text-sm text-navy-600 hover:text-gold-brand transition-colors">
                       Forgot password?
                     </Link>
                   </div>
@@ -187,7 +187,7 @@ export default function LoginPage() {
           </motion.div>
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>By signing in, you agree to our <Link href="/contact" className="text-navy-600 hover:underline">Terms of Service</Link> and <Link href="/contact" className="text-navy-600 hover:underline">Privacy Policy</Link>.</p>
+            <p>By signing in, you agree to our <Link href="/terms" className="text-navy-600 hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-navy-600 hover:underline">Privacy Policy</Link>.</p>
           </div>
         </div>
       </main>

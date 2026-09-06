@@ -187,9 +187,10 @@ export async function generateStaticParams() {
       const contentType = res.headers.get('content-type');
       if (contentType?.includes('application/json')) {
         const data = await res.json();
-        return (data.results || data).map((course: any) => ({
-          id: course.id.toString(),
-        }));
+        const ids = (data.results || data)
+          .filter((course: any) => course && course.id)
+          .map((course: any) => ({ id: String(course.id) }));
+        if (ids.length) return ids;
       }
     }
   } catch (e) {

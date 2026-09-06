@@ -6,8 +6,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.vaceup.ng/api/v1';
 
 class ApiClient {
-  private baseUrl: string;
-  private token: string | null = null;
+  baseUrl: string;
+  token: string | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -28,7 +28,7 @@ class ApiClient {
     return this.token;
   }
 
-  private async request<T>(
+  async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {

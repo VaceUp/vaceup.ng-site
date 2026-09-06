@@ -21,13 +21,25 @@ export default function VerifyPage() {
   const check = async (value: string) => {
     if (!value.trim()) return;
     setStatus('checking');
+    // Public verification endpoint (no auth): GET /api/v1/verify/<code>/
     try {
-      const res = await api.getCertificate(value.trim());
+      const res = await fetch(
+        `${api.baseUrl}/verify/${encodeURIComponent(value.trim())}/`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!res.ok) {
+        setStatus('invalid');
+        return;
+      }
+      const data = await res.json();
       setDetail({
-        student_name: (res as any).student_name || 'Verified holder',
-        course: (res as any).course?.title || (res as any).course || 'VaceUp Course',
-        issued_at: (res as any).issued_at || '',
-        certificate_number: (res as any).certificate_number || value.trim(),
+        student_name:
+          data.student_name || data.student?.full_name || 'Verified holder',
+        course:
+          data.course?.title || data.course || data.course_title || 'VaceUp Course',
+        issued_at: data.issued_at || data.issued_on || '',
+        certificate_number:
+          data.certificate_number || data.certificate || value.trim(),
       });
       setStatus('valid');
     } catch {

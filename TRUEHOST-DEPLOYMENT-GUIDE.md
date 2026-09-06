@@ -184,7 +184,7 @@ Follow the prompts (email + password). This is the login for `api.vaceup.ng/admi
 ## Step 11 — Restart the app
 
 1. **Setup Python App** → click **Restart** on your application.
-2. Visit **https://api.vaceup.ng/api/v1/healthz/** in your browser.
+2. Visit **https://api.vaceup.ng/healthz/** in your browser.
 3. You should see a small JSON health message. 🎉
 
 > If you see "Internal Server Error": open File Manager → `vaceup-api` → `stderr.log`

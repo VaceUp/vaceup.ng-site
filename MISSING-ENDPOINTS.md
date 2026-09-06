@@ -47,13 +47,14 @@ POST /api/v1/contact/   { name, email, subject, message }   → 201 { id }
 Build notes: spam protection (honeypot field + throttle 3/min/IP), notify
 info@vaceup.ng via Celery email, store for the admin inbox.
 
-### 3. Public certificate verification — action on `apps.certificates`
-Needed by: certificate QR codes (PRD §13 — verification link must work
-unauthenticated).
+### ✅ 3. Public certificate verification — RESOLVED (already built)
+The backend exposes it (confirmed live 2026-09-06):
 ```
-GET /api/v1/certificates/verify/{code}/   → 200 { student_name, course, issued_at, certificate_number } | 404
+GET /api/v1/verify/{verification_code}/        → JSON verification result
+GET /api/v1/verify/{verification_code}/page/   → HTML page (QR target alternative)
 ```
-Build notes: `AllowAny` + throttle, returns only public fields.
+The frontend /verify page now calls the real endpoint. Marked done — removed
+from PENDING_ENDPOINTS purpose.
 
 ### 4. Community testimonials & reviews — `apps.testimonials` (new)
 Used by: `/testimonials` page + homepage success stories (`lib/testimonials.ts`).

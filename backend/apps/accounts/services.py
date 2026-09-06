@@ -61,10 +61,14 @@ def register_user(*, email, full_name, password, role=None, **profile):
         except Exception:  # noqa: BLE001 — signup must succeed even if the mail queue is down
             import logging
             logging.getLogger("accounts").exception(
-                "Could not queue verification email for %s — verify link token: %s",
+                "Could not queue verification email for %s — verify link token: %s — "
+                "activating the account so the student is not stranded.",
                 user.email,
                 token.token,
             )
+            # Fallback: activate immediately so the student can log in.
+            user.is_active = True
+            user.save(update_fields=["is_active", "updated_at"])
 
     transaction.on_commit(_queue_verification_email)
     return user

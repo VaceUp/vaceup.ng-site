@@ -65,7 +65,14 @@ export default function RegisterPage() {
       const next = new URLSearchParams(window.location.search).get('next');
       router.push(next && next.startsWith('/') ? next : '/apply?registered=true');
     } catch (err: any) {
-      setError(err?.message || 'Unable to create your account right now. Please try again.');
+      const msg = String(err?.message || '');
+      if (msg.toLowerCase().includes('already exists')) {
+        setError('An account with this email already exists — please sign in instead.');
+      } else if (err?.status === 400 && msg.toLowerCase().includes('password')) {
+        setError(msg);
+      } else {
+        setError(msg || 'Unable to create your account right now. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

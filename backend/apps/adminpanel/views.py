@@ -334,6 +334,29 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         return Response({"detail": f"Updated {updated} courses.", "updated_count": updated})
 
     # ────────────────────────────────────────────── user directory (admin panel)
+    @action(detail=False, methods=["post"], url_path="users/password")
+    def user_password(self, request):
+        """POST /admin/dashboard/users/password/ {user_id, new_password} — admin sets a password."""
+        user_id = request.data.get("user_id")
+        new_password = request.data.get("new_password")
+        if not user_id or not new_password:
+            raise DomainError("user_id and new_password are required.", code="password_params")
+
+        from django.contrib.auth import password_validation
+        try:
+            user = User.objects.get(id=user_id)
+        except (User.DoesNotExist, ValueError, ValidationError):
+            raise DomainError("User not found (check the user id).", code="user_not_found")
+
+        try:
+            password_validation.validate_password(new_password, user)
+        except Exception as exc:
+            raise DomainError(" ".join(str(exc).split()), code="weak_password")
+
+        user.set_password(new_password)
+        user.save(update_fields=["password", "updated_at"])
+        return Response({"detail": f"Password updated for {user.full_name or user.email}."})
+
     @action(detail=False, methods=["get"], url_path="users")
     def users_list(self, request):
         """GET /admin/dashboard/users/?search=&role= — the user directory."""

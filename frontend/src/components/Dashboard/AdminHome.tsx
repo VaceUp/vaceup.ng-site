@@ -3,12 +3,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import LiveClassesTab from '@/components/Dashboard/admin/LiveClassesTab';
+import ContentTab from '@/components/Dashboard/admin/ContentTab';
+import AssignmentsTab from '@/components/Dashboard/admin/AssignmentsTab';
+import CertificatesTab from '@/components/Dashboard/admin/CertificatesTab';
+import EnrollmentsTab from '@/components/Dashboard/admin/EnrollmentsTab';
 
 type Tab =
   | 'overview'
   | 'users'
   | 'courses'
+  | 'content'
+  | 'liveclasses'
   | 'applications'
+  | 'assignments'
+  | 'certificates'
+  | 'enrollments'
   | 'payments'
   | 'announcements'
   | 'flags'
@@ -18,8 +28,13 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'speedometer2' },
   { id: 'users', label: 'Users', icon: 'people' },
   { id: 'courses', label: 'Courses', icon: 'book' },
-  { id: 'applications', label: 'Applications', icon: 'file-earmark-text' },
+  { id: 'content', label: 'Content', icon: 'folder-open' },
+  { id: 'liveclasses', label: 'Live Classes', icon: 'camera-video' },
+  { id: 'assignments', label: 'Assignments', icon: 'file-earmark-text' },
+  { id: 'certificates', label: 'Certificates', icon: 'award' },
+  { id: 'enrollments', label: 'Enrollments', icon: 'person-check' },
   { id: 'payments', label: 'Payments', icon: 'cash-coin' },
+  { id: 'applications', label: 'Applications', icon: 'file-earmark-text' },
   { id: 'announcements', label: 'Announcements', icon: 'megaphone' },
   { id: 'flags', label: 'Feature Flags', icon: 'toggles' },
   { id: 'marketing', label: 'Marketing', icon: 'send' },
@@ -615,6 +630,32 @@ export function AdminHome() {
                           Make Admin
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pw = window.prompt(`New password for ${u.full_name || u.email}:`);
+                          if (!pw) return;
+                          setStaffMsg(null);
+                          fetch(`${api.baseUrl}/admin/dashboard/users/password/`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${api.getToken()}`,
+                            },
+                            body: JSON.stringify({ user_id: u.id, new_password: pw }),
+                          })
+                            .then(async (res) => {
+                              const data = await res.json().catch(() => ({}));
+                              const detail =
+                                data.detail || data.error?.detail || 'Password updated.';
+                              setStaffMsg({ ok: res.ok, text: detail });
+                            })
+                            .catch(() => setStaffMsg({ ok: false, text: 'Password update failed.' }));
+                        }}
+                        className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
+                      >
+                        Set Password
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -813,6 +854,21 @@ export function AdminHome() {
           </div>
         </div>
       )}
+
+      {/* ═══ Content Manager ═══ */}
+      {tab === 'content' && <ContentTab />}
+
+      {/* ═══ Live Classes ═══ */}
+      {tab === 'liveclasses' && <LiveClassesTab />}
+
+      {/* ═══ Assignments & Quizzes ═══ */}
+      {tab === 'assignments' && <AssignmentsTab />}
+
+      {/* ═══ Certificates ═══ */}
+      {tab === 'certificates' && <CertificatesTab />}
+
+      {/* ═══ Enrollments ═══ */}
+      {tab === 'enrollments' && <EnrollmentsTab />}
 
       {/* ═══ Applications ═══ */}
       {tab === 'applications' && (

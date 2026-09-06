@@ -58,11 +58,11 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(
-        errorData.detail || errorData.message || `HTTP ${response.status}`,
-        response.status,
-        errorData
-      );
+              throw new ApiError(
+          errorData.detail || errorData.error?.detail || errorData.message || `HTTP ${response.status}`,
+          response.status,
+          errorData
+        );;
     }
 
     if (response.status === 204) return undefined as T;

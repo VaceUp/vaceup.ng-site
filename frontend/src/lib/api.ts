@@ -3,7 +3,9 @@
  * Auto-generated from backend API specification
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.vaceup.ng/api/v1';
+// Normalize: tolerate env values with or without the /api/v1 prefix
+const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://api.vaceup.ng').replace(/\/$/, '');
+const API_BASE_URL = RAW_API_URL.endsWith('/api/v1') ? RAW_API_URL : `${RAW_API_URL}/api/v1`;
 
 class ApiClient {
   baseUrl: string;

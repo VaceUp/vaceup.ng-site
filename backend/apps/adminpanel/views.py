@@ -127,7 +127,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
                 "students": User.objects.filter(role=User.Role.STUDENT).count(),
                 "instructors": User.objects.filter(role=User.Role.INSTRUCTOR).count(),
                 "admins": User.objects.filter(role=User.Role.ADMIN).count(),
-                "new_last_30_days": User.objects.filter(created_at__gte=thirty_days_ago).count(),
+                "new_last_30_days": User.objects.filter(date_joined__gte=thirty_days_ago).count(),
             },
             "courses": {
                 "total": Course.objects.count(),

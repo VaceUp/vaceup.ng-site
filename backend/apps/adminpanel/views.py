@@ -350,6 +350,48 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="enrollments")
+    def enrollments_list(self, request):
+        """GET /admin/dashboard/enrollments/ — every enrollment on the platform."""
+        from apps.enrollment.models import Enrollment
+        enrollments = Enrollment.objects.select_related("student", "course").order_by(
+            "-enrolled_at"
+        )[:300]
+        data = [
+            {
+                "id": str(e.id),
+                "student_name": e.student.full_name,
+                "student_email": e.student.email,
+                "course_title": e.course.title,
+                "status": e.status,
+                "progress_percent": e.progress_percent,
+                "enrolled_at": e.enrolled_at,
+            }
+            for e in enrollments
+        ]
+        return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="submissions")
+    def submissions_list(self, request):
+        """GET /admin/dashboard/submissions/ — every assignment submission (for grading)."""
+        from apps.assignments.models import Submission
+        subs = Submission.objects.select_related("student", "assignment").order_by(
+            "-created_at"
+        )[:300]
+        data = [
+            {
+                "id": str(sub.id),
+                "student_name": sub.student.full_name,
+                "assignment_title": sub.assignment.title,
+                "status": sub.status,
+                "score": str(sub.score) if sub.score is not None else None,
+                "feedback": sub.feedback,
+                "submitted_at": sub.created_at,
+            }
+            for sub in subs
+        ]
+        return Response(data)
+
     @action(detail=False, methods=["get"], url_path="payments")
     def payments_list(self, request):
         """GET /admin/dashboard/payments/ — every payment on the platform."""

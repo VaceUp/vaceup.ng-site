@@ -90,6 +90,7 @@ const SPECS = {
   book: { src: '', bi: 'book' },
   code: { src: '', bi: 'code-slash' },
   certificate: { src: '', bi: 'award' },
+  graduation: { src: '', bi: 'mortarboard' },
   award: { src: '', bi: 'trophy' },
   star: { src: '', bi: 'star' },
   heart: { src: '', bi: 'heart' },

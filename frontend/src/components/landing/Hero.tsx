@@ -36,21 +36,22 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
                 Practical digital skills training designed to prepare you for real-world opportunities and the global digital economy.
               </p>
 
-              {/* Action Buttons */}
+              {/* Action Buttons — PRD §3: Explore Courses + Watch How It Works */}
               <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
                 <a
                   href="#courses"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gold-brand px-8 py-3.5 text-sm sm:text-base font-bold text-navy-950 shadow-md transition-all hover:shadow-lg hover:shadow-gold-hover active:scale-95"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gold-brand px-8 py-3.5 text-sm sm:text-base font-bold text-navy-950 shadow-md transition-all hover:shadow-lg active:scale-95"
                 >
-                  <span>Enroll Now</span>
+                  Explore Courses
                   <span className="text-lg">→</span>
                 </a>
 
                 <a
-                  href="#courses"
-                  className="inline-flex items-center justify-center rounded-xl border border-white/30 bg-transparent px-8 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:border-white hover:bg-white/10 active:scale-95"
+                  href="#how-it-works"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-transparent px-8 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:border-white hover:bg-white/10 active:scale-95"
                 >
-                  Explore Courses
+                  <i className="bi bi-play-circle text-lg text-gold-brand" aria-hidden="true" />
+                  Watch How It Works
                 </a>
               </div>
 

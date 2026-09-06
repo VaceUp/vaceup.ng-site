@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { Header } from '@/components/landing/Header';
 import { Footer } from '@/components/landing/Footer';
 import AuthModal from '@/components/landing/AuthModal';
+import PageTransition from '@/components/ui/PageTransition';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className={`${inter.className} bg-white text-[#0A1128] antialiased`}>
         <AuthProvider>
           {/* Single global chrome — pages must NOT render their own Header/Footer */}
+          <PageTransition />
           <Header />
           <main className="min-h-screen">{children}</main>
           <Footer />

@@ -5,8 +5,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
+import { useRouter } from 'next/navigation';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const events = [
@@ -93,6 +93,37 @@ const events = [
 const eventTypes = ['All', 'Open Day', 'Career Fair', 'Workshop', 'Networking', 'Info Session', 'Hackathon'];
 
 export default function EventsPage() {
+  const router = useRouter();
+
+  // Register sends visitors into the standard enrollment funnel
+  const handleRegister = () => router.push('/apply');
+
+  // Add to Calendar generates a real calendar invite (.ics)
+  const handleAddToCalendar = (event: (typeof events)[number]) => {
+    const start = event.date.replace(/-/g, '') + 'T' + (event.time.match(/(\d{2}):(\d{2})/)?.[0] ?? '10:00').replace(':', '') + '00';
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//VaceUp Digital Academy//EN',
+      'BEGIN:VEVENT',
+      `UID:${event.id}@vaceup.ng`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+      `DTSTART;TZID=Africa/Lagos:${start}00`,
+      `SUMMARY:${event.title}`,
+      `DESCRIPTION:${event.description.replace(/\n/g, ' ')}`,
+      `LOCATION:${event.location}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${event.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const [selectedType, setSelectedType] = useState('All');
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
@@ -169,11 +200,11 @@ export default function EventsPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-4">
-                      <Button size="lg" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                      <Button size="lg" onClick={handleRegister} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                         Register Now
                         <LordIconComponent src={LordIcons.arrowRight} size={20} className="ml-2" />
                       </Button>
-                      <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10">
+                      <Button variant="outline" size="lg" onClick={() => handleAddToCalendar(events[0])} className="border-white/30 text-white hover:bg-white/10">
                         Add to Calendar
                         <LordIconComponent src={LordIcons.calendar} size={20} className="ml-2" />
                       </Button>
@@ -238,7 +269,7 @@ export default function EventsPage() {
             {view === 'grid' ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredEvents.slice(1).map((event) => (
-                  <Link key={event.id} href={`/events/${event.id}`}>
+                  <div key={event.id}>
                     <Card className="h-full hover:shadow-xl transition-all duration-300 border-gray-100">
                       <div className="relative aspect-video overflow-hidden rounded-t-xl">
                         <img
@@ -273,19 +304,19 @@ export default function EventsPage() {
                         </div>
                         <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
                           <span className="font-medium text-navy-900">{event.registered}/{event.capacity} seats filled</span>
-                          <Button size="sm" className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                          <Button size="sm" onClick={handleRegister} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                             Register
                           </Button>
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredEvents.slice(1).map((event) => (
-                  <Link key={event.id} href={`/events/${event.id}`}>
+                  <div key={event.id}>
                     <Card className="hover:shadow-lg transition-all duration-300 border-gray-100">
                       <CardContent className="p-6">
                         <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -316,14 +347,14 @@ export default function EventsPage() {
                             </div>
                           </div>
                           <div className="flex-shrink-0 md:w-48">
-                            <Button className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                            <Button onClick={handleRegister} className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
                               Register
                             </Button>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -339,14 +370,14 @@ export default function EventsPage() {
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { course: 'Frontend Engineering & React', start: 'Feb 12, 2024', spots: 12, color: 'from-blue-500 to-blue-600' },
-                { course: 'Data Analysis & Python', start: 'Feb 19, 2024', spots: 8, color: 'from-green-500 to-green-600' },
-                { course: 'UI/UX Design Fundamentals', start: 'Mar 4, 2024', spots: 15, color: 'from-purple-500 to-purple-600' },
+                { course: 'Virtual Assistant', start: '21 Sep 2026', spots: 12 },
+                { course: 'Data Analysis', start: '28 Sep 2026', spots: 8 },
+                { course: 'UI/UX Design', start: '05 Oct 2026', spots: 15 },
               ].map((cohort, i) => (
                 <Card key={i} className="bg-navy-900/50 border-navy-800 h-full">
                   <CardContent className="p-8 text-center">
-                    <div className={cn('w-20 h-20 rounded-2xl bg-gradient-to-br flex items-center justify-center mx-auto mb-6', cohort.color)}>
-                      <LordIconComponent src={LordIcons.graduation} size={40} colors="primary:#ffffff" />
+                    <div className="w-20 h-20 rounded-2xl bg-gold-brand/15 border border-gold-brand/30 flex items-center justify-center mx-auto mb-6">
+                      <i className="bi bi-mortarboard-fill text-3xl text-gold-brand" aria-hidden="true" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">{cohort.course}</h3>
                     <div className="flex items-center justify-center gap-2 text-navy-300 mb-4">

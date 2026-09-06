@@ -26,7 +26,7 @@ const sizeStyles = {
 
 const variantStyles = {
   // Brand system: primary CTA = Gold (navy text for WCAG contrast), secondary = Navy
-  primary: 'bg-gold-brand text-navy-950 hover:bg-gold-hover active:bg-gold-700 focus:ring-gold-500/50 shadow-glow-gold font-bold',
+  primary: 'bg-gold-brand text-navy-950 hover:bg-gold-hover active:bg-gold-700 focus:ring-gold-500/50 shadow-md font-bold',
   secondary: 'bg-navy-900 text-white hover:bg-navy-950 active:bg-navy-800 focus:ring-navy-900/50',
   outline: 'border-2 border-navy-900 text-navy-900 hover:bg-navy-50 active:bg-navy-100 focus:ring-navy-900/50',
   ghost: 'text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800/50 focus:ring-gray-500/50',

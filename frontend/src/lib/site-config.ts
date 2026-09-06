@@ -27,7 +27,7 @@ export const SOCIAL_LINKS = [
   { label: 'WhatsApp', href: SITE.whatsapp, icon: 'whatsapp' },
   { label: 'Facebook', href: 'https://www.facebook.com/vaceup', icon: 'facebook' },
   { label: 'Instagram', href: 'https://www.instagram.com/vaceup', icon: 'instagram' },
-  { label: 'X (Twitter)', href: 'https://x.com/vaceup', icon: 'twitter' },
+  { label: 'X (Twitter)', href: 'https://x.com/vaceup', icon: 'twitter-x' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/company/vaceup', icon: 'linkedin' },
   { label: 'YouTube', href: 'https://www.youtube.com/@vaceup', icon: 'youtube' },
 ] as const;

@@ -135,7 +135,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
               </div>
 
               <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-                <Button size="lg" onClick={handleEnroll} className="flex-1 sm:w-auto bg-gold-brand text-navy-950 font-bold hover:bg-gold-hover shadow-md hover:shadow-gold-hover">
+                <Button size="lg" onClick={handleEnroll} className="flex-1 sm:w-auto bg-gold-brand text-navy-950 font-bold hover:bg-gold-hover shadow-md">
                   <LordIconComponent src={LordIcons.play} size={20} colors="primary:#00088A,secondary:#FFC72C" />
                   Enroll Now - {course.price}
                 </Button>
@@ -197,7 +197,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
                 </div>
 
                 <Link href={`/checkout?course_id=${course.id}`}>
-                  <Button className="w-full py-4 bg-gold-brand text-navy-950 font-bold rounded-xl hover:bg-gold-hover shadow-md hover:shadow-gold-hover transition-all text-lg font-bold">
+                  <Button className="w-full py-4 bg-gold-brand text-navy-950 font-bold rounded-xl hover:bg-gold-hover shadow-md transition-all text-lg font-bold">
                     Enroll Now
                   </Button>
                 </Link>

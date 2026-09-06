@@ -111,7 +111,7 @@ export const Header = () => {
             </Link>
             <Link
               href="/apply"
-              className="rounded-lg bg-gold-brand px-5 py-2 text-sm font-bold text-navy-950 shadow-md hover:shadow-gold-hover transition-all active:scale-95"
+              className="rounded-lg bg-gold-brand px-5 py-2 text-sm font-bold text-navy-950 shadow-md transition-all active:scale-95"
             >
               <LordIconComponent
                 src={LordIcons.arrowRight}

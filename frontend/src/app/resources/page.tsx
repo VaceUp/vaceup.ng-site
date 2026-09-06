@@ -293,7 +293,7 @@ export default function ResourcesPage() {
             {view === 'grid' ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredResources.slice(1).map((resource) => (
-                  <Link key={resource.id} href={`/resources/${resource.id}`}>
+                  <div key={resource.id}>
                     <Card className="h-full hover:shadow-xl transition-all duration-300 border-gray-100">
                       <div className="relative aspect-video overflow-hidden rounded-t-xl">
                         <img
@@ -339,13 +339,13 @@ export default function ResourcesPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (
               <div className="space-y-4">
                 {filteredResources.slice(1).map((resource) => (
-                  <Link key={resource.id} href={`/resources/${resource.id}`}>
+                  <div key={resource.id}>
                     <Card className="hover:shadow-lg transition-all duration-300 border-gray-100">
                       <CardContent className="p-6">
                         <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -386,7 +386,7 @@ export default function ResourcesPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -402,16 +402,16 @@ export default function ResourcesPage() {
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { title: 'Development', count: 4, icon: LordIcons.code, color: 'from-blue-500 to-blue-600', items: ['React', 'Next.js', 'Git', 'Python'] },
-                { title: 'Data Science', count: 3, icon: LordIcons.brain, color: 'from-green-500 to-green-600', items: ['Pandas', 'ML', 'Visualization'] },
-                { title: 'Design', count: 2, icon: LordIcons.palette, color: 'from-purple-500 to-purple-600', items: ['UI/UX', 'Design Systems'] },
-                { title: 'Career', count: 3, icon: LordIcons.briefcase, color: 'from-orange-500 to-orange-600', items: ['Interviews', 'Freelance', 'Portfolio'] },
-                { title: 'Remote Work', count: 1, icon: LordIcons.laptop, color: 'from-teal-500 to-teal-600', items: ['Productivity', 'Tools'] },
+                { title: 'Development', count: 4, items: ['React', 'Next.js', 'Git', 'Python'] },
+                { title: 'Data Science', count: 3, items: ['Pandas', 'ML', 'Visualization'] },
+                { title: 'Design', count: 2, items: ['UI/UX', 'Design Systems'] },
+                { title: 'Career', count: 3, items: ['Interviews', 'Freelance', 'Portfolio'] },
+                { title: 'Remote Work', count: 1, items: ['Productivity', 'Tools'] },
               ].map((cat, i) => (
                 <Card key={i} className="bg-navy-900/50 border-navy-800 h-full hover:border-gold-brand/30 transition-all">
                   <CardContent className="p-8 text-center">
-                    <div className={cn('w-20 h-20 rounded-2xl bg-gradient-to-br flex items-center justify-center mx-auto mb-6', cat.color)}>
-                      <LordIconComponent src={cat.icon} size={40} colors="primary:#ffffff" />
+                    <div className="w-20 h-20 rounded-2xl bg-navy-50 border border-navy-100 flex items-center justify-center mx-auto mb-6">
+                      <i className="bi bi-folder2-open text-3xl text-navy-900" aria-hidden="true" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">{cat.title}</h3>
                     <p className="text-navy-300 mb-6">{cat.count} resources available</p>

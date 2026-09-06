@@ -115,6 +115,13 @@ export default function CertificatesPage() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Certificates</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">View and manage your earned certificates</p>
           </div>
+          <Link
+            href="/verify"
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-navy-900 px-5 py-2.5 text-sm font-bold text-navy-900 transition-colors hover:bg-navy-50"
+          >
+            <i className="bi bi-patch-check" aria-hidden="true" />
+            Verify a Certificate
+          </Link>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-8">

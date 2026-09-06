@@ -11,13 +11,13 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LordIcons.dashboard },
-  { name: 'My Courses', href: '/dashboard/courses', icon: LordIcons.book },
-  { name: 'Live Classes', href: '/dashboard/live-classes', icon: LordIcons.videoCall },
-  { name: 'Messages', href: '/dashboard/messages', icon: LordIcons.messageSquare },
-  { name: 'Certificates', href: '/dashboard/certificates', icon: LordIcons.certificate },
-  { name: 'Notifications', href: '/dashboard/notifications', icon: LordIcons.bell },
-  { name: 'Billing', href: '/dashboard/billing', icon: LordIcons.creditCard },
-  { name: 'Settings', href: '/dashboard/settings', icon: LordIcons.settings },
+  { name: 'My Courses', href: '/dashboard#courses', icon: LordIcons.book },
+  { name: 'Live Classes', href: '/dashboard#live-classes', icon: LordIcons.videoCall },
+  { name: 'Messages', href: '/dashboard#messages', icon: LordIcons.messageSquare },
+  { name: 'Certificates', href: '/dashboard#certificates', icon: LordIcons.certificate },
+  { name: 'Notifications', href: '/dashboard#notifications', icon: LordIcons.bell },
+  { name: 'Billing', href: '/dashboard#billing', icon: LordIcons.creditCard },
+  { name: 'Settings', href: '/dashboard#settings', icon: LordIcons.settings },
 ];
 
 export default function DashboardLayout({

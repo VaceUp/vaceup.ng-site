@@ -1,4 +1,7 @@
 """Serializers for admin panel."""
+from django.contrib.auth import get_user_model
+from apps.accounts.models import User
+from apps.courses.models import Course
 from rest_framework import serializers
 
 from apps.adminpanel.models import AdminActionLog, AdminSettings, SystemAnnouncement
@@ -138,3 +141,43 @@ class StaffInviteSerializer(serializers.Serializer):
         required=False,
         help_text="Required if role is instructor: bio, expertise, experience_years, etc."
     )
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    """Read shape for the admin user directory."""
+
+    class Meta:
+        model = User
+        fields = ("id", "email", "full_name", "role", "is_active", "date_joined")
+        read_only_fields = fields
+
+
+class AdminCourseListSerializer(serializers.ModelSerializer):
+    """Read shape for admin course management (includes drafts)."""
+
+    class Meta:
+        model = Course
+        fields = ("id", "name", "title", "slug", "price", "level",
+                  "is_published", "description", "thumbnail")
+        read_only_fields = fields
+
+
+class AdminCourseCreateSerializer(serializers.Serializer):
+    """Write shape: create a course from the admin panel."""
+
+    title = serializers.CharField(max_length=200)
+    category_id = serializers.UUIDField()
+    instructor_id = serializers.UUIDField()
+    description = serializers.CharField(required=False, allow_blank=True)
+    level = serializers.ChoiceField(choices=["beginner", "intermediate", "advanced"],
+                                    default="beginner")
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_published = serializers.BooleanField(default=False)
+
+
+class AdminCourseUpdateSerializer(serializers.Serializer):
+    """Write shape: edit price / publish state / title from the admin panel."""
+
+    title = serializers.CharField(max_length=200, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    is_published = serializers.BooleanField(required=False)

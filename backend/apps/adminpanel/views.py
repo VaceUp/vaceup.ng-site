@@ -20,10 +20,17 @@ from apps.adminpanel.serializers import (
     AdminActionLogCreateSerializer,
     BulkPriceUpdateSerializer,
     StaffInviteSerializer,
+    AdminCourseCreateSerializer,
+    AdminCourseListSerializer,
+    AdminCourseUpdateSerializer,
+    AdminUserListSerializer,
 )
 from apps.courses.models import Course
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.utils.text import slugify
 from apps.core.exceptions import AlreadyExists, DomainError
+from apps.payments.serializers import PaymentSerializer
 
 User = get_user_model()
 
@@ -325,3 +332,95 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         )
 
         return Response({"detail": f"Updated {updated} courses.", "updated_count": updated})
+
+    # ────────────────────────────────────────────── user directory (admin panel)
+    @action(detail=False, methods=["get"], url_path="users")
+    def users_list(self, request):
+        """GET /admin/dashboard/users/?search=&role= — the user directory."""
+        qs = User.objects.order_by("-date_joined")
+        search = request.query_params.get("search")
+        role = request.query_params.get("role")
+        if search:
+            qs = qs.filter(Q(email__icontains=search) | Q(full_name__icontains=search))
+        if role:
+            qs = qs.filter(role=role)
+        page = self.paginate_queryset(qs)
+        serializer = AdminUserListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="payments")
+    def payments_list(self, request):
+        """GET /admin/dashboard/payments/ — every payment on the platform."""
+        payments = Payment.objects.select_related("student", "course").order_by("-created_at")[:200]
+        return Response(PaymentSerializer(payments, many=True).data)
+
+    # ────────────────────────────────────────────── course management (admin panel)
+    @action(detail=False, methods=["get"], url_path="courses")
+    def courses_list(self, request):
+        """GET /admin/dashboard/courses/ — all courses including drafts."""
+        courses = Course.objects.select_related("category", "instructor").order_by("-created_at")
+        return Response(AdminCourseListSerializer(courses, many=True).data)
+
+    @action(detail=False, methods=["post"], url_path="courses/create")
+    def course_create(self, request):
+        """POST /admin/dashboard/courses/create/ — create a course."""
+        serializer = AdminCourseCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        from apps.courses.models import Category
+        try:
+            category = Category.objects.get(id=data["category_id"])
+        except Category.DoesNotExist:
+            raise DomainError("Category not found.", code="category_not_found")
+
+        try:
+            instructor = User.objects.get(id=data["instructor_id"], role=User.Role.INSTRUCTOR)
+        except User.DoesNotExist:
+            raise DomainError(
+                "Instructor not found — invite a tutor first, then assign them.",
+                code="instructor_not_found",
+            )
+
+        title = data["title"].strip()
+        slug = slugify(title)[:220] or f"course-{User.objects.count()}"
+        if Course.objects.filter(slug=slug).exists():
+            import uuid as _uuid
+            slug = f"{slug}-{_uuid.uuid4().hex[:6]}"
+
+        course = Course.objects.create(
+            name=title[:120],
+            title=title,
+            slug=slug,
+            category=category,
+            instructor=instructor,
+            description=data.get("description", ""),
+            level=data["level"],
+            price=data["price"],
+            is_published=data["is_published"],
+        )
+        return Response(AdminCourseListSerializer(course).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="courses/update")
+    def course_update(self, request):
+        """POST /admin/dashboard/courses/update/ {course_id, price?, is_published?, title?}."""
+        course_id = request.data.get("course_id")
+        if not course_id:
+            raise DomainError("course_id is required.", code="course_id_required")
+        try:
+            course = Course.objects.get(id=course_id)
+        except (Course.DoesNotExist, ValueError, ValidationError):
+            raise DomainError("Course not found (check the course id).", code="course_not_found")
+
+        allowed = {"title", "description", "price", "is_published"}
+        for field, value in request.data.items():
+            if field in allowed and value is not None:
+                setattr(course, field, value)
+
+        if course.title and (not course.name or course.name == "Untitled course"):
+            course.name = course.title[:120]
+
+        course.save()
+        return Response(AdminCourseListSerializer(course).data)

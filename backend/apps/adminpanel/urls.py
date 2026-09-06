@@ -22,4 +22,9 @@ urlpatterns = [
     path("admin/dashboard/staff/activate/", AdminDashboardViewSet.as_view({"post": "activate_staff"}), name="admin-staff-activate"),
     path("admin/dashboard/staff/promote/", AdminDashboardViewSet.as_view({"post": "promote_staff"}), name="admin-staff-promote"),
     path("admin/dashboard/courses/bulk-price/", AdminDashboardViewSet.as_view({"post": "bulk_price_update"}), name="admin-bulk-price"),
+    path("admin/dashboard/users/", AdminDashboardViewSet.as_view({"get": "users_list"}), name="admin-users-list"),
+    path("admin/dashboard/payments/", AdminDashboardViewSet.as_view({"get": "payments_list"}), name="admin-payments-list"),
+    path("admin/dashboard/courses/", AdminDashboardViewSet.as_view({"get": "courses_list"}), name="admin-courses-list"),
+    path("admin/dashboard/courses/create/", AdminDashboardViewSet.as_view({"post": "course_create"}), name="admin-course-create"),
+    path("admin/dashboard/courses/update/", AdminDashboardViewSet.as_view({"post": "course_update"}), name="admin-course-update"),
 ]

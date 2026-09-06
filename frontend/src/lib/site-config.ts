@@ -19,15 +19,39 @@ export const SITE = {
   kidsUrl: '/kids-academy',
 } as const;
 
-/**
- * Social profiles. WhatsApp is verified; the other handles are our best
- * candidates — verify and update handles as the accounts are confirmed.
- */
+/** TikTok has no Bootstrap icon — rendered as inline SVG by <SocialIcon/>. */
 export const SOCIAL_LINKS = [
   { label: 'WhatsApp', href: SITE.whatsapp, icon: 'whatsapp' },
-  { label: 'Facebook', href: 'https://www.facebook.com/vaceup', icon: 'facebook' },
-  { label: 'Instagram', href: 'https://www.instagram.com/vaceup', icon: 'instagram' },
-  { label: 'X (Twitter)', href: 'https://x.com/vaceup', icon: 'twitter-x' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/vaceup', icon: 'linkedin' },
-  { label: 'YouTube', href: 'https://www.youtube.com/@vaceup', icon: 'youtube' },
+  { label: 'Facebook', href: 'https://www.facebook.com/share/1Gj9BfAk5E/', icon: 'facebook' },
+  {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/vaceupdigitalacademy',
+    icon: 'instagram',
+  },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@vaceupdigitalacademy', icon: 'tiktok' },
+  {
+    label: 'YouTube',
+    href: 'https://youtube.com/@vaceupdigitalacademy',
+    icon: 'youtube',
+  },
+  {
+    label: 'LinkedIn',
+    href: 'https://www.linkedin.com/company/vaceup-academy/',
+    icon: 'linkedin',
+  },
+] as const;
+
+/** VaceUp Kids Tech Academy socials (kids brand). */
+export const KIDS_SOCIAL_LINKS = [
+  {
+    label: 'Facebook',
+    href: 'https://www.facebook.com/share/14mbUoVbbpF/',
+    icon: 'facebook',
+  },
+  {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/vaceupkidstech',
+    icon: 'instagram',
+  },
+  { label: 'YouTube', href: 'https://youtube.com/@vaceupkidstech', icon: 'youtube' },
 ] as const;

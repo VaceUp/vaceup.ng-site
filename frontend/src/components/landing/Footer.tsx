@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { SOCIAL_LINKS, SITE } from '@/lib/site-config';
+import { SocialIcon } from '@/components/ui/SocialIcon';
 
 export const Footer = () => {
   const [name, setName] = useState('');
@@ -180,7 +181,7 @@ export const Footer = () => {
                 title={social.label}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-teal-brand"
               >
-                <i className={`bi bi-${social.icon} text-sm text-white`} aria-hidden="true" />
+                <SocialIcon icon={social.icon} size={15} />
               </a>
             ))}
           </div>

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SITE, SOCIAL_LINKS } from '@/lib/site-config';
+import { SocialIcon } from '@/components/ui/SocialIcon';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 const NAV_LINKS = [
@@ -71,7 +72,7 @@ export const Header = () => {
                 aria-label={s.label}
                 className="text-white/80 hover:text-gold-brand transition-colors"
               >
-                <i className={`bi bi-${s.icon}`} aria-hidden="true" />
+                <SocialIcon icon={s.icon} size={14} />
               </a>
             ))}
           </div>

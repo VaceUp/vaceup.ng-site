@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { cn } from '@/lib/utils';
+import { KIDS_SOCIAL_LINKS } from '@/lib/site-config';
+import { SocialIcon } from '@/components/ui/SocialIcon';
 import Link from 'next/link';
 
 const kidsPrograms = [
@@ -391,6 +393,28 @@ export default function KidsAcademyPage() {
                     Talk to an Advisor
                   </Button>
                 </Link>
+              </div>
+            </div>
+
+            {/* Kids socials — follow the fun */}
+            <div className="mt-12 text-center">
+              <p className="text-sm font-bold uppercase tracking-widest text-gold-brand mb-4">
+                Follow the fun
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                {KIDS_SOCIAL_LINKS.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.label}
+                    title={social.label}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all hover:bg-gold-brand hover:text-navy-950 hover:scale-110"
+                  >
+                    <SocialIcon icon={social.icon} size={18} />
+                  </a>
+                ))}
               </div>
             </div>
           </section>

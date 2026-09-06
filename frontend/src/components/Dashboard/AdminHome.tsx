@@ -4,11 +4,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Tab = 'overview' | 'staff' | 'announcements' | 'flags' | 'marketing';
+type Tab = 'overview' | 'staff' | 'courses' | 'announcements' | 'flags' | 'marketing';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: 'speedometer2' },
   { id: 'staff', label: 'Staff & Users', icon: 'people' },
+  { id: 'courses', label: 'Courses', icon: 'book' },
   { id: 'announcements', label: 'Announcements', icon: 'megaphone' },
   { id: 'flags', label: 'Feature Flags', icon: 'toggles' },
   { id: 'marketing', label: 'Marketing', icon: 'send' },
@@ -20,6 +21,72 @@ interface AdminStats {
   enrollments: { total: number; active: number; completed: number };
   live_classes?: { total: number };
   applications?: { total: number; pending: number };
+}
+
+function AdminCourses() {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .getCourses({ limit: 50 })
+      .then((res) => setCourses(res.results ?? []))
+      .catch((err) => setError(err?.message || 'Failed to load courses.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="h-40 animate-pulse rounded-2xl bg-gray-100" />;
+  if (error) return <div className="rounded-2xl bg-red-50 p-6 text-sm text-red-700">{error}</div>;
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="font-black text-navy-950">All Courses ({courses.length})</h3>
+        <a
+          href="https://api.vaceup.ng/admin/courses/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-lg bg-navy-950 px-4 py-2 text-xs font-bold text-white"
+        >
+          + New course (Django admin)
+        </a>
+      </div>
+      {courses.length === 0 ? (
+        <p className="text-sm text-gray-500">No courses yet.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {courses.map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-navy-950">{c.title}</p>
+                <p className="text-xs capitalize text-gray-500">
+                  {c.level} · {c.duration}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-black text-navy-950">
+                  {new Intl.NumberFormat('en-NG', {
+                    style: 'currency',
+                    currency: 'NGN',
+                    maximumFractionDigits: 0,
+                  }).format(parseFloat(c.price) || 0)}
+                </span>
+                <a
+                  href={`https://api.vaceup.ng/admin/courses/course/${c.id}/change/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
+                >
+                  Edit
+                </a>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function Card({ label, value, icon }: { label: string; value: React.ReactNode; icon: string }) {
@@ -39,6 +106,7 @@ const inputCls =
 
 export function AdminHome() {
   const [tab, setTab] = useState<Tab>('overview');
+  const [hash, setHash] = useState('');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsError, setStatsError] = useState('');
 
@@ -81,6 +149,31 @@ export function AdminHome() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Sidebar links use /dashboard#users etc. — sync the tab to the URL hash
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    onHash();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    const h = hash.replace('#', '');
+    if (['staff', 'courses', 'announcements', 'flags', 'marketing'].includes(h)) {
+      setTab(h as Tab);
+      window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+    }
+  }, [hash]);
+
+  const setTabAndHash = (t: Tab) => {
+    setTab(t);
+    if (t === 'overview') {
+      window.history.replaceState(null, '', '/dashboard');
+    } else {
+      window.history.replaceState(null, '', `/dashboard#${t}`);
+    }
+  };
 
   const post = async (url: string, body: any) => {
     const res = await fetch(`${api.baseUrl}${url}`, {
@@ -200,7 +293,7 @@ export function AdminHome() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTabAndHash(t.id)}
             className={cn(
               'rounded-full px-4 py-2 text-sm font-bold transition-all',
               tab === t.id
@@ -263,7 +356,7 @@ export function AdminHome() {
                   <button
                     key={a.title}
                     type="button"
-                    onClick={() => setTab(a.tab)}
+                    onClick={() => setTabAndHash(a.tab)}
                     className="rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
                     <i className={cn('bi', a.icon, 'text-2xl text-gold-700')} aria-hidden="true" />
@@ -392,6 +485,9 @@ export function AdminHome() {
           </div>
         </div>
       )}
+
+      {/* Courses management */}
+      {tab === 'courses' && <AdminCourses />}
 
       {/* Announcements */}
       {tab === 'announcements' && (

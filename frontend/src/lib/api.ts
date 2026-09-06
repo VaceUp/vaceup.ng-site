@@ -560,7 +560,7 @@ export interface CourseModule { title: string; topics?: string[]; }
 
 export interface CourseListParams {
   page?: number; page_size?: number; category?: string;
-  level?: string; search?: string; ordering?: string;
+  level?: string; search?: string; ordering?: string; limit?: number;
 }
 
 export interface PaginatedResponse<T> {

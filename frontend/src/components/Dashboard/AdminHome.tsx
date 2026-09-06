@@ -121,8 +121,17 @@ export function AdminHome() {
     }
   };
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   const staffAction = async (action: 'deactivate' | 'activate' | 'promote', user_id: string) => {
     setStaffMsg(null);
+    if (!UUID_RE.test(user_id.trim())) {
+      setStaffMsg({
+        ok: false,
+        text: 'That is not a valid user id. Copy the full id (UUID) from Django admin → Users.',
+      });
+      return;
+    }
     try {
       await post(`/admin/dashboard/staff/${action}/`, { user_id, role: 'admin' });
       setStaffMsg({ ok: true, text: `User ${action}d successfully.` });
@@ -359,7 +368,7 @@ export function AdminHome() {
                   key={a}
                   type="button"
                   disabled={!targetId}
-                  onClick={() => staffAction(a, targetId)}
+                  onClick={() => staffAction(a, targetId.trim())}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-xs font-bold capitalize text-white transition-colors hover:bg-navy-900 disabled:opacity-40"
                 >
                   {a}
@@ -458,7 +467,7 @@ export function AdminHome() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {flags.map((f) => (
-                <li key={f.key ?? f.id} className="flex items-center justify-between gap-4 py-3">
+                <li key={f.key} className="flex items-center justify-between gap-4 py-3">
                   <span className="font-mono text-sm text-navy-950">{f.key}</span>
                   <div className="flex items-center gap-2">
                     <input

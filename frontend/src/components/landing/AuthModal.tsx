@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
-import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import { dockSpring, staggerContainer, fieldItem } from '@/components/ui/Reveal';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
-interface AuthModalProps {
-  isOpen: boolean;
-  mode: 'signin' | 'signup';
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModalProps) {
-  const { login, register } = useAuth();
+/**
+ * Global auth modal — rendered once in the root layout.
+ * Any page/CTA can open it via `useAuth().openAuth('signin' | 'signup')`.
+ * Submits to the real backend through the shared auth context.
+ */
+export default function AuthModal() {
+  const router = useRouter();
+  const { isOpen, mode, closeAuth, login, register } = useAuth();
   const [isSignUp, setIsSignUp] = useState(mode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,10 +23,17 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      setIsSignUp(mode === 'signup');
+      setError('');
+    }
+  }, [isOpen, mode]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (isSignUp) {
       if (password !== confirmPassword) {
         setError('Passwords do not match');
@@ -43,23 +52,44 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
       } else {
         await login({ email, password });
       }
-      onSuccess();
-    } catch (error: any) {
-      setError(error.message || 'Something went wrong. Please try again.');
+      closeAuth();
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative border border-gray-100 text-[#0A1128]">
+    <AnimatePresence>
+      {isOpen && (
+      <>
+      {/* Backdrop */}
+      <motion.div
+        key="backdrop"
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: 0.18 } }}
+        onClick={closeAuth}
+      >
+        {/* Panel — macOS dock-style spring pop */}
+        <motion.div
+          key="panel"
+          className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative border border-gray-100 text-[#0A1128]"
+          initial={{ opacity: 0, y: 96, scale: 0.88 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 56, scale: 0.92, transition: { duration: 0.16 } }}
+          transition={dockSpring}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
         {/* Close Button */}
         <button
-          onClick={onClose}
-          className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 text-lg font-bold"
+          type="button"
+          onClick={closeAuth}
+          aria-label="Close"
+          className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 text-lg font-bold transition-transform hover:scale-110 active:scale-90"
         >
           ✕
         </button>
@@ -75,9 +105,15 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <motion.form
+          onSubmit={handleSubmit}
+          className="space-y-4 text-xs"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+        >
           {isSignUp && (
-            <div>
+            <motion.div variants={fieldItem}>
               <label className="block font-bold text-gray-700 mb-1">Full Name</label>
               <input
                 type="text"
@@ -85,12 +121,12 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
                 placeholder="Abubakar Aminu"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-5 py-3.5 text-base text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:bg-white transition-all"
               />
-            </div>
+            </motion.div>
           )}
 
-          <div>
+          <motion.div variants={fieldItem}>
             <label className="block font-bold text-gray-700 mb-1">Email Address</label>
             <input
               type="email"
@@ -98,62 +134,62 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-5 py-3.5 text-base text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900 focus:bg-white transition-all"
             />
-          </div>
+          </motion.div>
 
-          <div>
+          <motion.div variants={fieldItem}>
             <label className="block font-bold text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              className="w-full bg-gray-50 border border-gray-200 text-gray-800 focus:bg-white"
             />
-          </div>
+          </motion.div>
 
           {isSignUp && (
-            <div>
+            <motion.div variants={fieldItem}>
               <label className="block font-bold text-gray-700 mb-1">Confirm Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-navy-900"
+                autoComplete="new-password"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-800 focus:bg-white"
               />
-            </div>
+            </motion.div>
           )}
 
           {error && (
-            <div className="text-red-500 text-xs text-center bg-red-50 px-3 py-2 rounded-lg">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-red-500 text-xs text-center bg-red-50 px-3 py-2 rounded-lg"
+            >
               {error}
-            </div>
+            </motion.div>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3.5 bg-navy-900 text-white font-bold rounded-xl hover:bg-navy-950 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {isSignUp ? 'Creating Account...' : 'Signing In...'}
-              </span>
-            ) : (
-              isSignUp ? 'Proceed to Enrollment & Payment →' : 'Sign In to Dashboard →'
-            )}
-          </button>
-        </form>
+          <motion.div variants={fieldItem}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 bg-gold-brand text-navy-950 font-bold rounded-xl hover:bg-gold-hover transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            >
+              {isLoading ? 'Please wait…' : isSignUp ? 'Create Account & Continue →' : 'Sign In to Dashboard →'}
+            </button>
+          </motion.div>
+        </motion.form>
 
-        <div className="text-center mt-6 text-xs text-gray-500">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.35 } }}
+          className="text-center mt-6 text-xs text-gray-500"
+        >
           {isSignUp ? (
             <p>
               Already have an account?{' '}
@@ -177,8 +213,11 @@ export default function AuthModal({ isOpen, mode, onClose, onSuccess }: AuthModa
               </button>
             </p>
           )}
-        </div>
-      </div>
-    </div>
+        </motion.div>
+        </motion.div>
+      </motion.div>
+      </>
+      )}
+    </AnimatePresence>
   );
 }

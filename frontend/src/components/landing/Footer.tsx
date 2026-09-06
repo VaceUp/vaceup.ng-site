@@ -1,21 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import Link from 'next/link';
 
-interface FooterProps {
-  onNavigateCourses?: () => void;
-}
-
-export const Footer = ({ onNavigateCourses }: FooterProps) => {
-  const { openAuth } = useAuth();
+export const Footer = () => {
   const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      console.log('Subscribed:', email);
+      // PENDING backend: POST /api/v1/newsletter/subscribe/ — see MISSING-ENDPOINTS.md
+      setSubscribed(true);
       setEmail('');
     }
   };
@@ -28,10 +25,11 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
           {/* Brand Logo & Address */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-white px-4 py-2.5 rounded-xl inline-flex items-center gap-3 shadow-md">
-              <svg className="h-9 w-9 flex-shrink-0" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15 30 L40 80 L70 10 L50 10 L38 60 L28 30 Z" fill="#008B8B" />
-                <path d="M30 30 L45 60 L80 10 L95 25 L55 90 L30 30 Z" fill="#FFC72C" />
-              </svg>
+              <img
+                src="/logo.webp"
+                alt="VaceUp Digital Academy logo"
+                className="h-9 w-9 flex-shrink-0 object-contain"
+              />
               <div className="flex flex-col">
                 <span className="text-2xl font-extrabold tracking-tight text-navy-900 leading-none">
                   VACEUP
@@ -91,19 +89,19 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#about" className="hover:text-teal-brand transition-colors">
+                <Link href="/about" className="hover:text-teal-brand transition-colors">
                   About VaceUp
-                </a>
+                </Link>
               </li>
               <li>
-                <button onClick={onNavigateCourses} className="hover:text-teal-brand transition-colors text-left">
+                <Link href="/courses" className="hover:text-teal-brand transition-colors">
                   All courses
-                </button>
+                </Link>
               </li>
               <li>
-                <button onClick={onNavigateCourses} className="hover:text-teal-brand transition-colors text-left">
+                <Link href="/kids-academy" className="hover:text-teal-brand transition-colors">
                   Kids Tech Academy
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
@@ -115,19 +113,19 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#blog" className="hover:text-teal-brand transition-colors">
+                <Link href="/blog" className="hover:text-teal-brand transition-colors">
                   Blog
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#resources" className="hover:text-teal-brand transition-colors">
+                <Link href="/resources" className="hover:text-teal-brand transition-colors">
                   Free Resources
-                </a>
+                </Link>
               </li>
               <li>
-                <button onClick={() => useAuth().openAuth('signin')} className="hover:text-teal-brand transition-colors text-left">
+                <Link href="/dashboard" className="hover:text-teal-brand transition-colors">
                   Student Dashboard
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
@@ -139,14 +137,14 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#contact" className="hover:text-teal-brand transition-colors">
+                <Link href="/contact" className="hover:text-teal-brand transition-colors">
                   Contact Us
-                </a>
+                </Link>
               </li>
               <li>
-                <button onClick={() => useAuth().openAuth('signin')} className="hover:text-teal-brand transition-colors text-left">
+                <Link href="/login" className="hover:text-teal-brand transition-colors">
                   Login
-                </button>
+                </Link>
               </li>
             </ul>
           </div>
@@ -160,22 +158,28 @@ export const Footer = ({ onNavigateCourses }: FooterProps) => {
               Cohort dates, free workshops and career tips — once a month.
             </p>
 
-            <form onSubmit={handleSubscribe} className="flex items-center gap-2">
-              <input
-                type="email"
-                required
-                placeholder="Email Address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl bg-white px-4 py-3 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-brand"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-gold-brand px-5 py-3 text-xs font-bold text-navy-950 hover:bg-gold-hover transition-all whitespace-nowrap shadow-md"
-              >
-                Subscribe
-              </button>
-            </form>
+            {subscribed ? (
+              <p className="text-xs font-semibold text-gold-brand bg-white/5 rounded-xl px-4 py-3">
+                Thanks for subscribing! We&apos;ll be in touch.
+              </p>
+            ) : (
+              <form onSubmit={handleSubscribe} className="flex items-center gap-2">
+                <input
+                  type="email"
+                  required
+                  placeholder="Email Address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl bg-white px-4 py-3 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-brand"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-gold-brand px-5 py-3 text-xs font-bold text-navy-950 hover:bg-gold-hover transition-all whitespace-nowrap shadow-md"
+                >
+                  Subscribe
+                </button>
+              </form>
+            )}
           </div>
 
         </div>

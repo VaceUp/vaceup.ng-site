@@ -225,46 +225,6 @@ class ApiClient {
   }
 
   // ============================================
-  // CERTIFICATES
-  // ============================================
-  async getMyCertificates(): Promise<Certificate[]> {
-    return this.request<Certificate[]>('/certificates/my/');
-  }
-
-  async getCertificate(id: string): Promise<Certificate> {
-    return this.request<Certificate>(`/certificates/${id}/`);
-  }
-
-  async downloadCertificate(id: string): Promise<Blob> {
-    const response = await fetch(`${this.baseUrl}/certificates/${id}/download/`, {
-      headers: { 'Authorization': `Bearer ${this.token}` },
-    });
-    if (!response.ok) throw new ApiError('Failed to download certificate', response.status);
-    return response.blob();
-  }
-
-  // ============================================
-  // LIVE CLASSES
-  // ============================================
-  async getLiveClasses(params?: LiveClassListParams): Promise<PaginatedResponse<LiveClass>> {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) searchParams.append(key, String(value));
-      });
-    }
-    return this.request<PaginatedResponse<LiveClass>>(`/live-classes/?${searchParams}`);
-  }
-
-  async getLiveClass(id: string): Promise<LiveClass> {
-    return this.request<LiveClass>(`/live-classes/${id}/`);
-  }
-
-  async joinLiveClass(id: string): Promise<LiveClassSession> {
-    return this.request<LiveClassSession>(`/live-classes/${id}/join/`, { method: 'POST' });
-  }
-
-  // ============================================
   // MESSAGING
   // ============================================
   async getConversations(): Promise<Conversation[]> {
@@ -334,7 +294,7 @@ class ApiClient {
   }
 
   // ============================================
-  // APPLICATIONS
+  // APPLICATIONS (admissions)
   // ============================================
   async getApplications(params?: ApplicationListParams): Promise<PaginatedResponse<Application>> {
     const searchParams = new URLSearchParams();
@@ -354,150 +314,99 @@ class ApiClient {
   }
 
   // ============================================
-  // CART
+  // ANNOUNCEMENTS (backend: apps.announcements)
   // ============================================
-  async getCart(): Promise<Cart> {
-    return this.request<Cart>('/cart/');
-  }
-
-  async addToCart(data: AddToCartRequest): Promise<CartItem> {
-    return this.request<CartItem>('/cart/items/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCartItem(itemId: string, quantity: number): Promise<CartItem> {
-    return this.request<CartItem>(`/cart/items/${itemId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
-    });
-  }
-
-  async removeFromCart(itemId: string): Promise<void> {
-    return this.request<void>(`/cart/items/${itemId}/`, { method: 'DELETE' });
-  }
-
-  async clearCart(): Promise<void> {
-    return this.request<void>('/cart/', { method: 'DELETE' });
-  }
-
-  // ============================================
-  // APPLICATIONS
-  // ============================================
-  async getApplications(params?: ApplicationListParams): Promise<PaginatedResponse<Application>> {
+  async getAnnouncements(params?: AnnouncementListParams): Promise<PaginatedResponse<Announcement>> {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) searchParams.append(key, String(value));
       });
     }
-    return this.request<PaginatedResponse<Application>>(`/applications/?${searchParams}`);
+    return this.request<PaginatedResponse<Announcement>>(`/announcements/?${searchParams}`);
   }
 
-  async submitApplication(data: SubmitApplicationRequest): Promise<Application> {
-    return this.request<Application>('/applications/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async getAnnouncement(id: string): Promise<Announcement> {
+    return this.request<Announcement>(`/announcements/${id}/`);
   }
 
   // ============================================
-  // CART
+  // ASSIGNMENTS & QUIZZES (backend: apps.assignments)
   // ============================================
-  async getCart(): Promise<Cart> {
-    return this.request<Cart>('/cart/');
-  }
-
-  async addToCart(data: AddToCartRequest): Promise<CartItem> {
-    return this.request<CartItem>('/cart/items/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCartItem(itemId: string, quantity: number): Promise<CartItem> {
-    return this.request<CartItem>(`/cart/items/${itemId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
-    });
-  }
-
-  async removeFromCart(itemId: string): Promise<void> {
-    return this.request<void>(`/cart/items/${itemId}/`, { method: 'DELETE' });
-  }
-
-  async clearCart(): Promise<void> {
-    return this.request<void>('/cart/', { method: 'DELETE' });
-  }
-
-  // ============================================
-  // APPLICATIONS
-  // ============================================
-  async getApplications(params?: ApplicationListParams): Promise<PaginatedResponse<Application>> {
+  async getAssignments(params?: AssignmentListParams): Promise<PaginatedResponse<Assignment>> {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) searchParams.append(key, String(value));
       });
     }
-    return this.request<PaginatedResponse<Application>>(`/applications/?${searchParams}`);
+    return this.request<PaginatedResponse<Assignment>>(`/assignments/?${searchParams}`);
   }
 
-  async submitApplication(data: SubmitApplicationRequest): Promise<Application> {
-    return this.request<Application>('/applications/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async getAssignment(id: string): Promise<Assignment> {
+    return this.request<Assignment>(`/assignments/${id}/`);
   }
 
-  // ============================================
-  // CART
-  // ============================================
-  async getCart(): Promise<Cart> {
-    return this.request<Cart>('/cart/');
-  }
-
-  async addToCart(data: AddToCartRequest): Promise<CartItem> {
-    return this.request<CartItem>('/cart/items/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCartItem(itemId: string, quantity: number): Promise<CartItem> {
-    return this.request<CartItem>(`/cart/items/${itemId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
-    });
-  }
-
-  async removeFromCart(itemId: string): Promise<void> {
-    return this.request<void>(`/cart/items/${itemId}/`, { method: 'DELETE' });
-  }
-
-  async clearCart(): Promise<void> {
-    return this.request<void>('/cart/', { method: 'DELETE' });
-  }
-
-  // ============================================
-  // APPLICATIONS
-  // ============================================
-  async getApplications(params?: ApplicationListParams): Promise<PaginatedResponse<Application>> {
+  async getSubmissions(params?: AssignmentListParams): Promise<PaginatedResponse<Submission>> {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) searchParams.append(key, String(value));
       });
     }
-    return this.request<PaginatedResponse<Application>>(`/applications/?${searchParams}`);
+    return this.request<PaginatedResponse<Submission>>(`/submissions/?${searchParams}`);
   }
 
-  async submitApplication(data: SubmitApplicationRequest): Promise<Application> {
-    return this.request<Application>('/applications/', {
+  async submitAssignment(assignmentId: string, data: SubmitAssignmentRequest): Promise<Submission> {
+    // NOTE: confirm the exact submit action path against /api/schema/ once the
+    // backend is redeployed — DefaultRouter usually exposes POST /submissions/.
+    return this.request<Submission>('/submissions/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ assignment: assignmentId, ...data }),
     });
+  }
+
+  async getQuizzes(params?: AssignmentListParams): Promise<PaginatedResponse<Quiz>> {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) searchParams.append(key, String(value));
+      });
+    }
+    return this.request<PaginatedResponse<Quiz>>(`/quizzes/?${searchParams}`);
+  }
+
+  async getQuizAttempts(params?: AssignmentListParams): Promise<PaginatedResponse<QuizAttempt>> {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) searchParams.append(key, String(value));
+      });
+    }
+    return this.request<PaginatedResponse<QuizAttempt>>(`/quiz-attempts/?${searchParams}`);
+  }
+
+  // ============================================
+  // CODE EDITOR & WHITEBOARD (backend REST sessions; realtime runs over WebSocket)
+  // ============================================
+  async getCodeEditorSessions(params?: AssignmentListParams): Promise<PaginatedResponse<CollabSession>> {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) searchParams.append(key, String(value));
+      });
+    }
+    return this.request<PaginatedResponse<CollabSession>>(`/code-editor/sessions/?${searchParams}`);
+  }
+
+  async getWhiteboardSessions(params?: AssignmentListParams): Promise<PaginatedResponse<CollabSession>> {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) searchParams.append(key, String(value));
+      });
+    }
+    return this.request<PaginatedResponse<CollabSession>>(`/whiteboard/sessions/?${searchParams}`);
   }
 
   // ============================================
@@ -684,17 +593,71 @@ export interface ApplicationListParams { page?: number; page_size?: number; stat
 
 export interface SubmitApplicationRequest { course_id: string; motivation: string; }
 
-export interface Cart { id: string; items: CartItem[]; subtotal: number; discount: number; total: number; item_count: number; }
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  target: string;
+  priority: 'low' | 'normal' | 'high' | 'critical';
+  status: 'draft' | 'scheduled' | 'published' | 'archived';
+  publish_at?: string;
+  created_at?: string;
+}
 
-export interface CartItem { id: string; course: Course; quantity: number; price: number; }
+export interface AnnouncementListParams { page?: number; page_size?: number; priority?: string; target?: string; }
 
-export interface AddToCartRequest { course_id: string; quantity?: number; }
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  course: string;
+  due_date?: string;
+  max_score?: number;
+  created_at?: string;
+}
 
-export interface Application { id: string; course_title: string; course_thumbnail: string; student_name: string; student_avatar: string; submitted_at: string; status: 'submitted' | 'under_review' | 'approved' | 'rejected'; motivation: string; reviewed_at?: string; reviewed_by?: string; }
+export interface Submission {
+  id: string;
+  assignment: string;
+  student: string;
+  content?: string;
+  file?: string;
+  submitted_at?: string;
+  grade?: number | null;
+  feedback?: string;
+  status: string;
+}
 
-export interface ApplicationListParams { page?: number; page_size?: number; status?: string; }
+export interface Quiz {
+  id: string;
+  title: string;
+  course: string;
+  description?: string;
+  time_limit?: number;
+  pass_score?: number;
+}
 
-export interface SubmitApplicationRequest { course_id: string; motivation: string; }
+export interface QuizAttempt {
+  id: string;
+  quiz: string;
+  student: string;
+  score?: number;
+  passed?: boolean;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface CollabSession {
+  id: string;
+  title: string;
+  course?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface AssignmentListParams { page?: number; page_size?: number; course?: string; search?: string; }
+
+export interface SubmitAssignmentRequest { content?: string; file_url?: string; }
 
 export interface Notification { id: string; title: string; message: string; type: string; is_read: boolean; created_at: string; related_object_id?: string; related_object_type?: string; }
 

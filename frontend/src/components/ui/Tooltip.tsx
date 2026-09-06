@@ -33,7 +33,7 @@ export function Tooltip({
   avoidCollisions = true,
   sticky = false,
   hideWhenDetached = true,
-}: TooltipProps {
+}: TooltipProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);

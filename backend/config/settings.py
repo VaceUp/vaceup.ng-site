@@ -223,6 +223,9 @@ AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="") or None
 # --- CORS: lock to the known frontend origin(s) ---
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
+# --- CSRF: required by Django 4+ for admin/form POSTs served from these hosts ---
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
 # --- Cache: Redis/Upstash when configured, else per-process memory ---------
 # IMPORTANT for scale: DRF throttling and any shared locking are only correct
 # with a shared cache. Set REDIS_URL (Upstash) in production; without it we
@@ -356,6 +359,8 @@ if not DEBUG:
     X_FRAME_OPTIONS = "DENY"
     # Trust the proxy's X-Forwarded-Proto (Nginx/ELB terminating TLS).
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Enforce TLS at the origin when behind a proxy that terminates TLS.
+    # NOTE: keep False ONLY if the proxy cannot guarantee https (e.g. cPanel).
 
 # --- URLs ---
 ROOT_URLCONF = "config.urls"

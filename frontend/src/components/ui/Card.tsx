@@ -23,7 +23,7 @@ const variantStyles = {
   default: 'bg-white dark:bg-slate-900/80 border border-gray-200 dark:border-slate-700',
   glass: 'bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl border-white/30 dark:border-slate-700/20 shadow-glass',
   'glass-dark': 'bg-slate-950/70 backdrop-blur-xl border-slate-700/20 shadow-glass-dark',
-  primary: 'bg-primary-500/10 backdrop-blur-xl border-primary-500/30 shadow-glass-primary',
+  primary: 'bg-gold-500/10 backdrop-blur-xl border-gold-500/30 shadow-glass-gold',
   bordered: 'bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700',
   elevated: 'bg-white dark:bg-slate-900 shadow-xl dark:shadow-slate-900/50',
 };

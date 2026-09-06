@@ -7,13 +7,7 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
-  const stats = [
-    { value: '30', label: 'Students Trained' },
-    { value: '5', label: 'Expert Instructors' },
-    { value: '8', label: 'Courses & Programmes' },
-    { value: '98%', label: 'Student Satisfaction' },
-    { value: '3', label: 'Countries Reached' },
-  ];
+  // Academy statistics live in the single Stats band (components/homepage/Stats.tsx).
 
   return (
     <div className="w-full">
@@ -105,24 +99,6 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-          </div>
-        </div>
-      </section>
-
-      {/* Integrated Stats Strip */}
-      <section className="bg-gray-50 py-10 sm:py-12 md:py-16 border-b border-gray-200">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid grid-cols-2 gap-8 text-center sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
-            {stats.map((stat, index) => (
-              <div key={index} className="flex flex-col items-center justify-center">
-                <span className="text-3xl font-extrabold text-navy-950 sm:text-4xl md:text-5xl lg:text-6xl tracking-tight">
-                  {stat.value}
-                </span>
-                <span className="mt-2 text-xs sm:text-sm font-medium text-navy-950/80">
-                  {stat.label}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       </section>

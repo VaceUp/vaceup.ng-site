@@ -268,11 +268,6 @@ export const FRONTEND_PAGES = {
   '/certificates/[id]': 'Certificate detail with verification',
   '/verify/[code]': 'Public certificate verification',
 
-  // Live Classes
-  '/live-classes': 'Live classes schedule',
-  '/live-classes/[id]': 'Live class detail',
-  '/live-classes/[id]/live': 'Live classroom',
-
   // Code Editor
   '/code-editor': 'Code editor with multiple languages',
   '/code-editor/[sessionId]': 'Code editor session',
@@ -293,17 +288,36 @@ export const FRONTEND_PAGES = {
   '/marketing/campaigns': 'Campaign management',
   '/marketing/analytics': 'Marketing analytics',
 
-  // Code Editor
-  '/code-editor': 'Code editor dashboard',
-  '/code-editor/[sessionId]': 'Code editor session',
-
-  // Whiteboard
-  '/whiteboard': 'Whiteboard dashboard',
-  '/whiteboard/[id]': 'Whiteboard canvas',
-
-  // Cart & Checkout
+  // Cart
   '/cart': 'Shopping cart',
-  '/checkout': 'Checkout flow',
+} as const;
+
+// ============================================================
+// PENDING ENDPOINTS — frontend features with NO backend route yet.
+// Build these in apps.core (or a new app) and move them into
+// API_ENDPOINTS above. Do NOT call them from production code paths
+// until the backend ships; see MISSING-ENDPOINTS.md at repo root.
+// ============================================================
+export const PENDING_ENDPOINTS = {
+  newsletter: {
+    // Footer "Stay Updated" form (frontend currently shows local success state)
+    subscribe: 'POST /api/v1/newsletter/subscribe/',
+    confirm: 'POST /api/v1/newsletter/confirm/',
+    unsubscribe: 'POST /api/v1/newsletter/unsubscribe/',
+  },
+  contact: {
+    // Contact page form (frontend currently falls back to mailto:info@vaceup.ng)
+    create: 'POST /api/v1/contact/',
+  },
+  certificates: {
+    // Public, unauthenticated certificate verification (QR code target on certificates)
+    verify: 'GET /api/v1/certificates/verify/{code}/',
+  },
+  liveClasses: {
+    // Class reminders / calendar invites (PRD §9.5) — verify whether shipped
+    // with apps.liveclasses or still pending.
+    reminders: 'GET /api/v1/live-classes/{id}/reminders/',
+  },
 } as const;
 
 // Feature flag mapping

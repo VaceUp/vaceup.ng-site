@@ -80,3 +80,7 @@ next-env.d.ts
 .next/
 out/
 node_modules/
+
+# Local artifacts that must never be committed
+backend.zip
+~/

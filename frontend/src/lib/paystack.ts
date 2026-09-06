@@ -29,8 +29,15 @@ export const initializePayment = async ({
     return;
   }
 
+  const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+  if (!publicKey) {
+    // Never fall back to a fake key — payments must fail visibly, not silently.
+    alert('Payments are temporarily unavailable. Please contact support at info@vaceup.ng.');
+    return;
+  }
+
   const handler = (window as any).PaystackPop.setup({
-    key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_sample_key_12345',
+    key: publicKey,
     email,
     amount: amountInNgn * 100, // Convert NGN to Kobo
     currency: 'NGN',

@@ -3,7 +3,7 @@
 import React, { Fragment, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
-import { X } from 'react-bootstrap-icons';
+import { LordIconComponent, LordIcons } from './LordIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface ModalProps {
@@ -104,11 +104,8 @@ export function Modal({
                 'shadow-2xl',
                 'backdrop-blur-xl',
                 'bg-white/95 dark:bg-slate-950/95',
-                'backdrop-blur-xl',
                 'border border-white/20 dark:border-slate-800/50',
-                'shadow-2xl',
-                'rounded-2xl',
-                'overflow-hidden'
+                sizeClasses[size] || sizeClasses.md
               )}
             >
               <div className="flex items-start justify-between p-4 md:p-6 border-b border-gray-200 dark:border-slate-700/50">
@@ -136,12 +133,12 @@ export function Modal({
                       text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
                       hover:bg-gray-100 dark:hover:bg-slate-800/50
                       transition-colors duration-200
-                      focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2
+                      focus:outline-none focus:ring-2 focus:ring-navy-900/50 focus:ring-offset-2
                       focus:ring-offset-white dark:focus:ring-offset-slate-950
                     `}
                     aria-label="Close"
                   >
-                    <X className="w-5 h-5" aria-hidden="true" />
+                    <LordIconComponent src={LordIcons.close} size={20} colors="primary:#64748B" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -152,79 +149,79 @@ export function Modal({
             </motion.div>
           </div>
         </motion.div>
-      </AnimatePresence>
-    );
-  };
+      </div>
+    </AnimatePresence>
+  );
+}
 
-  Modal.displayName = 'Modal';
+Modal.displayName = 'Modal';
 
-  // Export alert/confirm/prompt helpers
-  export function AlertModal({
-    isOpen,
-    onClose,
-    title,
-    message,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
-    variant: 'default' | 'destructive' = 'default',
-    onConfirm,
-    loading = false,
-  }: {
-    isOpen: boolean;
-    onClose: () => void;
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    variant?: 'default' | 'destructive';
-    onConfirm: () => Promise<void> | void;
-    loading?: boolean;
-  }) {
-    return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        title={title}
-        size="sm"
-        closeOnOverlayClick={false}
-        closeOnEscape={false}
-      >
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-300 mt-2 mb-6">{children}</p>
-        </div>
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-          >
-            {cancelText}
-          </button>
-          <button
-            onClick={async () => {
-              await onConfirm();
-              onClose();
-            }}
-            disabled={loading}
-            className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
-              variant === 'destructive'
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-primary-500 text-white hover:bg-primary-600'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Loading...
-              </>
-            ) : (
-              confirmText
-            )}
-          </button>
-        </div>
-      </Modal>
-    );
-  }
+// Export alert/confirm/prompt helpers
+export function AlertModal({
+  isOpen,
+  onClose,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  variant = 'default',
+  onConfirm,
+  loading = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'default' | 'destructive';
+  onConfirm: () => Promise<void> | void;
+  loading?: boolean;
+}) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      closeOnOverlayClick={false}
+      closeOnEscape={false}
+    >
+      <div className="text-center">
+        <p className="text-gray-600 dark:text-gray-300 mt-2 mb-6">{message}</p>
+      </div>
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+        >
+          {cancelText}
+        </button>
+        <button
+          onClick={async () => {
+            await onConfirm();
+            onClose();
+          }}
+          disabled={loading}
+          className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
+            variant === 'destructive'
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : 'bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Loading...
+            </>
+          ) : (
+            confirmText
+          )}
+        </button>
+      </div>
+    </Modal>
+  );
+}

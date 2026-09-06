@@ -37,7 +37,7 @@ const features = [
   {
     icon: LordIcons.book,
     title: 'Community Access',
-    description: 'Join 30,000+ alumni in our exclusive community. Network, collaborate, and grow with peers across Africa.',
+    description: 'Join our growing community of learners. Network, collaborate, and grow with peers across Africa.',
   },
   {
     icon: LordIcons.shield,

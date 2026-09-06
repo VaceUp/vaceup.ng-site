@@ -66,7 +66,7 @@ export function CourseDetailContent({ course }: CourseDetailContentProps) {
               <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
                 <div className="flex items-center gap-2"><span className="text-teal-brand">📊</span><span>{course.level}</span></div>
                 <div className="flex items-center gap-2"><LordIconComponent src={LordIcons.clock} size={16} />{course.duration}</div>
-                <div className="flex items-center gap-2"><LordIconComponent src={LordIcons.userGroup} size={16} />30,000+ students</div>
+                <div className="flex items-center gap-2"><LordIconComponent src={LordIcons.userGroup} size={16} />Hands-on projects</div>
                 <div className="flex items-center gap-2"><LordIconComponent src={LordIcons.star} colors="primary:#f59e0b,secondary:#ffffff" size={16} />4.9 (1,200+ reviews)</div>
               </div>
 

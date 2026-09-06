@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { DashboardLayout } from './layout';
+import DashboardLayout from './layout';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import { api, DashboardStats, DashboardCourse } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 
 function StatCard({ icon, title, value, change, color }: any) {
@@ -101,6 +102,8 @@ function RecommendationCard({ title, instructor, duration, level, rating, studen
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     coursesEnrolled: 0,
     hoursLearned: 0,
@@ -113,28 +116,34 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // Auth guard: the dashboard requires a session
+      if (!api.getToken()) {
+        router.replace('/login?next=/dashboard');
+        return;
+      }
       try {
         setLoading(true);
-        // Fetch real data from API
         const [statsData, coursesData] = await Promise.all([
-          fetch('/api/v1/dashboard/stats/', {
-            headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-          }).then(res => res.json()),
-          fetch('/api/v1/dashboard/courses/', {
-            headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-          }).then(res => res.json()),
+          api.getDashboardStats(),
+          api.getDashboardCourses(),
         ]);
-        
+
         setStats({
           coursesEnrolled: statsData.courses_enrolled || 0,
           hoursLearned: statsData.hours_learned || 0,
           certificatesEarned: statsData.certificates_earned || 0,
           streak: statsData.streak || 0,
         });
-        setCourses(coursesData || []);
-      } catch (err) {
+        setCourses((coursesData as any) || []);
+      } catch (err: any) {
+        if (err?.status === 401) {
+          api.setToken(null);
+          router.replace('/login?next=/dashboard');
+          return;
+        }
         console.error('Failed to load dashboard:', err);
-        // Fallback to mock data
+        setError('We could not load your dashboard right now. Please try again later.');
+        // Fallback to demo data so the UI stays explorable
         setStats({ coursesEnrolled: 5, hoursLearned: 24, certificatesEarned: 2, streak: 7 });
         setCourses([
           { id: '1', title: 'Frontend Engineering & React', thumbnail: '/course1.jpg', progress: 65, nextLesson: 'State Management with Redux', instructor: 'Sarah Johnson', totalLessons: 24, completedLessons: 15 },
@@ -147,7 +156,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (
@@ -172,7 +181,9 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {user ? `Welcome back, ${user.full_name.split(' ')[0]}` : 'Welcome back'}
+            </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">Continue your learning journey</p>
           </div>
           <div className="flex items-center gap-4">

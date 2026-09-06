@@ -20,6 +20,11 @@ export function KidsAcademy() {
     <section className="py-20 bg-navy-950" aria-labelledby="kids-heading">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
+          <img
+            src="/kids-academy-logo.png"
+            alt="VaceUp Kids Tech Academy logo — Learn Today. Build Tomorrow. Lead the Future."
+            className="h-28 w-28 mx-auto mb-6 rounded-2xl bg-white object-contain p-2 shadow-lg"
+          />
           <span className="inline-block px-4 py-2 rounded-full bg-gold-brand/10 text-gold-brand text-sm font-semibold mb-6">
             VaceUp Kids Tech Academy
           </span>
@@ -39,7 +44,7 @@ export function KidsAcademy() {
               className="bg-white border-gray-200 h-full hover:shadow-xl transition-all duration-300"
             >
               <CardContent className="p-6">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br {program.color} flex items-center justify-center mb-4">
+                <div className={cn('w-14 h-14 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4', program.color)}>
                   <LordIconComponent src={program.icon} size={28} colors="primary:#ffffff" />
                 </div>
                 <h3 className="text-xl font-bold text-navy-950 mb-2">{program.title}</h3>

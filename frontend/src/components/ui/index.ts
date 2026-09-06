@@ -5,4 +5,4 @@ export { Modal } from './Modal';
 export { Badge } from './Badge';
 export { Avatar } from './Avatar';
 export { Dropdown } from './Dropdown';
-export { Tooltip } from './Tooltip';
+export { Tooltip } from './Tooltip';export { PasswordInput } from './PasswordInput';

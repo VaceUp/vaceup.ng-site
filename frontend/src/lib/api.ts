@@ -44,7 +44,17 @@ class ApiClient {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    let response = await fetch(url, { ...options, headers });
+
+    // Access tokens are short-lived (15 min) — refresh once and retry on 401
+    if (response.status === 401 && this.token && !(options as any).__retried) {
+      await this.refreshToken(); // throws ApiError('Session expired') if refresh fails
+      return this.request<T>(endpoint, {
+        ...options,
+        headers: { ...options.headers, Authorization: `Bearer ${this.token}` },
+        __retried: true,
+      } as RequestInit);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -119,7 +129,25 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
-    return this.request<RefreshTokenResponse>('/auth/refresh/', { method: 'POST' });
+    const refresh =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('refresh_token')
+        : null;
+    if (!refresh) throw new ApiError('No refresh token', 401);
+    // Direct fetch — going through request() would recurse on 401
+    const res = await fetch(`${this.baseUrl}/auth/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!res.ok) {
+      this.setToken(null);
+      if (typeof window !== 'undefined') localStorage.removeItem('refresh_token');
+      throw new ApiError('Session expired', 401);
+    }
+    const data: RefreshTokenResponse = await res.json();
+    this.setToken(data.access);
+    return data;
   }
 
   // User Profile
@@ -229,30 +257,32 @@ class ApiClient {
   // ============================================
   // MESSAGING
   // ============================================
-  async getConversations(): Promise<Conversation[]> {
-    return this.request<Conversation[]>('/messaging/conversations/');
+  // NOTE: Message model is direct user-to-user (sender/recipient).
+  async getConversations(): Promise<any[]> {
+    return this.request<any[]>('/messages/');
   }
 
-  async getConversation(id: string): Promise<Conversation> {
-    return this.request<Conversation>(`/messaging/conversations/${id}/`);
+  async getThread(withUserId: string): Promise<any[]> {
+    const res = await this.request<any>(`/messages/thread/?with=${encodeURIComponent(withUserId)}`);
+    return res.results ?? res;
   }
 
-  async getMessages(conversationId: string): Promise<Message[]> {
-    return this.request<Message[]>(`/messaging/conversations/${conversationId}/messages/`);
-  }
-
-  async sendMessage(conversationId: string, content: string): Promise<Message> {
-    return this.request<Message>(`/messaging/conversations/${conversationId}/messages/`, {
+  async sendUserMessage(recipientId: string, body: string): Promise<any> {
+    return this.request<any>('/messages/', {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ recipient: recipientId, body }),
     });
+  }
+
+  async getUnreadCount(): Promise<number> {
+    const res = await this.request<{ unread: number }>('/messages/unread-count/');
+    return res.unread ?? 0;
   }
 
   async createConversation(userId: string): Promise<Conversation> {
-    return this.request<Conversation>('/messaging/conversations/', {
-      method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
-    });
+    // No conversation-creation endpoint — direct messages start on first send.
+    void userId;
+    throw new Error('Start a chat by sending the first message instead.');
   }
 
   // ============================================
@@ -483,6 +513,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  role?: 'admin' | 'instructor' | 'student';
   phone_number?: string;
   avatar?: string;
   is_verified: boolean;
@@ -577,7 +608,26 @@ export interface Conversation {
   last_message: string; timestamp: string; unread_count: number;
 }
 
-export interface Message { id: string; sender_id: string; content: string; timestamp: string; is_own: boolean; read: boolean; }
+export interface Message {
+  id: string;
+  sender: string;
+  sender_name: string;
+  recipient: string;
+  body: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface ConversationSummary {
+  user_id: string;
+  full_name: string;
+  role: string;
+  unread: number;
+  last_message: string;
+  last_at: string;
+  last_from_me: boolean;
+}
 
 export interface DashboardStats { courses_enrolled: number; hours_learned: number; certificates_earned: number; streak: number; }
 

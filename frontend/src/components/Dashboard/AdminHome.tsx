@@ -40,6 +40,7 @@ const inputCls =
 export function AdminHome() {
   const [tab, setTab] = useState<Tab>('overview');
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsError, setStatsError] = useState('');
 
   // Staff form state
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'instructor' });
@@ -60,7 +61,9 @@ export function AdminHome() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
 
   const loadAll = useCallback(() => {
-    api.request('/admin/dashboard/').then(setStats).catch(() => setStats(null));
+    api.request('/admin/dashboard/')
+      .then((res) => { setStats(res as AdminStats); setStatsError(''); })
+      .catch((err) => { setStats(null); setStatsError(err?.message || 'Request failed'); });
     api
       .request('/admin/announcements/')
       .then((res: any) => setAnnouncements(res.results ?? res ?? []))
@@ -205,7 +208,24 @@ export function AdminHome() {
       {/* Overview */}
       {tab === 'overview' && (
         <div className="space-y-6">
-          {!stats ? (
+          {!stats && statsError ? (
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+              <i className="bi bi-exclamation-triangle mb-3 block text-3xl text-red-400" aria-hidden="true" />
+              <p className="font-bold text-red-700">Could not load platform stats</p>
+              <p className="mx-auto mt-1 max-w-md break-words font-mono text-xs text-red-500">{statsError}</p>
+              <p className="mx-auto mt-3 max-w-md text-xs text-gray-500">
+                If this says 403: your account's <b>role</b> is not set to <code>admin</code> —
+                run the role-fix command, or set it in Django admin → Users → your account → Role.
+              </p>
+              <button
+                type="button"
+                onClick={loadAll}
+                className="mt-4 rounded-xl bg-navy-950 px-6 py-2.5 text-sm font-bold text-white"
+              >
+                Retry
+              </button>
+            </div>
+          ) : !stats ? (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="h-28 animate-pulse rounded-2xl bg-gray-200" />

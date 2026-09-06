@@ -2,8 +2,7 @@ import './globals.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth-context';
-import { Header } from '@/components/landing/Header';
-import { Footer } from '@/components/landing/Footer';
+import AppShell from '@/components/layout/AppShell';
 import AuthModal from '@/components/landing/AuthModal';
 import PageTransition from '@/components/ui/PageTransition';
 
@@ -39,11 +38,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} bg-white text-[#0A1128] antialiased`}>
         <AuthProvider>
-          {/* Single global chrome — pages must NOT render their own Header/Footer */}
+          {/* Single global chrome — pages must NOT render their own Header/Footer.
+              AppShell hides the marketing chrome on dashboard/tool pages. */}
           <PageTransition />
-          <Header />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
+          <AppShell>
+            {children}
+          </AppShell>
           <AuthModal />
         </AuthProvider>
       </body>

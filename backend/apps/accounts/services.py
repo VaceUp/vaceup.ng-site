@@ -54,9 +54,19 @@ def register_user(*, email, full_name, password, role=None, **profile):
     _create_profile_for(user)
 
     token = EmailVerificationToken.objects.create(user=user)
-    transaction.on_commit(
-        lambda: tasks.send_verification_email.delay(user.email, str(token.token))
-    )
+
+    def _queue_verification_email():
+        try:
+            tasks.send_verification_email.delay(user.email, str(token.token))
+        except Exception:  # noqa: BLE001 — signup must succeed even if the mail queue is down
+            import logging
+            logging.getLogger("accounts").exception(
+                "Could not queue verification email for %s — verify link token: %s",
+                user.email,
+                token.token,
+            )
+
+    transaction.on_commit(_queue_verification_email)
     return user
 
 
@@ -102,9 +112,16 @@ def resend_verification(*, email):
         used=True
     )
     token = EmailVerificationToken.objects.create(user=user)
-    transaction.on_commit(
-        lambda: tasks.send_verification_email.delay(user.email, str(token.token))
-    )
+    def _queue_resend():
+        try:
+            tasks.send_verification_email.delay(user.email, str(token.token))
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger("accounts").exception(
+                "Could not queue verification resend for %s — token: %s", user.email, token.token
+            )
+
+    transaction.on_commit(_queue_resend)
 
 
 @transaction.atomic

@@ -22,6 +22,7 @@ from apps.adminpanel.serializers import (
     StaffInviteSerializer,
 )
 from apps.courses.models import Course
+from django.core.exceptions import ValidationError
 from apps.core.exceptions import AlreadyExists, DomainError
 
 User = get_user_model()
@@ -214,8 +215,9 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
         try:
             user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise DomainError("User not found.", code="user_not_found")
+        except (User.DoesNotExist, ValueError, ValidationError):
+            # ValueError/ValidationError: user_id is not a valid UUID
+            raise DomainError("User not found (check the user id).", code="user_not_found")
 
         if user.is_admin and user != request.user:
             raise DomainError("Cannot deactivate another admin.", code="cannot_deactivate_admin")
@@ -247,8 +249,9 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
         try:
             user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise DomainError("User not found.", code="user_not_found")
+        except (User.DoesNotExist, ValueError, ValidationError):
+            # ValueError/ValidationError: user_id is not a valid UUID
+            raise DomainError("User not found (check the user id).", code="user_not_found")
 
         user.is_active = True
         user.save(update_fields=["is_active", "updated_at"])
@@ -272,8 +275,9 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
         try:
             user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise DomainError("User not found.", code="user_not_found")
+        except (User.DoesNotExist, ValueError, ValidationError):
+            # ValueError/ValidationError: user_id is not a valid UUID
+            raise DomainError("User not found (check the user id).", code="user_not_found")
 
         user.role = User.Role.ADMIN
         user.is_staff = True

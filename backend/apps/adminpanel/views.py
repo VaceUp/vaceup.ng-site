@@ -357,6 +357,116 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         user.save(update_fields=["password", "updated_at"])
         return Response({"detail": f"Password updated for {user.full_name or user.email}."})
 
+    @action(detail=False, methods=["post"], url_path="users/delete")
+    def users_delete(self, request):
+        """POST /admin/dashboard/users/delete/ {user_id} — permanently delete a user.
+
+        Admins cannot be deleted. Users with payment history are refused
+        (deactivate instead) — financial records must be kept.
+        """
+        user_id = request.data.get("user_id")
+        if not user_id:
+            raise DomainError("user_id is required.", code="user_id_required")
+        try:
+            user = User.objects.get(id=user_id)
+        except (User.DoesNotExist, ValueError, ValidationError):
+            raise DomainError("User not found (check the user id).", code="user_not_found")
+
+        if user.is_superuser or user.is_admin:
+            raise DomainError(
+                "Admin accounts cannot be deleted — deactivate instead.",
+                code="cannot_delete_admin",
+            )
+
+        from django.db import transaction as db_transaction
+        from django.db.models import ProtectedError
+
+        try:
+            with db_transaction.atomic():
+                # Clear related rows that would block deletion (safe to remove).
+                user.messages.all().delete() if hasattr(user, "messages") else None
+                user.notifications.all().delete() if hasattr(user, "notifications") else None
+                user.enrollments.all().delete() if hasattr(user, "enrollments") else None
+                user.applications.all().delete() if hasattr(user, "applications") else None
+                user.certificates.all().delete() if hasattr(user, "certificates") else None
+                user.submissions.all().delete() if hasattr(user, "submissions") else None
+                user.tokens.all().delete() if hasattr(user, "tokens") else None
+                user.outstandingtoken_set.all().delete()
+                if hasattr(user, "cart"):
+                    user.cart.delete() if user.cart else None
+                if hasattr(user, "tutor_profile"):
+                    user.tutor_profile.delete() if user.tutor_profile else None
+                user.delete()
+        except ProtectedError:
+            raise DomainError(
+                "This user has records that prevent deletion (e.g. payment history). "
+                "Use Deactivate instead.",
+                code="protected",
+            )
+
+        services.log_admin_action(
+            admin=request.user,
+            action_type=AdminActionLog.ActionType.STAFF_DEACTIVATE,
+            description=f"Deleted user {user_id}",
+            request=request,
+        )
+        return Response({"detail": "User deleted permanently."})
+
+    @action(detail=False, methods=["post"], url_path="certificates/issue")
+    def certificates_issue(self, request):
+        """POST /admin/dashboard/certificates/issue/ {student_id, course_id}.
+
+        Issues a certificate for the student on the given course. Marks the
+        enrollment completed if it isn't already. PDF generation failures are
+        non-fatal — the certificate (and its verify page) still exists.
+        """
+        student_id = request.data.get("student_id")
+        course_id = request.data.get("course_id")
+        if not student_id or not course_id:
+            raise DomainError("student_id and course_id are required.", code="params")
+
+        from apps.certificates.services import issue_certificate
+        from apps.enrollment.models import Enrollment
+        from apps.certificates.models import Certificate
+
+        try:
+            student = User.objects.get(id=student_id)
+            course = Course.objects.get(id=course_id)
+        except (User.DoesNotExist, Course.DoesNotExist, ValueError, ValidationError):
+            raise DomainError("Student or course not found.", code="not_found")
+
+        enrollment = Enrollment.objects.filter(student=student, course=course).first()
+        if not enrollment:
+            raise DomainError(
+                "That student is not enrolled in this course.", code="not_enrolled"
+            )
+
+        if enrollment.status != Enrollment.Status.COMPLETED:
+            enrollment.status = Enrollment.Status.COMPLETED
+            if not enrollment.completed_at:
+                from django.utils import timezone as _tz
+                enrollment.completed_at = _tz.now()
+            enrollment.save(update_fields=["status", "completed_at", "updated_at"])
+
+        try:
+            certificate = issue_certificate(enrollment=enrollment)
+        except Exception:
+            certificate = Certificate.objects.filter(enrollment=enrollment).first()
+            if not certificate:
+                raise DomainError(
+                    "Certificate could not be generated (PDF engine unavailable on this host).",
+                    code="pdf_failed",
+                )
+            # Certificate record exists — the PDF just failed. Good enough.
+
+        return Response({
+            "detail": "Certificate issued.",
+            "certificate_number": certificate.certificate_number,
+            "verification_code": certificate.verification_code,
+            "student_name": certificate.student_name_at_issue,
+            "course_title": certificate.course_title_at_issue,
+        })
+
     @action(detail=False, methods=["get"], url_path="users")
     def users_list(self, request):
         """GET /admin/dashboard/users/?search=&role= — the user directory."""

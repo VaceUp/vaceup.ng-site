@@ -42,18 +42,18 @@ const INSTRUCTOR_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: 'grid-1x2' },
-  { name: 'Users', href: '/dashboard#users', icon: 'people' },
-  { name: 'Courses', href: '/dashboard#courses', icon: 'book' },
-  { name: 'Content', href: '/dashboard#content', icon: 'folder-open' },
-  { name: 'Live Classes', href: '/dashboard#liveclasses', icon: 'camera-video' },
-  { name: 'Assignments', href: '/dashboard#assignments', icon: 'file-earmark-text' },
-  { name: 'Certificates', href: '/dashboard#certificates', icon: 'award' },
-  { name: 'Enrollments', href: '/dashboard#enrollments', icon: 'person-check' },
-  { name: 'Payments', href: '/dashboard#payments', icon: 'cash-coin' },
-  { name: 'Applications', href: '/dashboard#applications', icon: 'file-earmark-text' },
-  { name: 'Announcements', href: '/dashboard#announcements', icon: 'megaphone' },
-  { name: 'Feature Flags', href: '/dashboard#flags', icon: 'toggles' },
-  { name: 'Marketing', href: '/dashboard#marketing', icon: 'send' },
+  { name: 'Users', href: '/dashboard?tab=users', icon: 'people' },
+  { name: 'Courses', href: '/dashboard?tab=courses', icon: 'book' },
+  { name: 'Content', href: '/dashboard?tab=content', icon: 'folder-open' },
+  { name: 'Live Classes', href: '/dashboard?tab=liveclasses', icon: 'camera-video' },
+  { name: 'Assignments', href: '/dashboard?tab=assignments', icon: 'file-earmark-text' },
+  { name: 'Certificates', href: '/dashboard?tab=certificates', icon: 'award' },
+  { name: 'Enrollments', href: '/dashboard?tab=enrollments', icon: 'person-check' },
+  { name: 'Payments', href: '/dashboard?tab=payments', icon: 'cash-coin' },
+  { name: 'Applications', href: '/dashboard?tab=applications', icon: 'file-earmark-text' },
+  { name: 'Announcements', href: '/dashboard?tab=announcements', icon: 'megaphone' },
+  { name: 'Feature Flags', href: '/dashboard?tab=flags', icon: 'toggles' },
+  { name: 'Marketing', href: '/dashboard?tab=marketing', icon: 'send' },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -85,9 +85,12 @@ export default function DashboardLayout({
     role === 'admin' ? ADMIN_NAV : role === 'instructor' ? INSTRUCTOR_NAV : STUDENT_NAV;
 
   const isItemActive = (item: NavItem) => {
-    const [base, section] = item.href.split('#');
+    const [base, section] = item.href.includes('?tab=') 
+      ? item.href.split('?tab=')
+      : item.href.split('#');
     if (base === '/dashboard') {
-      const current = hash.replace('#', '');
+      const qTab = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : '';
+      const current = hash.replace('#', '') || qTab || '';
       if (section) return current === section;
       return !current || current === 'overview';
     }

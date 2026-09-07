@@ -85,6 +85,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function AdminHome() {
   const [tab, setTab] = useState<Tab>('overview');
   const [hash, setHash] = useState('');
+  const [searchParams, setSearchParams] = useState('');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsError, setStatsError] = useState('');
 
@@ -218,26 +219,37 @@ export function AdminHome() {
     loadAll();
   }, [loadAll]);
 
-  // Sidebar hash links → tabs
+  // Sidebar links (query ?tab= or hash #) → tabs
   useEffect(() => {
-    const onHash = () => setHash(window.location.hash);
-    onHash();
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const onNav = () => {
+      setHash(window.location.hash);
+      setSearchParams(window.location.search);
+    };
+    onNav();
+    window.addEventListener('hashchange', onNav);
+    window.addEventListener('popstate', onNav);
+    return () => {
+      window.removeEventListener('hashchange', onNav);
+      window.removeEventListener('popstate', onNav);
+    };
   }, []);
 
   useEffect(() => {
-    const h = hash.replace('#', '');
-    if (TABS.some((t) => t.id === h)) {
-      setTab(h as Tab);
+    if (typeof window === 'undefined') return;
+    const qTab = new URLSearchParams(searchParams).get('tab');
+    const hTab = hash.replace('#', '');
+    const incoming = qTab || hTab;
+    if (incoming && TABS.some((t) => t.id === incoming)) {
+      setTab(incoming as Tab);
       window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
     }
-  }, [hash]);
+  }, [hash, searchParams]);
 
   const setTabAndHash = (t: Tab) => {
     setTab(t);
-    if (t === 'overview') window.history.replaceState(null, '', '/dashboard');
-    else window.history.replaceState(null, '', `/dashboard#${t}`);
+    if (t === 'overview') window.history.pushState(null, '', '/dashboard');
+    else window.history.pushState(null, '', `/dashboard?tab=${t}`);
+    window.dispatchEvent(new Event('popstate'));
   };
 
   const post = async (url: string, body: any) => {

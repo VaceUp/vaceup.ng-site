@@ -20,3 +20,8 @@ def send_verification_email(email, token):
 @shared_task(name="accounts.send_password_reset_email", **_RETRY)
 def send_password_reset_email(email, token):
     emails.send_password_reset_email(email=email, token=token)
+
+
+@shared_task(name="accounts.send_welcome_email", **_RETRY)
+def send_welcome_email(email, full_name):
+    emails.send_welcome_email(email=email, full_name=full_name)

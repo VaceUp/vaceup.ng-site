@@ -3,6 +3,8 @@
  * Auto-generated from backend API specification
  */
 
+import { apiErrorMessage } from './api-errors';
+
 // Normalize: tolerate env values with or without the /api/v1 prefix
 const RAW_API_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://api.vaceup.ng').replace(/\/$/, '');
 const API_BASE_URL = RAW_API_URL.endsWith('/api/v1') ? RAW_API_URL : `${RAW_API_URL}/api/v1`;
@@ -32,7 +34,8 @@ class ApiClient {
 
   async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    authenticated = true
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers: HeadersInit = {
@@ -40,14 +43,14 @@ class ApiClient {
       ...options.headers,
     };
 
-    if (this.token) {
+    if (authenticated && this.token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
     }
 
     let response = await fetch(url, { ...options, headers });
 
     // Access tokens are short-lived (15 min) — refresh once and retry on 401
-    if (response.status === 401 && this.token && !(options as any).__retried) {
+    if (response.status === 401 && authenticated && this.token && !(options as any).__retried) {
       await this.refreshToken(); // throws ApiError('Session expired') if refresh fails
       return this.request<T>(endpoint, {
         ...options,
@@ -58,11 +61,7 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-              throw new ApiError(
-          errorData.detail || errorData.error?.detail || errorData.message || `HTTP ${response.status}`,
-          response.status,
-          errorData
-        );;
+      throw new ApiError(apiErrorMessage(errorData, response.status), response.status, errorData);
     }
 
     if (response.status === 204) return undefined as T;
@@ -72,18 +71,18 @@ class ApiClient {
   // ============================================
   // AUTHENTICATION
   // ============================================
-  async register(data: RegisterRequest): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/register/', {
+  async register(data: RegisterRequest): Promise<RegisterResponse> {
+    return this.request<RegisterResponse>('/auth/register/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/auth/login/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
     if (response.access) this.setToken(response.access);
     return response;
   }
@@ -92,14 +91,14 @@ class ApiClient {
     return this.request<VerifyEmailResponse>('/auth/verify-email/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   }
 
   async resendVerification(data: ResendVerificationRequest): Promise<ResendVerificationResponse> {
     return this.request<ResendVerificationResponse>('/auth/resend-verification/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   }
 
   async requestPasswordReset(data: PasswordResetRequest): Promise<PasswordResetResponse> {
@@ -118,7 +117,10 @@ class ApiClient {
 
   async logout(): Promise<void> {
     try {
-      await this.request('/auth/logout/', { method: 'POST' });
+      const refresh = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      if (refresh) await this.request('/auth/logout/', {
+        method: 'POST', body: JSON.stringify({ refresh }),
+      }, false);
     } finally {
       this.setToken(null);
     }
@@ -126,6 +128,12 @@ class ApiClient {
 
   async getMe(): Promise<User> {
     return this.request<User>('/auth/me/');
+  }
+
+  async setAdminGuideDismissed(dismissed: boolean): Promise<User> {
+    return this.request<User>('/auth/me/', {
+      method: 'PATCH', body: JSON.stringify({ admin_guide_dismissed: dismissed }),
+    });
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
@@ -147,6 +155,7 @@ class ApiClient {
     }
     const data: RefreshTokenResponse = await res.json();
     this.setToken(data.access);
+    if (data.refresh && typeof window !== 'undefined') localStorage.setItem('refresh_token', data.refresh);
     return data;
   }
 
@@ -499,6 +508,8 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface RegisterResponse { detail: string; verification_email_queued?: boolean; }
+
 export interface VerifyEmailRequest { token: string; }
 export interface VerifyEmailResponse { detail: string; }
 export interface ResendVerificationRequest { email: string; }
@@ -507,7 +518,7 @@ export interface PasswordResetRequest { email: string; }
 export interface PasswordResetResponse { detail: string; }
 export interface PasswordResetConfirmRequest { token: string; new_password: string; }
 export interface PasswordResetConfirmResponse { detail: string; }
-export interface RefreshTokenResponse { access: string; }
+export interface RefreshTokenResponse { access: string; refresh?: string; }
 
 export interface User {
   id: string;
@@ -520,6 +531,7 @@ export interface User {
   is_active: boolean;
   date_joined: string;
   last_login?: string;
+  admin_guide_dismissed?: boolean;
 }
 
 export interface UserProfile {

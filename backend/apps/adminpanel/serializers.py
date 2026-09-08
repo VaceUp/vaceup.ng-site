@@ -1,7 +1,7 @@
 """Serializers for admin panel."""
 from django.contrib.auth import get_user_model
 from apps.accounts.models import User
-from apps.courses.models import Course
+from apps.courses.models import Category, Course
 from rest_framework import serializers
 
 from apps.adminpanel.models import AdminActionLog, AdminSettings, SystemAnnouncement
@@ -156,8 +156,8 @@ class AdminCourseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ("id", "name", "title", "slug", "price", "level",
-                  "is_published", "description", "thumbnail")
+        fields = ("id", "title", "slug", "price", "level", "category", "instructor",
+                  "is_published", "description", "thumbnail", "duration", "image_url")
         read_only_fields = fields
 
 
@@ -165,12 +165,14 @@ class AdminCourseCreateSerializer(serializers.Serializer):
     """Write shape: create a course from the admin panel."""
 
     title = serializers.CharField(max_length=200)
-    category_id = serializers.UUIDField()
-    instructor_id = serializers.UUIDField()
+    category_id = serializers.IntegerField(min_value=1)
+    instructor_id = serializers.IntegerField(min_value=1)
     description = serializers.CharField(required=False, allow_blank=True)
     level = serializers.ChoiceField(choices=["beginner", "intermediate", "advanced"],
                                     default="beginner")
-    price = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, default=0, min_value=0)
+    duration = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    image_url = serializers.URLField(required=False, allow_blank=True)
     is_published = serializers.BooleanField(default=False)
 
 
@@ -179,5 +181,9 @@ class AdminCourseUpdateSerializer(serializers.Serializer):
 
     title = serializers.CharField(max_length=200, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
-    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, min_value=0)
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False)
+    instructor = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(role=User.Role.INSTRUCTOR, is_active=True), required=False)
+    duration = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    image_url = serializers.URLField(required=False, allow_blank=True)
     is_published = serializers.BooleanField(required=False)

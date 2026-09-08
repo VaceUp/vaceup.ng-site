@@ -9,14 +9,8 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { getPublicCourses } from '@/lib/public-catalog';
 
-const FALLBACK_COURSES = [
-  { id: '1', title: 'Virtual Assistant', price: 80000, duration: '6 weeks' },
-  { id: '2', title: 'Data Analysis', price: 150000, duration: '10 weeks' },
-  { id: '3', title: 'UI/UX Design', price: 120000, duration: '8 weeks' },
-  { id: '4', title: 'Graphic Design', price: 100000, duration: '8 weeks' },
-  { id: '5', title: 'Web Development', price: 180000, duration: '12 weeks' },
-];
 
 const steps = [
   { number: 1, title: 'Select Course', description: 'Choose your program' },
@@ -29,7 +23,7 @@ export default function ApplyPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
-  const [courses, setCourses] = useState(FALLBACK_COURSES);
+  const [courses, setCourses] = useState<{ id: string; title: string; price: number; duration: string }[]>([]);
   const [serverError, setServerError] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -65,24 +59,23 @@ export default function ApplyPage() {
     if (preset) setSelectedCourse(preset);
   }, []);
 
-  // Load the live course catalog; fall back to the static list if the API is unreachable
+  // Accept only courses that exist in the published backend catalogue.
   useEffect(() => {
     let cancelled = false;
-    api
-      .getCourses()
+    getPublicCourses()
       .then((res) => {
-        if (cancelled || !res.results?.length) return;
+        if (cancelled) return;
         setCourses(
           res.results.map((c) => ({
-            id: c.id,
+            id: String(c.id),
             title: c.title,
-            price: c.numeric_price,
-            duration: c.duration,
+            price: Number(c.price),
+            duration: c.duration || 'Contact admissions',
           }))
         );
       })
       .catch(() => {
-        /* backend offline — keep fallback list */
+        if (!cancelled) setServerError('Courses could not be loaded. Please refresh and try again before applying.');
       });
     return () => {
       cancelled = true;
@@ -93,7 +86,7 @@ export default function ApplyPage() {
     const newErrors: Record<string, string> = {};
     
     if (step === 1) {
-      if (!selectedCourse) newErrors.course = 'Please select a course';
+      if (!courses.some((course) => course.id === selectedCourse)) newErrors.course = 'Please select an available course';
     }
     if (step === 2) {
       if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';

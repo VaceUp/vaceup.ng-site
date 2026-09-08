@@ -6,7 +6,8 @@ Run with the project's normal test runner:
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import override_settings
-from rest_framework.test import APITestCase
+from unittest.mock import patch
+from rest_framework.test import APITestCase, APITransactionTestCase
 
 from apps.accounts.models import (
     EmailVerificationToken,
@@ -27,6 +28,21 @@ ME = "/api/v1/auth/me/"
 EMAIL = "learner@example.com"
 PW1 = "Str0ng-Passw0rd!x"
 PW2 = "An0ther-Passw0rd!y"
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class RegistrationDeliveryTests(APITransactionTestCase):
+    def test_broker_failure_keeps_account_inactive_and_does_not_expose_token(self):
+        from django.core.cache import cache
+        cache.clear()
+        with patch("apps.accounts.tasks.send_verification_email.delay", side_effect=ConnectionError("offline")):
+            response = self.client.post(REG, {"email": EMAIL, "password": PW1, "full_name": "Ada Learner"}, format="json")
+        user = User.objects.get(email=EMAIL)
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data["verification_email_queued"])
+        self.assertFalse(user.is_active)
+        self.assertNotIn(str(EmailVerificationToken.objects.get(user=user).token), str(response.data))
+        self.assertNotIn("access", response.data)
 
 
 # SSL redirect is on in production settings; disable it for the HTTP test client.
@@ -82,6 +98,56 @@ class AuthFlowTests(APITestCase):
         r = self._register(password="123")
         self.assertEqual(r.status_code, 400)
         self.assertFalse(User.objects.filter(email=EMAIL).exists())
+
+    def test_registration_preserves_password_whitespace(self):
+        password = f"  {PW1}  "
+        response = self._register(password=password)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.get(email=EMAIL).check_password(password))
+
+    def test_stale_authorization_header_does_not_block_public_registration(self):
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer expired-or-invalid-token")
+        self.assertEqual(self._register().status_code, 201)
+
+    def test_registration_returns_field_errors_for_common_password(self):
+        response = self._register(password="password")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+
+    def test_duplicate_email_case_insensitive_has_actionable_error(self):
+        self._register()
+        response = self._register(email=EMAIL.upper())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already exists", str(response.data["email"]))
+
+    def test_admin_guide_preference_persists_and_can_be_reenabled(self):
+        admin = User.objects.create_superuser("admin@example.com", PW1)
+        self.client.force_authenticate(admin)
+        self.assertFalse(self.client.get(ME).data["admin_guide_dismissed"])
+        response = self.client.patch(ME, {"admin_guide_dismissed": True}, format="json")
+        self.assertEqual(response.status_code, 200)
+        admin.refresh_from_db()
+        self.assertTrue(admin.admin_guide_dismissed)
+        self.client.force_authenticate(User.objects.get(pk=admin.pk))
+        self.assertTrue(self.client.get(ME).data["admin_guide_dismissed"])
+        self.assertEqual(self.client.patch(ME, {"admin_guide_dismissed": False}, format="json").status_code, 200)
+        admin.refresh_from_db()
+        self.assertFalse(admin.admin_guide_dismissed)
+
+    def test_preference_endpoint_cannot_change_identity_or_privileges(self):
+        admin = User.objects.create_superuser("admin@example.com", PW1)
+        self.client.force_authenticate(admin)
+        response = self.client.patch(ME, {"admin_guide_dismissed": True, "role": "student", "email": EMAIL}, format="json")
+        self.assertEqual(response.status_code, 400)
+        admin.refresh_from_db()
+        self.assertEqual(admin.role, User.Role.ADMIN)
+        self.assertFalse(admin.admin_guide_dismissed)
+
+    def test_preference_endpoint_requires_admin(self):
+        self.assertEqual(self.client.patch(ME, {"admin_guide_dismissed": True}, format="json").status_code, 401)
+        student = User.objects.create_user(EMAIL, PW1, is_active=True)
+        self.client.force_authenticate(student)
+        self.assertEqual(self.client.patch(ME, {"admin_guide_dismissed": True}, format="json").status_code, 403)
 
     # --- verification -------------------------------------------------------
     def test_login_blocked_until_verified_with_clear_message(self):

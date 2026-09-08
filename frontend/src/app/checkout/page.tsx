@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { initializePayment } from '@/lib/paystack';
-import { CANONICAL_FALLBACK } from '@/data/catalog';
+import { getPublicCourseById } from '@/lib/public-catalog';
 
 interface Line {
   id: string;
@@ -42,13 +42,13 @@ export default function CheckoutPage() {
       const courseId = params.get('course_id');
 
       if (courseId) {
-        const known = CANONICAL_FALLBACK[courseId];
-        setLines([
-          known
-            ? { id: courseId, title: known.title, price: known.price }
-            : { id: courseId, title: `Course #${courseId}`, price: 0 },
-        ]);
-        setLoading(false);
+        try {
+          const course = await getPublicCourseById(courseId);
+          setLines([{ id: String(course.id), title: course.title, price: Number(course.price) }]);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to confirm the course price. Please try again.');
+          setLines([]);
+        } finally { setLoading(false); }
         return;
       }
 

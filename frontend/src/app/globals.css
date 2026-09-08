@@ -22,6 +22,16 @@
  */
 
 @theme {
+  /* Semantic surfaces shared by account recovery, catalogue and admin guidance. */
+  --color-surface: var(--color-white);
+  --color-surface-subtle: var(--color-gray-50);
+  --color-line: var(--color-gray-200);
+  --color-line-control: var(--color-gray-400);
+  --color-content-muted: var(--color-gray-600);
+  --color-content-secondary: var(--color-gray-700);
+  --color-feedback-error: var(--color-red-700);
+  --color-feedback-error-surface: var(--color-red-50);
+  --color-feedback-error-line: var(--color-red-200);
   /* Navy scale — brand primary #00088A at 900 */
   --color-navy-50: #e8ebfc;
   --color-navy-100: #d1d5f9;

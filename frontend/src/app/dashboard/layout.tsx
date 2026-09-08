@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
+import { ADMIN_SECTIONS, adminHref } from '@/lib/admin-sections';
+import { useAdminTab } from '@/lib/use-admin-tab';
 
 interface NavItem {
   name: string;
@@ -40,21 +42,9 @@ const INSTRUCTOR_NAV: NavItem[] = [
   { name: 'Settings', href: '/setting', icon: 'gear' },
 ];
 
-const ADMIN_NAV: NavItem[] = [
-  { name: 'Overview', href: '/dashboard', icon: 'grid-1x2' },
-  { name: 'Users', href: '/dashboard?tab=users', icon: 'people' },
-  { name: 'Courses', href: '/dashboard?tab=courses', icon: 'book' },
-  { name: 'Content', href: '/dashboard?tab=content', icon: 'folder-open' },
-  { name: 'Live Classes', href: '/dashboard?tab=liveclasses', icon: 'camera-video' },
-  { name: 'Assignments', href: '/dashboard?tab=assignments', icon: 'file-earmark-text' },
-  { name: 'Certificates', href: '/dashboard?tab=certificates', icon: 'award' },
-  { name: 'Enrollments', href: '/dashboard?tab=enrollments', icon: 'person-check' },
-  { name: 'Payments', href: '/dashboard?tab=payments', icon: 'cash-coin' },
-  { name: 'Applications', href: '/dashboard?tab=applications', icon: 'file-earmark-text' },
-  { name: 'Announcements', href: '/dashboard?tab=announcements', icon: 'megaphone' },
-  { name: 'Feature Flags', href: '/dashboard?tab=flags', icon: 'toggles' },
-  { name: 'Marketing', href: '/dashboard?tab=marketing', icon: 'send' },
-];
+const ADMIN_NAV: NavItem[] = ADMIN_SECTIONS.map((section) => ({
+  name: section.name, href: adminHref(section.id), icon: section.icon,
+}));
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrator',
@@ -62,13 +52,14 @@ const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
 };
 
-export default function DashboardLayout({
+function DashboardShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const adminTab = useAdminTab();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [hash, setHash] = useState('');
@@ -85,6 +76,7 @@ export default function DashboardLayout({
     role === 'admin' ? ADMIN_NAV : role === 'instructor' ? INSTRUCTOR_NAV : STUDENT_NAV;
 
   const isItemActive = (item: NavItem) => {
+    if (role === 'admin') return item.href === adminHref(adminTab);
     const [base, section] = item.href.includes('?tab=') 
       ? item.href.split('?tab=')
       : item.href.split('#');
@@ -157,7 +149,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav aria-label="Dashboard navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {navigation.map((item) => {
             const active = isItemActive(item);
             return (
@@ -166,6 +158,8 @@ export default function DashboardLayout({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 title={item.name}
+                aria-label={item.name}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
                   'flex items-center rounded-xl text-sm font-medium transition-all',
                   collapsed ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5',
@@ -217,4 +211,10 @@ export default function DashboardLayout({
       </main>
     </div>
   );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<p role="status" className="p-6">Loading dashboard...</p>}>
+    <DashboardShell>{children}</DashboardShell>
+  </Suspense>;
 }

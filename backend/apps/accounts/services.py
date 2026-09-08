@@ -54,21 +54,19 @@ def register_user(*, email, full_name, password, role=None, **profile):
     _create_profile_for(user)
 
     token = EmailVerificationToken.objects.create(user=user)
+    user.verification_email_queued = True
 
     def _queue_verification_email():
         try:
             tasks.send_verification_email.delay(user.email, str(token.token))
         except Exception:  # noqa: BLE001 — signup must succeed even if the mail queue is down
+            user.verification_email_queued = False
             import logging
-            logging.getLogger("accounts").exception(
-                "Could not queue verification email for %s — verify link token: %s — "
-                "activating the account so the student is not stranded.",
-                user.email,
-                token.token,
+            logging.getLogger("accounts").error(
+                "Could not queue verification email for account %s. "
+                "Account remains inactive; retry via resend-verification after restoring the mail queue.",
+                user.pk,
             )
-            # Fallback: activate immediately so the student can log in.
-            user.is_active = True
-            user.save(update_fields=["is_active", "updated_at"])
 
     transaction.on_commit(_queue_verification_email)
     return user
@@ -121,8 +119,8 @@ def resend_verification(*, email):
             tasks.send_verification_email.delay(user.email, str(token.token))
         except Exception:  # noqa: BLE001
             import logging
-            logging.getLogger("accounts").exception(
-                "Could not queue verification resend for %s — token: %s", user.email, token.token
+            logging.getLogger("accounts").error(
+                "Could not queue verification resend for account %s.", user.pk
             )
 
     transaction.on_commit(_queue_resend)

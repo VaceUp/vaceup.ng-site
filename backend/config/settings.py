@@ -7,6 +7,7 @@ present. Secrets are read from the environment (12-factor).
 """
 from datetime import timedelta
 from pathlib import Path
+import ssl
 
 import environ
 
@@ -268,8 +269,17 @@ else:
 # --- Celery: async email + scheduled reminders -----------------------------
 # Broker/result default to the same Upstash Redis as the cache. In dev/CI with
 # no worker running, set CELERY_TASK_ALWAYS_EAGER=True to run tasks inline.
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="") or REDIS_URL
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="") or CELERY_BROKER_URL
+if CELERY_BROKER_URL.startswith("rediss://"):
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+if CELERY_RESULT_BACKEND.startswith("rediss://"):
+    CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+# Bound web-request publishing when the broker is unavailable. Worker task
+# retries still apply independently to SMTP delivery failures.
+CELERY_BROKER_CONNECTION_TIMEOUT = 5
+CELERY_TASK_PUBLISH_RETRY_POLICY = {"max_retries": 1, "interval_start": 0, "interval_step": 0, "interval_max": 0}
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 5, "socket_timeout": 5}
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_ACCEPT_CONTENT = ["json"]

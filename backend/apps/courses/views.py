@@ -44,7 +44,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     lookup_field = "slug"
     # Catalog filtering for the frontend: ?category=<id>&level=beginner
     # &is_published=true&search=python&ordering=price (or -price, created_at…)
-    filterset_fields = ["category", "level", "is_published"]
+    filterset_fields = ["id", "category", "level", "is_published"]
     search_fields = ["title", "description"]
     ordering_fields = ["price", "created_at", "title"]
     ordering = ["-created_at"]

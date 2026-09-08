@@ -38,10 +38,10 @@ export default function LoginPage() {
       // Send the user back where they came from (e.g. /apply) or to the dashboard
       const params = new URLSearchParams(window.location.search);
       const next = params.get('next');
-      router.push(next && next.startsWith('/') ? next : '/dashboard');
+      router.push(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
     } catch (err: any) {
       setError(
-        err?.status === 401
+        err?.status === 401 && !String(err?.message).includes('not verified')
           ? 'Invalid email or password. Please try again.'
           : err?.message || 'Unable to sign in right now. Please try again.'
       );

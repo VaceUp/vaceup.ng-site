@@ -8,15 +8,16 @@ import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { dockSpring } from '@/components/ui/Reveal';
+import RegistrationNotice from '@/components/landing/RegistrationNotice';
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [emailQueued, setEmailQueued] = useState(true);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -55,19 +56,18 @@ export default function RegisterPage() {
     setError('');
 
     try {
-      await register({
+      const result = await register({
         email: formData.email.trim(),
         password: formData.password,
         full_name: formData.fullName.trim(),
         phone_number: formData.phone.trim(),
       });
-      // Account created — continue where the user was headed (e.g. application)
-      const next = new URLSearchParams(window.location.search).get('next');
-      router.push(next && next.startsWith('/') ? next : '/apply?registered=true');
+      setEmailQueued(result.verification_email_queued !== false);
+      setRegisteredEmail(formData.email.trim());
     } catch (err: any) {
       const msg = String(err?.message || '');
       if (msg.toLowerCase().includes('already exists')) {
-        setError('An account with this email already exists — please sign in instead.');
+        setError('An account with this email already exists. Sign in, or request a verification link if you have not activated it yet.');
       } else if (err?.status === 400 && msg.toLowerCase().includes('password')) {
         setError(msg);
       } else {
@@ -77,6 +77,12 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  if (registeredEmail) return (
+    <div className="mx-auto my-12 max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
+      <RegistrationNotice email={registeredEmail} queued={emailQueued} />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -99,9 +105,9 @@ export default function RegisterPage() {
               </div>
 
               {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-700 text-sm flex items-center gap-2">
+                <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-700 text-sm flex items-center gap-2">
                   <LordIconComponent src={LordIcons.alert} size={18} colors="primary:#ef4444" />
-                  <span>{error}</span>
+                  <span>{error} <Link href="/verify-email" className="font-semibold underline">Request a verification link</Link></span>
                 </div>
               )}
 
@@ -111,6 +117,7 @@ export default function RegisterPage() {
                   <Input
                     id="fullName"
                     name="fullName"
+                    maxLength={150}
                     type="text"
                     placeholder="John Doe"
                     value={formData.fullName}
@@ -161,7 +168,7 @@ export default function RegisterPage() {
                     minLength={8}
                     leftIcon={<LordIconComponent src={LordIcons.shield} size={20} colors="primary:#00088A" />}
                   />
-                  <p className="mt-1 text-xs text-gray-500">Must be at least 8 characters</p>
+                  <p className="mt-1 text-xs text-gray-600">Use at least 8 characters. Avoid common passwords and passwords made only of numbers.</p>
                 </div>
 
                 <div>

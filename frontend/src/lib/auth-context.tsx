@@ -9,7 +9,7 @@ import React, {
   useState,
   ReactNode,
 } from 'react';
-import { api, AuthResponse, User } from '@/lib/api';
+import { api, AuthResponse, RegisterResponse, User } from '@/lib/api';
 
 interface AuthContextType {
   // Modal state (used by marketing CTAs)
@@ -30,7 +30,8 @@ interface AuthContextType {
     password: string;
     full_name: string;
     phone_number?: string;
-  }) => Promise<AuthResponse>;
+  }) => Promise<RegisterResponse>;
+  setAdminGuideDismissed: (dismissed: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: { email: string; password: string }) => {
       const response = await api.login(credentials);
+      try { sessionStorage.removeItem(`vaceup:admin-guide:seen:${response.user.id}`); } catch { /* Session storage may be unavailable. */ }
       return handleAuthResponse(response);
     },
     [handleAuthResponse]
@@ -100,11 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       full_name: string;
       phone_number?: string;
     }) => {
-      const response = await api.register(data);
-      return handleAuthResponse(response);
+      return api.register(data);
     },
-    [handleAuthResponse]
+    []
   );
+
+  const setAdminGuideDismissed = useCallback(async (dismissed: boolean) => {
+    const updated = await api.setAdminGuideDismissed(dismissed);
+    setUser(updated);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -126,9 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoggedIn: !!user,
       login,
       register,
+      setAdminGuideDismissed,
       logout,
     }),
-    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, logout]
+    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, logout, setAdminGuideDismissed]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "email", "full_name", "role", "is_active",
-                  "date_joined")
+                  "date_joined", "admin_guide_dismissed")
         read_only_fields = fields
 
 
@@ -29,7 +29,9 @@ class RegisterSerializer(serializers.Serializer):
 
     email = serializers.EmailField()
     full_name = serializers.CharField(max_length=150)
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}
+    )
 
     def validate_email(self, value):
         value = User.objects.normalize_email(value)
@@ -50,6 +52,17 @@ class RegisterSerializer(serializers.Serializer):
 
 class EmailVerificationSerializer(serializers.Serializer):
     token = serializers.UUIDField()
+
+
+class AdminGuidePreferenceSerializer(serializers.Serializer):
+    """The only profile value this endpoint may change."""
+
+    admin_guide_dismissed = serializers.BooleanField()
+
+    def validate(self, attrs):
+        if set(self.initial_data) - {"admin_guide_dismissed"}:
+            raise serializers.ValidationError("Only the admin guide preference can be changed here.")
+        return attrs
 
 
 class ResendVerificationSerializer(serializers.Serializer):

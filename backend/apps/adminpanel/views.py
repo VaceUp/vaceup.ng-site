@@ -31,6 +31,7 @@ from django.db.models import Q
 from django.utils.text import slugify
 from apps.core.exceptions import AlreadyExists, DomainError
 from apps.payments.serializers import PaymentSerializer
+from apps.payments.models import Payment
 
 User = get_user_model()
 
@@ -566,7 +567,6 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             slug = f"{slug}-{_uuid.uuid4().hex[:6]}"
 
         course = Course.objects.create(
-            name=title[:120],
             title=title,
             slug=slug,
             category=category,
@@ -575,6 +575,8 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             level=data["level"],
             price=data["price"],
             is_published=data["is_published"],
+            duration=data.get("duration", ""),
+            image_url=data.get("image_url", ""),
         )
         return Response(AdminCourseListSerializer(course).data, status=status.HTTP_201_CREATED)
 
@@ -589,13 +591,10 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         except (Course.DoesNotExist, ValueError, ValidationError):
             raise DomainError("Course not found (check the course id).", code="course_not_found")
 
-        allowed = {"title", "description", "price", "is_published"}
-        for field, value in request.data.items():
-            if field in allowed and value is not None:
-                setattr(course, field, value)
-
-        if course.title and (not course.name or course.name == "Untitled course"):
-            course.name = course.title[:120]
+        serializer = AdminCourseUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        for field, value in serializer.validated_data.items():
+            setattr(course, field, value)
 
         course.save()
         return Response(AdminCourseListSerializer(course).data)

@@ -6,6 +6,21 @@ import { cn } from '@/lib/utils';
 import { LordIconComponent, LordIcons } from './LordIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/** Native top-layer modal for new dialogs. The browser makes the background inert. */
+export const NativeDialog = React.forwardRef<HTMLDialogElement, React.ComponentPropsWithoutRef<'dialog'>>(
+  function NativeDialog({ onKeyDown, ...props }, ref) {
+    return <dialog {...props} ref={ref} aria-modal="true" onKeyDown={(event) => {
+      onKeyDown?.(event);
+      if (event.defaultPrevented || event.key !== 'Tab') return;
+      const targets = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')).filter((target) => target.getClientRects().length > 0);
+      const first = targets[0], last = targets[targets.length - 1];
+      if (!first) { event.preventDefault(); event.currentTarget.focus(); }
+      else if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }} />;
+  }
+);
+
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;

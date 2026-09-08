@@ -25,7 +25,7 @@ export default function Home() {
         <Hero onOpenAuth={openAuth} />
         <Stats />
         <Reveal>
-          <FeaturedCourses onOpenAuth={openAuth} />
+          <FeaturedCourses />
         </Reveal>
         <Reveal>
           <WhyVaceUp />

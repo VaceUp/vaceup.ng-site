@@ -83,4 +83,5 @@ node_modules/
 
 # Local artifacts that must never be committed
 backend.zip
+artifacts/admin-auth-catalog/
 ~/

@@ -7,6 +7,7 @@ a hardened wrapper around simplejwt's token endpoint.
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -15,6 +16,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.accounts import services
 from apps.accounts.serializers import (
+    AdminGuidePreferenceSerializer,
     EmailVerificationSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -27,7 +29,8 @@ User = get_user_model()
 
 # Generic, non-committal message for flows that must not leak account existence.
 _OK_IF_EXISTS = (
-    "If an account matches, we've sent an email with the next steps."
+    "If an account matches and needs this email, delivery will be attempted. "
+    "Check your inbox and spam folder. If it does not arrive, try again shortly or contact support."
 )
 
 
@@ -35,17 +38,23 @@ class RegisterView(APIView):
     """POST: create an inactive account and email a verification link."""
 
     permission_classes = [AllowAny]
+    authentication_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_register"
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        services.register_user(**serializer.validated_data)
+        user = services.register_user(**serializer.validated_data)
         return Response(
             {
-                "detail": "Account created. Check your email to verify your "
-                "address before logging in."
+                "detail": (
+                    "Account created. Check your email to verify your address before logging in."
+                    if user.verification_email_queued else
+                    "Account created, but the verification email could not be queued. "
+                    "Please request a new verification link shortly. Do not register again."
+                ),
+                "verification_email_queued": user.verification_email_queued,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -125,6 +134,15 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        if not request.user.is_admin:
+            raise PermissionDenied("Only administrators have an admin guide preference.")
+        serializer = AdminGuidePreferenceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request.user.admin_guide_dismissed = serializer.validated_data["admin_guide_dismissed"]
+        request.user.save(update_fields=["admin_guide_dismissed"])
         return Response(UserSerializer(request.user).data)
 
 

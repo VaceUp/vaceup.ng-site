@@ -6,6 +6,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { dockSpring, staggerContainer, fieldItem } from '@/components/ui/Reveal';
 import { PasswordInput } from '@/components/ui/PasswordInput';
+import RegistrationNotice from './RegistrationNotice';
+import { X } from 'lucide-react';
 
 /**
  * Global auth modal — rendered once in the root layout.
@@ -22,11 +24,14 @@ export default function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [emailQueued, setEmailQueued] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       setIsSignUp(mode === 'signup');
       setError('');
+      setRegisteredEmail('');
     }
   }, [isOpen, mode]);
 
@@ -48,7 +53,10 @@ export default function AuthModal() {
     setIsLoading(true);
     try {
       if (isSignUp) {
-        await register({ email, password, full_name: name });
+        const result = await register({ email, password, full_name: name });
+        setEmailQueued(result.verification_email_queued !== false);
+        setRegisteredEmail(email.trim());
+        return;
       } else {
         await login({ email, password });
       }
@@ -91,9 +99,10 @@ export default function AuthModal() {
           aria-label="Close"
           className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 text-lg font-bold transition-transform hover:scale-110 active:scale-90"
         >
-          ✕
+          <X className="h-5 w-5" aria-hidden="true" />
         </button>
 
+        {registeredEmail ? <RegistrationNotice email={registeredEmail} queued={emailQueued} onContinue={closeAuth} /> : <>
         <div className="text-center space-y-2 mb-6">
           <h3 className="text-2xl font-black text-navy-950">
             {isSignUp ? 'Create Your Account' : 'Welcome Back'}
@@ -114,9 +123,11 @@ export default function AuthModal() {
         >
           {isSignUp && (
             <motion.div variants={fieldItem}>
-              <label className="block font-bold text-gray-700 mb-1">Full Name</label>
+              <label htmlFor="auth-name" className="block font-bold text-gray-700 mb-1">Full Name</label>
               <input
                 type="text"
+                id="auth-name"
+                maxLength={150}
                 required
                 placeholder="Abubakar Aminu"
                 value={name}
@@ -127,9 +138,10 @@ export default function AuthModal() {
           )}
 
           <motion.div variants={fieldItem}>
-            <label className="block font-bold text-gray-700 mb-1">Email Address</label>
+            <label htmlFor="auth-email" className="block font-bold text-gray-700 mb-1">Email Address</label>
             <input
               type="email"
+              id="auth-email"
               required
               placeholder="name@example.com"
               value={email}
@@ -139,8 +151,9 @@ export default function AuthModal() {
           </motion.div>
 
           <motion.div variants={fieldItem}>
-            <label className="block font-bold text-gray-700 mb-1">Password</label>
+            <label htmlFor="auth-password" className="block font-bold text-gray-700 mb-1">Password</label>
             <PasswordInput
+              id="auth-password"
               required
               placeholder="••••••••"
               value={password}
@@ -152,8 +165,9 @@ export default function AuthModal() {
 
           {isSignUp && (
             <motion.div variants={fieldItem}>
-              <label className="block font-bold text-gray-700 mb-1">Confirm Password</label>
+              <label htmlFor="auth-confirm-password" className="block font-bold text-gray-700 mb-1">Confirm Password</label>
               <PasswordInput
+                id="auth-confirm-password"
                 required
                 placeholder="••••••••"
                 value={confirmPassword}
@@ -166,6 +180,7 @@ export default function AuthModal() {
 
           {error && (
             <motion.div
+              role="alert"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="text-red-500 text-xs text-center bg-red-50 px-3 py-2 rounded-lg"
@@ -214,6 +229,7 @@ export default function AuthModal() {
             </p>
           )}
         </motion.div>
+        </>}
         </motion.div>
       </motion.div>
       </>

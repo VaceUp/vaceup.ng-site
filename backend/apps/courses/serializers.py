@@ -167,6 +167,9 @@ class CourseListSerializer(serializers.ModelSerializer):
             "price",
             "thumbnail",
             "is_published",
+            "description",
+            "duration",
+            "image_url",
         )
 
 
@@ -222,6 +225,8 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "is_published",
             "modules",
             "created_at",
+            "duration",
+            "image_url",
         )
         # instructor is bound from request.user server-side; slug is derived.
         read_only_fields = ("instructor", "slug")

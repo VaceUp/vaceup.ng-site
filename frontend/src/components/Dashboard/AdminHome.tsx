@@ -1,6 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { adminHref, type AdminTab as Tab } from '@/lib/admin-sections';
+import { useAdminTab } from '@/lib/use-admin-tab';
+import AdminGuide from './admin/AdminGuide';
+import CategoryManager from './admin/CategoryManager';
+import CourseDetailsEditor from './admin/CourseDetailsEditor';
+import { getCategories, type CatalogCategory } from '@/lib/public-catalog';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import LiveClassesTab from '@/components/Dashboard/admin/LiveClassesTab';
@@ -8,37 +15,6 @@ import ContentTab from '@/components/Dashboard/admin/ContentTab';
 import AssignmentsTab from '@/components/Dashboard/admin/AssignmentsTab';
 import CertificatesTab from '@/components/Dashboard/admin/CertificatesTab';
 import EnrollmentsTab from '@/components/Dashboard/admin/EnrollmentsTab';
-
-type Tab =
-  | 'overview'
-  | 'users'
-  | 'courses'
-  | 'content'
-  | 'liveclasses'
-  | 'applications'
-  | 'assignments'
-  | 'certificates'
-  | 'enrollments'
-  | 'payments'
-  | 'announcements'
-  | 'flags'
-  | 'marketing';
-
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'overview', label: 'Overview', icon: 'speedometer2' },
-  { id: 'users', label: 'Users', icon: 'people' },
-  { id: 'courses', label: 'Courses', icon: 'book' },
-  { id: 'content', label: 'Content', icon: 'folder-open' },
-  { id: 'liveclasses', label: 'Live Classes', icon: 'camera-video' },
-  { id: 'assignments', label: 'Assignments', icon: 'file-earmark-text' },
-  { id: 'certificates', label: 'Certificates', icon: 'award' },
-  { id: 'enrollments', label: 'Enrollments', icon: 'person-check' },
-  { id: 'payments', label: 'Payments', icon: 'cash-coin' },
-  { id: 'applications', label: 'Applications', icon: 'file-earmark-text' },
-  { id: 'announcements', label: 'Announcements', icon: 'megaphone' },
-  { id: 'flags', label: 'Feature Flags', icon: 'toggles' },
-  { id: 'marketing', label: 'Marketing', icon: 'send' },
-];
 
 interface AdminStats {
   users: { total: number; students: number; instructors: number; admins: number; new_last_30_days: number };
@@ -83,9 +59,8 @@ function naira(v: number | string) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function AdminHome() {
-  const [tab, setTab] = useState<Tab>('overview');
-  const [hash, setHash] = useState('');
-  const [searchParams, setSearchParams] = useState('');
+  const tab = useAdminTab();
+  const router = useRouter();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsError, setStatsError] = useState('');
 
@@ -100,7 +75,7 @@ export function AdminHome() {
   // ── Courses ──
   const [courses, setCourses] = useState<any[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [instructors, setInstructors] = useState<{ id: string; full_name: string; email: string }[]>([]);
   const [creating, setCreating] = useState(false);
   const [courseMsg, setCourseMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -163,10 +138,7 @@ export function AdminHome() {
       .request('/marketing/campaigns/')
       .then((res: any) => setCampaigns(res.results ?? res ?? []))
       .catch(() => undefined);
-    api
-      .request('/categories/')
-      .then((res: any) => setCategories(res.results ?? res ?? []))
-      .catch(() => undefined);
+    getCategories().then(setCategories).catch(() => setCourseMsg({ ok: false, text: 'Categories could not be loaded. Please refresh before creating a course.' }));
     api
       .request('/admin/dashboard/users/?role=instructor')
       .then((res: any) => setInstructors(res.results ?? res ?? []))
@@ -193,7 +165,7 @@ export function AdminHome() {
     api
       .request('/admin/dashboard/courses/')
       .then((res: any) => setCourses(res.results ?? res ?? []))
-      .catch(() => setCourses([]))
+      .catch((err) => { setCourses([]); setCourseMsg({ ok: false, text: err instanceof Error ? err.message : 'Courses could not be loaded. Please refresh and try again.' }); })
       .finally(() => setCoursesLoading(false));
   }, []);
 
@@ -219,37 +191,8 @@ export function AdminHome() {
     loadAll();
   }, [loadAll]);
 
-  // Sidebar links (query ?tab= or hash #) → tabs
-  useEffect(() => {
-    const onNav = () => {
-      setHash(window.location.hash);
-      setSearchParams(window.location.search);
-    };
-    onNav();
-    window.addEventListener('hashchange', onNav);
-    window.addEventListener('popstate', onNav);
-    return () => {
-      window.removeEventListener('hashchange', onNav);
-      window.removeEventListener('popstate', onNav);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const qTab = new URLSearchParams(searchParams).get('tab');
-    const hTab = hash.replace('#', '');
-    const incoming = qTab || hTab;
-    if (incoming && TABS.some((t) => t.id === incoming)) {
-      setTab(incoming as Tab);
-      window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-    }
-  }, [hash, searchParams]);
-
   const setTabAndHash = (t: Tab) => {
-    setTab(t);
-    if (t === 'overview') window.history.pushState(null, '', '/dashboard');
-    else window.history.pushState(null, '', `/dashboard?tab=${t}`);
-    window.dispatchEvent(new Event('popstate'));
+    router.push(adminHref(t));
   };
 
   const post = async (url: string, body: any) => {
@@ -344,13 +287,8 @@ export function AdminHome() {
   const updateCourse = async (courseId: string, payload: any, okText: string) => {
     setCourseMsg(null);
     try {
-      await fetch(`${api.baseUrl}/admin/dashboard/courses/update/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${api.getToken()}`,
-        },
-        body: JSON.stringify({ course_id: courseId, ...payload }),
+      await api.request('/admin/dashboard/courses/update/', {
+        method: 'POST', body: JSON.stringify({ course_id: courseId, ...payload }),
       });
       setCourseMsg({ ok: true, text: okText });
       loadCourses();
@@ -425,6 +363,7 @@ export function AdminHome() {
 
   return (
     <div className="space-y-6">
+      <AdminGuide currentTab={tab} onNavigate={setTabAndHash} />
       {/* ═══ Overview ═══ */}
       {tab === 'overview' && (
         <div className="space-y-6">
@@ -670,6 +609,7 @@ export function AdminHome() {
       {/* ═══ Courses ═══ */}
       {tab === 'courses' && (
         <div className="space-y-6">
+          <CategoryManager categories={categories} onChanged={async () => { setCategories(await getCategories()); }} />
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-navy-950">All Courses ({courses.length})</h3>
@@ -696,6 +636,7 @@ export function AdminHome() {
                   />
                   <select
                     required
+                    aria-label="Course category"
                     value={newCourse.category_id}
                     onChange={(e) => setNewCourse({ ...newCourse, category_id: e.target.value })}
                     className={inputCls}
@@ -808,7 +749,7 @@ export function AdminHome() {
                         </span>
                       </p>
                       <p className="text-xs capitalize text-gray-500">
-                        {c.level} · {naira(c.price)}
+                        {c.level} · {naira(c.price)} · {categories.find((category) => category.id === c.category)?.name || 'Category unavailable'}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -834,6 +775,7 @@ export function AdminHome() {
                         Change price
                       </button>
                     </div>
+                    <CourseDetailsEditor course={c} categories={categories} instructors={instructors} onSaved={loadCourses} />
                   </li>
                 ))}
               </ul>

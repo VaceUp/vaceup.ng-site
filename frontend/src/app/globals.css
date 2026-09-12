@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Dark mode is intentionally disabled: the brand is light-only.
+ * Marketing and admin remain light; member workspaces have a scoped theme.
  * Tailwind v4 defaults `dark:` to the OS color-scheme media query, which made
  * cards render dark for users with dark-mode OS. Pin the variant to a class
  * that is never applied so all `dark:` utilities stay inert.
@@ -136,6 +136,42 @@
 
 :root {
   color-scheme: light;
+}
+
+/* Shared member-workspace semantic tokens. Both roles use the existing brand. */
+:root {
+  --workspace-page: var(--color-gray-50);
+  --workspace-surface: var(--color-white);
+  --workspace-subtle: var(--color-navy-50);
+  --workspace-text: var(--color-ink);
+  --workspace-muted: var(--color-gray-600);
+  --workspace-line: var(--color-gray-200);
+  --workspace-control: var(--color-gray-500);
+  --workspace-focus: var(--color-navy-900);
+  --workspace-nav: var(--color-navy-950);
+  --workspace-nav-text: var(--color-navy-50);
+  --workspace-nav-muted: var(--color-navy-200);
+  --workspace-primary: var(--color-gold-brand);
+  --workspace-primary-hover: var(--color-gold-hover);
+  --workspace-primary-text: var(--color-navy-950);
+  --workspace-error: var(--color-red-700);
+  --workspace-error-bg: var(--color-red-50);
+  --workspace-progress: var(--color-teal-brand);
+}
+
+[data-workspace-theme="dark"] {
+  color-scheme: dark;
+  --workspace-page: var(--color-slate-950);
+  --workspace-surface: var(--color-slate-900);
+  --workspace-subtle: var(--color-slate-800);
+  --workspace-text: var(--color-slate-50);
+  --workspace-muted: var(--color-slate-300);
+  --workspace-line: var(--color-slate-700);
+  --workspace-control: var(--color-slate-400);
+  --workspace-focus: var(--color-gold-brand);
+  --workspace-error: var(--color-red-200);
+  --workspace-error-bg: var(--color-red-950);
+  --workspace-progress: var(--color-teal-400);
 }
 
 body {

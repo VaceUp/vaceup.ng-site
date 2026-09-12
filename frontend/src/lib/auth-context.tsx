@@ -9,7 +9,7 @@ import React, {
   useState,
   ReactNode,
 } from 'react';
-import { api, AuthResponse, RegisterResponse, User } from '@/lib/api';
+import { api, ApiError, AuthResponse, RegisterResponse, User } from '@/lib/api';
 
 interface AuthContextType {
   // Modal state (used by marketing CTAs)
@@ -22,6 +22,8 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isLoggedIn: boolean;
+  sessionError: string;
+  retrySession: () => void;
 
   // Auth actions — call the real backend via the shared API client
   login: (credentials: { email: string; password: string }) => Promise<AuthResponse>;
@@ -42,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const retrySession = useCallback(() => setRestoreAttempt(value => value + 1), []);
 
   const openAuth = useCallback((nextMode: 'signin' | 'signup') => {
     setMode(nextMode);
@@ -56,6 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const restore = async () => {
+      setIsLoading(true);
+      setSessionError('');
       if (!api.getToken()) {
         setIsLoading(false);
         return;
@@ -63,9 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await api.getMe();
         if (!cancelled) setUser(me);
-      } catch {
-        // Stale/invalid token — clear it so we start clean
-        api.setToken(null);
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof ApiError && error.status === 401) api.setToken(null);
+        else setSessionError('Your account could not be loaded. The service may be unavailable; your saved session has not been removed.');
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -74,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [restoreAttempt]);
 
   const handleAuthResponse = useCallback((response: AuthResponse) => {
     // api.login stores the access token; persist the refresh token for
@@ -83,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('refresh_token', response.refresh);
     }
     setUser(response.user);
+    setSessionError('');
     return response;
   }, []);
 
@@ -118,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       if (typeof window !== 'undefined') localStorage.removeItem('refresh_token');
       setUser(null);
+      setSessionError('');
     }
   }, []);
 
@@ -130,12 +140,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       isLoggedIn: !!user,
+      sessionError,
+      retrySession,
       login,
       register,
       setAdminGuideDismissed,
       logout,
     }),
-    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, logout, setAdminGuideDismissed]
+    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, logout, setAdminGuideDismissed, sessionError, retrySession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

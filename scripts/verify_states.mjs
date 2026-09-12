@@ -9,6 +9,7 @@
  * Exit 1 if any state of any element drops below WCAG AA.
  */
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 let chromium;
 try { ({ chromium } = await import('playwright')); }
 catch {
@@ -24,6 +25,7 @@ const argv = process.argv.slice(2);
 const dark = argv.includes('--dark');
 const file = argv.find(a => !a.startsWith('--'));
 if (!file) { console.log('usage: node scripts/verify_states.mjs <file.html> [--dark]'); process.exit(0); }
+if (!existsSync(resolve(file))) { console.error(`Required state harness not found: ${file}`); process.exit(1); }
 
 function lin(c) { c /= 255; return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; }
 function L([r, g, b]) { return .2126 * lin(r) + .7152 * lin(g) + .0722 * lin(b); }
@@ -37,6 +39,18 @@ await page.addStyleTag({ content: '*{transition:none!important;animation:none!im
 if (dark) await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
 
 const read = el => {
+  // Let the browser convert modern CSS colors (OKLCH, color(), etc.) to sRGB.
+  // Parsing their numeric channels as RGB gives false contrast failures.
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const rgb = color => {
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = color;
+    context.fillRect(0, 0, 1, 1);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
   const transparent = c => { const a = c.match(/[\d.]+/g); return !c || c === 'rgba(0, 0, 0, 0)' || (a && a.length === 4 && parseFloat(a[3]) === 0); };
   const eff = n => { while (n) { const c = getComputedStyle(n).backgroundColor; if (!transparent(c)) return c; n = n.parentElement; } return getComputedStyle(document.body).backgroundColor; };
   const cs = getComputedStyle(el);
@@ -45,12 +59,12 @@ const read = el => {
   const isToggle = el.tagName === 'INPUT' && ['checkbox', 'radio'].includes(el.type);
   // WCAG 1.4.3 / 1.4.11 exempt disabled (inactive) controls from contrast.
   const isDisabled = el.disabled || el.getAttribute('aria-disabled') === 'true';
-  const skip = isToggle || el.getAttribute('role') === 'switch' || +cs.opacity === 0 || isDisabled;
+  const skip = isToggle || el.getAttribute('role') === 'switch' || +cs.opacity === 0 || isDisabled || !el.getClientRects().length;
   const own = transparent(cs.backgroundColor) ? eff(el.parentElement) : cs.backgroundColor;
   // graphical / icon-only control: no DIRECT text node (only an <svg> or nothing) →
   // WCAG 1.4.11 non-text contrast applies (3:1), not the 4.5 text rule.
-  const graphical = ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
-  return { skip, graphical, color: cs.color, bg: own, label: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 18), px: parseFloat(cs.fontSize), bold: (parseInt(cs.fontWeight, 10) || 400) >= 700 };
+  const graphical = !el.textContent.trim() && !['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+  return { skip, graphical, color: rgb(cs.color), bg: rgb(own), label: (el.textContent || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 18), px: parseFloat(cs.fontSize), bold: (parseInt(cs.fontWeight, 10) || 400) >= 700 };
 };
 
 const handles = await page.$$('button, a[href], input, select, textarea, [role="button"], [role="switch"]');

@@ -12,6 +12,7 @@ const API_BASE_URL = RAW_API_URL.endsWith('/api/v1') ? RAW_API_URL : `${RAW_API_
 class ApiClient {
   baseUrl: string;
   token: string | null = null;
+  private refreshPending: Promise<RefreshTokenResponse> | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -47,11 +48,13 @@ class ApiClient {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const sentToken = this.token;
     let response = await fetch(url, { ...options, headers });
 
     // Access tokens are short-lived (15 min) — refresh once and retry on 401
     if (response.status === 401 && authenticated && this.token && !(options as any).__retried) {
-      await this.refreshToken(); // throws ApiError('Session expired') if refresh fails
+      // A concurrent request may already have refreshed the token we sent.
+      if (this.token === sentToken) await this.refreshToken();
       return this.request<T>(endpoint, {
         ...options,
         headers: { ...options.headers, Authorization: `Bearer ${this.token}` },
@@ -137,6 +140,14 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<RefreshTokenResponse> {
+    if (this.refreshPending) return this.refreshPending;
+    this.refreshPending = this.performRefresh();
+    try { return await this.refreshPending; }
+    finally { this.refreshPending = null; }
+  }
+
+  private async performRefresh(): Promise<RefreshTokenResponse> {
+    const previousAccess = this.token;
     const refresh =
       typeof window !== 'undefined'
         ? localStorage.getItem('refresh_token')
@@ -149,11 +160,17 @@ class ApiClient {
       body: JSON.stringify({ refresh }),
     });
     if (!res.ok) {
-      this.setToken(null);
-      if (typeof window !== 'undefined') localStorage.removeItem('refresh_token');
-      throw new ApiError('Session expired', 401);
+      if (res.status === 401 || res.status === 400) {
+        if (this.token === previousAccess) {
+          this.setToken(null);
+          if (typeof window !== 'undefined') localStorage.removeItem('refresh_token');
+        }
+        throw new ApiError('Session expired', 401);
+      }
+      throw new ApiError('Your session could not be refreshed. Please try again shortly.', res.status);
     }
     const data: RefreshTokenResponse = await res.json();
+    if (this.token !== previousAccess) throw new ApiError('Your session changed. Please try again.', 401);
     this.setToken(data.access);
     if (data.refresh && typeof window !== 'undefined') localStorage.setItem('refresh_token', data.refresh);
     return data;

@@ -52,13 +52,7 @@ export default function DashboardPage() {
   }
 
   if (role === 'instructor') {
-    return (
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="mb-1 text-3xl font-black text-navy-950">Tutor Dashboard</h1>
-        <p className="mb-8 text-sm text-gray-500">Your classes, students and earnings at a glance.</p>
-        <TutorHome />
-      </div>
-    );
+    return <TutorHome />;
   }
 
   return <StudentHome />;

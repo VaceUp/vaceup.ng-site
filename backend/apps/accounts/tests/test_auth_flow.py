@@ -35,7 +35,7 @@ class RegistrationDeliveryTests(APITransactionTestCase):
     def test_broker_failure_keeps_account_inactive_and_does_not_expose_token(self):
         from django.core.cache import cache
         cache.clear()
-        with patch("apps.accounts.tasks.send_verification_email.delay", side_effect=ConnectionError("offline")):
+        with patch("apps.accounts.tasks.send_verification_email.apply_async", side_effect=ConnectionError("offline")):
             response = self.client.post(REG, {"email": EMAIL, "password": PW1, "full_name": "Ada Learner"}, format="json")
         user = User.objects.get(email=EMAIL)
         self.assertEqual(response.status_code, 201)

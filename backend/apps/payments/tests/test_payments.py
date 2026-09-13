@@ -30,7 +30,7 @@ class FakeGateway:
                 "access_code": "acc_123"}
 
     def verify(self, *, reference):
-        return self.verify_data
+        return {"reference": reference, **self.verify_data}
 
 
 def success_data(amount_kobo=500000):

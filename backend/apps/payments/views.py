@@ -81,55 +81,13 @@ class PaymentViewSet(
 
     @action(detail=False, methods=["post"])
     def checkout(self, request):
-        """POST /payments/checkout/ {cart_items: [uuid...]} -> authorization_url."""
+        """POST /payments/checkout/ {cart_items: [id...]} -> authorization_url."""
         serializer = CartCheckoutSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        cart = Cart.objects.get(user=request.user)
-        cart_items = CartItem.objects.filter(cart=cart, id__in=serializer.validated_data["cart_items"])
-        if not cart_items.exists():
-            raise serializers.ValidationError("No valid cart items to checkout.")
-
-        # Calculate total amount
-        total_amount = sum(item.effective_price for item in cart_items)
-        if total_amount <= 0:
-            # Free courses - auto-enroll
-            for item in cart_items:
-                grant_enrollment(student=request.user, course=item.course)
-            cart.items.filter(id__in=serializer.validated_data["cart_items"]).delete()
+        payment = services.checkout_cart(student=request.user, item_ids=serializer.validated_data["cart_items"])
+        if payment is None:
             return Response({"detail": "Free courses enrolled successfully."}, status=status.HTTP_200_OK)
-
-        # Create a single payment record for the cart
-        # We'll use the first course as the "primary" course for the payment record
-        primary_course = cart_items.first().course
-
-        # Check if already enrolled in any of the courses
-        enrolled_courses = Enrollment.objects.filter(
-            student=request.user, course__in=[item.course for item in cart_items],
-            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED)
-        ).values_list("course_id", flat=True)
-        if enrolled_courses:
-            raise AlreadyExists("Already enrolled in one or more of these courses.")
-
-        payment = Payment.objects.create(
-            student=request.user,
-            course=primary_course,
-            amount=total_amount,
-            currency=getattr(settings, "PAYMENT_CURRENCY", "NGN"),
-        )
-        # Store cart item IDs in gateway_response for later reconciliation
-        payment.gateway_response = {"cart_items": [str(item.id) for item in cart_items]}
-        payment.save(update_fields=["gateway_response", "updated_at"])
-
-        data = get_gateway().initialize(
-            reference=payment.reference,
-            amount=payment.amount,
-            email=request.user.email,
-            callback_url=getattr(settings, "PAYSTACK_CALLBACK_URL", "") or None,
-        )
-        payment.authorization_url = data.get("authorization_url", "")
-        payment.access_code = data.get("access_code", "")
-        payment.save(update_fields=["authorization_url", "access_code", "updated_at"])
 
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 

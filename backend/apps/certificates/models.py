@@ -2,6 +2,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -43,16 +44,23 @@ class CertificateTemplate(TimeStampedModel):
     )
     is_active = models.BooleanField(default=True)
     is_default = models.BooleanField(default=False)
+    # An ordinary UNIQUE index works on MySQL too. Non-defaults yield NULL;
+    # global defaults yield a literal distinct from every numeric course ID.
+    default_scope = models.GeneratedField(
+        expression=models.Case(
+            models.When(is_default=True, course_id__isnull=True, then=models.Value("global")),
+            models.When(is_default=True, then=Cast("course_id", models.CharField(max_length=20))),
+            default=models.Value(None),
+            output_field=models.CharField(max_length=20),
+        ),
+        output_field=models.CharField(max_length=20),
+        db_persist=True,
+        null=True,
+        unique=True,
+    )
 
     class Meta:
         ordering = ("-is_default", "name")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["course", "is_default"],
-                condition=models.Q(is_default=True),
-                name="unique_default_template_per_course",
-            )
-        ]
 
     def __str__(self):
         return f"{self.name} ({'Global' if not self.course else self.course.title})"

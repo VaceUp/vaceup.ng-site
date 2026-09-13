@@ -116,6 +116,9 @@ class WorkspaceTests(APITestCase):
         self.assertEqual(detail['completed_lesson_ids'], [self.lesson.pk])
 
     def test_course_search_pagination_and_constant_queries(self):
+        # Warm the shared throttle bucket: first-use INSERT/savepoint queries
+        # are independent of the number of courses being measured here.
+        self.client.get('/api/v1/dashboard/courses/')
         with CaptureQueriesContext(connection) as one:
             self.client.get('/api/v1/dashboard/courses/')
         for number in range(24):

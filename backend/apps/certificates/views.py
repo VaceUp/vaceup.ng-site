@@ -4,9 +4,11 @@ from django.http import HttpResponse, FileResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.db import IntegrityError, transaction
 
 from apps.certificates import services
 from apps.certificates.models import Certificate, CertificateTemplate
@@ -36,13 +38,35 @@ class CertificateTemplateViewSet(viewsets.ModelViewSet):
     queryset = CertificateTemplate.objects.all()
     filterset_fields = ["is_active", "is_default", "course"]
 
+    def get_queryset(self):
+        if self.request.user.is_admin:
+            return self.queryset.all()
+        return self.queryset.filter(course__instructor=self.request.user)
+
     def get_serializer_class(self):
         if self.action == "create":
             return CertificateTemplateCreateSerializer
         return CertificateTemplateSerializer
 
     def perform_create(self, serializer):
-        serializer.save()
+        self._check_course(serializer)
+        self._save_template(serializer)
+
+    def perform_update(self, serializer):
+        self._check_course(serializer)
+        self._save_template(serializer)
+
+    def _save_template(self, serializer):
+        try:
+            with transaction.atomic():
+                serializer.save()
+        except IntegrityError:
+            raise ValidationError("That template conflicts with an existing name or default. Choose one default per course/global scope.") from None
+
+    def _check_course(self, serializer):
+        course = serializer.validated_data.get("course", getattr(serializer.instance, "course", None))
+        if not self.request.user.is_admin and (course is None or course.instructor_id != self.request.user.pk):
+            raise PermissionDenied("Only administrators manage global templates; tutors may manage their own courses only.")
 
 
 class CertificateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -64,7 +88,7 @@ class CertificateViewSet(viewsets.ReadOnlyModelViewSet):
     def download_pdf(self, request, certificate_number=None):
         """GET /certificates/{number}/pdf/ -> download PDF."""
         certificate = self.get_object()
-        if not certificate.pdf_file:
+        if not services.certificate_pdf_url(certificate):
             return Response({"detail": "PDF not generated."}, status=404)
 
         # Increment download count if needed
@@ -84,8 +108,7 @@ class CertificateViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": "Not authorized."}, status=403)
 
         reason = request.data.get("reason", "")
-        if not certificate.revoke(request.user, reason):
-            return Response({"detail": "Certificate cannot be revoked."}, status=400)
+        services.revoke_certificate(certificate=certificate, user=request.user, reason=reason)
 
         return Response({"detail": "Certificate revoked."})
 
@@ -93,6 +116,7 @@ class CertificateViewSet(viewsets.ReadOnlyModelViewSet):
 @csrf_exempt
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def verify_certificate(request, verification_code):
     """GET /verify/{code}/ - public certificate verification page/API."""
     # Accept both GET and POST
@@ -104,63 +128,13 @@ def verify_certificate(request, verification_code):
     if not code:
         return Response({"valid": False, "error": "Verification code required."}, status=400)
 
-    result = verify_certificate(code, request=request)
-    return Response(result)
+    result = services.verify_certificate(code, request=request)
+    return Response(result, headers={"Cache-Control": "no-store"})
 
 
 def certificate_verification_page(request, verification_code):
-    """HTML page for public certificate verification."""
-    result = verify_certificate(verification_code)
-
-    html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Certificate Verification - VaceUp</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-            .card { border: 1px solid #ddd; border-radius: 8px; padding: 30px; max-width: 600px; margin: 0 auto; }
-            .status { padding: 15px; border-radius: 4px; margin: 20px 0; text-align: center; font-weight: bold; }
-            .valid { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-            .invalid { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-            .cert-info { background: #f8f9fa; padding: 20px; border-radius: 4px; margin: 20px 0; }
-            .detail { margin: 10px 0; }
-            .label { font-weight: bold; color: #666; }
-            .btn { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h1>Certificate Verification</h1>
-            <div class="status {{ 'valid' if result.get('valid') else 'invalid' }}">
-                {'✓ Valid Certificate' if result.get('valid') else '✗ Invalid Certificate'}
-            </div>
-            {% if result.valid %}
-            <div class="cert-info">
-                <div class="detail"><span class="label">Certificate #:</span> <span>{{ cert.certificate_number }}</span></div>
-                <div class="detail"><span class="label">Student:</span> <span>{{ cert.student_name }}</span></div>
-                <div class="detail"><span class="label">Course:</span> <span>{{ cert.course_title }}</span></div>
-                <div class="detail"><span class="label">Instructor:</span> <span>{{ cert.instructor_name }}</span></div>
-                <div class="detail"><span class="label">Issued:</span> <span>{{ cert.issue_date }}</span></div>
-                <div class="detail"><span class="label">Verification Code:</span> <span>{{ cert.verification_code }}</span></div>
-                {% if cert.pdf_url %}
-                <a href="{{ cert.pdf_url }}" class="btn" target="_blank">Download PDF</a>
-                {% endif %}
-            </div>
-            {% else %}
-            <p>{{ result.error }}</p>
-            {% endif %}
-        </div>
-    </body>
-    </html>
-    """
-    from django.template import Template, Context
-    from django.http import HttpResponse
-
-    result = verify_certificate(verification_code)
-    cert = result.get("certificate", {})
-
-    template = Template(html)
-    context = Context({"result": result, "cert": cert})
-    return HttpResponse(template.render(context))
+    """Use the established branded frontend instead of a separate HTML shell."""
+    from urllib.parse import urlencode
+    from django.conf import settings
+    from django.shortcuts import redirect
+    return redirect(f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify?{urlencode({'code': verification_code})}")

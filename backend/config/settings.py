@@ -10,6 +10,7 @@ from pathlib import Path
 import ssl
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,6 +20,14 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
+REDIS_URL = env("REDIS_URL", default="")
+VACEUP_INFRASTRUCTURE = env(
+    "VACEUP_INFRASTRUCTURE", default="redis" if REDIS_URL else "database",
+).strip().lower()
+if VACEUP_INFRASTRUCTURE not in {"database", "redis"}:
+    raise ImproperlyConfigured("VACEUP_INFRASTRUCTURE must be database or redis.")
+if VACEUP_INFRASTRUCTURE == "redis" and not REDIS_URL:
+    raise ImproperlyConfigured("Redis infrastructure requires REDIS_URL.")
 
 # --- Custom user: MUST be set before the very first migration ---
 AUTH_USER_MODEL = "accounts.User"
@@ -94,15 +103,13 @@ REST_FRAMEWORK = {
     ),
     "PAGE_SIZE": 20,
     "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "apps.core.throttling.DatabaseAnonRateThrottle",
+        "apps.core.throttling.DatabaseUserRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "50/hour",
+        "anon": "120/min",
         "user": "1000/hour",
-        # Per-endpoint scopes for abuse-prone auth flows. NOTE: throttling is
-        # only correct once the cache is a shared store (Redis/Upstash) — with
-        # the default per-process LocMem cache these counters are per-worker.
+        # Auth scopes use database row locks across all web workers.
         "auth_login": "10/min",
         "auth_register": "5/min",
         "auth_verify": "10/min",
@@ -113,6 +120,8 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Domain exceptions → consistent JSON envelope (apps/core/exceptions.py).
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
+    # Ignore spoofable forwarded IPs unless the trusted proxy count is explicit.
+    "NUM_PROXIES": env.int("DRF_NUM_PROXIES", default=0),
 }
 
 SPECTACULAR_SETTINGS = {
@@ -168,18 +177,30 @@ SIMPLE_JWT = {
 }
 
 # --- Email + account lifecycle -------------------------------------------
-# Falls back to the console backend when no SMTP host is configured, so the
-# verify/reset flows are fully testable in dev without a provider. Set the
-# EMAIL_* / DEFAULT_FROM_EMAIL / FRONTEND_BASE_URL vars in .env for production.
-EMAIL_HOST = env("EMAIL_HOST", default="")
-if EMAIL_HOST:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_PORT = env.int("EMAIL_PORT", default=587)
-    EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-    EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Never print verification/reset links to worker logs when SMTP is missing.
+# Tests explicitly use locmem. Diagnose production with diagnose_email_delivery.
+EMAIL_HOST = env("EMAIL_HOST", default="").strip()
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default=("django.core.mail.backends.smtp.EmailBackend" if EMAIL_HOST else
+             "django.core.mail.backends.dummy.EmailBackend"),
+)
+# Implicit TLS (usually 465) and STARTTLS (usually 587) are different protocols.
+# Explicit contradictory flags remain an error; never silently downgrade TLS.
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=not EMAIL_USE_SSL)
+EMAIL_PORT = env.int("EMAIL_PORT", default=465 if EMAIL_USE_SSL else 587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+# Django uses ssl.create_default_context(): hostname and certificate validation
+# stay enabled. SSL_CERT_FILE/SSL_CERT_DIR can supply a trusted CA bundle.
+# Explicit cPanel option when a persistent worker cannot be run. This only
+# affects account mail; a broker outage never silently switches to sync.
+ACCOUNT_EMAIL_DELIVERY_MODE = env(
+    "ACCOUNT_EMAIL_DELIVERY_MODE",
+    default="database" if VACEUP_INFRASTRUCTURE == "database" else "async",
+).strip().lower()
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
 # Base URL of the frontend that renders the emailed verify/reset links.
@@ -227,12 +248,9 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 # --- CSRF: required by Django 4+ for admin/form POSTs served from these hosts ---
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
-# --- Cache: Redis/Upstash when configured, else per-process memory ---------
-# IMPORTANT for scale: DRF throttling and any shared locking are only correct
-# with a shared cache. Set REDIS_URL (Upstash) in production; without it we
-# fall back to LocMemCache, which is per-worker and NOT safe for throttling.
-REDIS_URL = env("REDIS_URL", default="")
-if REDIS_URL:
+# --- Shared cache: explicit Redis mode or a migrated database table --------
+# Abuse counters are separate, transactional database rows in both modes.
+if VACEUP_INFRASTRUCTURE == "redis":
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -242,14 +260,16 @@ if REDIS_URL:
 else:
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "vaceup_cache",
         }
     }
 
 # --- Django Channels (WebSockets for real-time features) --------------------
 # Redis-backed channel layer for WebSocket pub/sub (code editor, whiteboard,
 # notifications, presence). Requires REDIS_URL to be set.
-if REDIS_URL:
+WEBSOCKETS_ENABLED = env.bool("WEBSOCKETS_ENABLED", default=False)
+if VACEUP_INFRASTRUCTURE == "redis":
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -259,17 +279,14 @@ if REDIS_URL:
         }
     }
 else:
-    # In-memory channel layer for dev without Redis
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
-        }
-    }
+    CHANNEL_LAYERS = {}
+if WEBSOCKETS_ENABLED and VACEUP_INFRASTRUCTURE != "redis":
+    raise ImproperlyConfigured("WebSockets require a shared channel layer. Leave WEBSOCKETS_ENABLED=False in database mode.")
 
 # --- Celery: async email + scheduled reminders -----------------------------
 # Broker/result default to the same Upstash Redis as the cache. In dev/CI with
 # no worker running, set CELERY_TASK_ALWAYS_EAGER=True to run tasks inline.
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="") or REDIS_URL
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="") or (REDIS_URL if VACEUP_INFRASTRUCTURE == "redis" else "")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="") or CELERY_BROKER_URL
 if CELERY_BROKER_URL.startswith("rediss://"):
     CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
@@ -285,6 +302,8 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+# The deployed workers consume "emails", not Celery's default "celery" queue.
+CELERY_TASK_ROUTES = {"accounts.*": {"queue": "emails"}}
 CELERY_ENABLE_UTC = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # How far ahead of a class to send reminder emails, and how often beat scans.
@@ -313,6 +332,7 @@ if SENTRY_DSN:
                 "SENTRY_TRACES_SAMPLE_RATE", default=0.1
             ),
             send_default_pii=False,  # don't ship user PII to Sentry
+            include_local_variables=False,  # mail stack frames contain account links
         )
     except ImportError:
         # sentry-sdk not installed; skip rather than crash the app.

@@ -51,6 +51,7 @@ class Payment(TimeStampedModel):
     paid_at = models.DateTimeField(null=True, blank=True)
     # Raw gateway verify payload, kept for audit/reconciliation.
     gateway_response = models.JSONField(null=True, blank=True)
+    checkout_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -75,3 +76,15 @@ class Payment(TimeStampedModel):
         if gateway_response is not None:
             self.gateway_response = gateway_response
         self.save(update_fields=["status", "gateway_response", "updated_at"])
+
+
+class PaymentItem(models.Model):
+    """Order snapshot independent of the mutable shopping cart/gateway payload."""
+
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="items")
+    course = models.ForeignKey("courses.Course", on_delete=models.PROTECT, related_name="payment_items")
+    course_title = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["payment", "course"], name="uq_payment_course_item")]

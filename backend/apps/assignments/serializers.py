@@ -38,7 +38,25 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "is_late",
             "submitted_at",
         )
-        read_only_fields = ("student", "assignment", "status", "submitted_at")
+        read_only_fields = ("student", "assignment", "status", "submitted_at", "score", "feedback", "is_late")
+
+
+class SubmissionCreateSerializer(serializers.Serializer):
+    assignment = serializers.PrimaryKeyRelatedField(queryset=Assignment.objects.all())
+    file = serializers.FileField(required=False)
+    text_answer = serializers.CharField(required=False, allow_blank=True, max_length=50000)
+
+    def validate(self, attrs):
+        if not attrs.get("file") and not attrs.get("text_answer", "").strip():
+            raise serializers.ValidationError("Provide a text answer or upload your assignment.")
+        upload = attrs.get("file")
+        if upload:
+            from pathlib import Path
+            if upload.size > 10 * 1024 * 1024:
+                raise serializers.ValidationError("Assignment files must be at most 10 MB.")
+            if Path(upload.name).suffix.lower() not in {".pdf", ".txt", ".docx", ".png", ".jpg", ".jpeg"}:
+                raise serializers.ValidationError("Upload a PDF, text, DOCX, PNG or JPEG file.")
+        return attrs
 
 
 class AssignmentSerializer(serializers.ModelSerializer):
@@ -123,7 +141,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         if obj.question_type == Question.Type.MCQ:
             from apps.assignments.serializers import MCQChoiceSerializer
             return MCQChoiceSerializer(
-                obj.choices.all(), many=True, read_only=True
+                obj.choices.all(), many=True, read_only=True, context=self.context,
             ).data
         return []
 
@@ -135,6 +153,13 @@ class MCQChoiceSerializer(serializers.ModelSerializer):
         model = MCQChoice
         fields = ("id", "choice_text", "is_correct", "order")
         read_only_fields = ("is_correct",)  # instructor sets correct answers
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        user = getattr(self.context.get("request"), "user", None)
+        if not user or not (user.is_admin or (user.is_instructor and instance.question.quiz.course.instructor_id == user.pk)):
+            data.pop("is_correct", None)
+        return data
 
 
 class QuizSerializer(serializers.ModelSerializer):
@@ -176,6 +201,8 @@ class QuizWriteSerializer(serializers.ModelSerializer):
     """Write shape for creating a quiz (instructor only)."""
 
     course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all())
+    pass_mark = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False)
+    time_limit_minutes = serializers.IntegerField(min_value=1, max_value=1440, required=False)
 
     class Meta:
         model = Quiz

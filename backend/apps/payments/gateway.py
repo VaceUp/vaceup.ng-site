@@ -18,7 +18,7 @@ from decimal import Decimal
 
 from django.conf import settings
 
-from apps.core.exceptions import PaymentFailed
+from apps.core.exceptions import PaymentFailed, PaymentProviderUnavailable
 
 PAYSTACK_BASE = "https://api.paystack.co"
 
@@ -56,10 +56,11 @@ class PaystackGateway:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 body = json.loads(resp.read().decode())
         except urllib.error.HTTPError as exc:  # 4xx/5xx from Paystack
-            detail = exc.read().decode(errors="replace")[:200]
-            raise PaymentFailed(f"Paystack error ({exc.code}): {detail}")
-        except urllib.error.URLError as exc:  # network/DNS/timeout
-            raise PaymentFailed(f"Could not reach Paystack: {exc.reason}")
+            if exc.code == 429 or exc.code >= 500:
+                raise PaymentProviderUnavailable() from None
+            raise PaymentFailed(f"Payment provider rejected the request (HTTP {exc.code}). Contact support.") from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError):
+            raise PaymentProviderUnavailable() from None
         if not body.get("status"):
             raise PaymentFailed(body.get("message", "Paystack request failed."))
         return body["data"]
@@ -120,11 +121,11 @@ def get_gateway() -> PaystackGateway:
     """Factory used by services; patched in tests."""
     secret = getattr(settings, "PAYSTACK_SECRET_KEY", "")
     # Use fake gateway if secret is dummy/test value
-    if secret in ("sk_test_dummy", "", None):
+    if getattr(settings, "PAYMENTS_ALLOW_FAKE", False) and secret == "sk_test_dummy":
         global _fake_gateway
         if _fake_gateway is None:
             _fake_gateway = FakePaystackGateway()
         return _fake_gateway
-    if not secret:
+    if not secret or secret == "sk_test_dummy":
         raise PaymentFailed("Payments are not configured (missing Paystack key).")
     return PaystackGateway(secret)

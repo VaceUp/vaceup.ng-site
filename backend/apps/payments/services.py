@@ -10,16 +10,19 @@ Security invariants:
 from __future__ import annotations
 
 from decimal import Decimal
+import hashlib
+import json
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 
-from apps.core.exceptions import AlreadyExists, DomainError, PaymentFailed
+from apps.core.exceptions import AlreadyExists, DomainError, PaymentFailed, PaymentProviderUnavailable
 from apps.enrollment.models import Enrollment
 from apps.enrollment.services import grant_enrollment
 from apps.payments.gateway import get_gateway, to_minor_unit
-from apps.payments.models import Payment
+from apps.payments.models import Payment, PaymentItem
 
 
 @transaction.atomic
@@ -29,6 +32,7 @@ def initialize_payment(*, student, course):
     Idempotent-ish: an existing PENDING payment for the same (student, course)
     is reused rather than creating a duplicate.
     """
+    get_user_model().objects.select_for_update().get(pk=student.pk)
     if not course.is_published:
         raise DomainError("This course is not open for enrollment.",
                           code="not_available")
@@ -42,19 +46,29 @@ def initialize_payment(*, student, course):
     if already:
         raise AlreadyExists("You are already enrolled in this course.")
 
-    payment = (
-        Payment.objects.filter(
-            student=student, course=course, status=Payment.Status.PENDING
-        )
-        .order_by("-created_at")
-        .first()
-    )
+    return _initialize_order(student, [(course, course.price)])
+
+
+def _initialize_order(student, lines):
+    """Caller holds the student row lock for concurrent checkout serialization."""
+    currency = settings.PAYMENT_CURRENCY.upper()
+    fingerprint = hashlib.sha256(json.dumps(
+        [currency, sorted((course.pk, format(Decimal(amount), ".2f")) for course, amount in lines)],
+    ).encode()).hexdigest()
+    payment = Payment.objects.filter(
+        student=student, checkout_fingerprint=fingerprint, status=Payment.Status.PENDING,
+    ).first()
     if payment is None:
         payment = Payment.objects.create(
-            student=student, course=course, amount=course.price,
-            currency=getattr(settings, "PAYMENT_CURRENCY", "NGN"),
+            student=student, course=lines[0][0], amount=sum(amount for _, amount in lines),
+            currency=currency, checkout_fingerprint=fingerprint,
         )
-
+        PaymentItem.objects.bulk_create([
+            PaymentItem(payment=payment, course=course, amount=amount, course_title=course.title)
+            for course, amount in lines
+        ])
+    if payment.authorization_url:
+        return payment
     data = get_gateway().initialize(
         reference=payment.reference,
         amount=payment.amount,
@@ -65,6 +79,30 @@ def initialize_payment(*, student, course):
     payment.access_code = data.get("access_code", "")
     payment.save(update_fields=["authorization_url", "access_code", "updated_at"])
     return payment
+
+
+@transaction.atomic
+def checkout_cart(*, student, item_ids):
+    from apps.cart.models import CartItem
+    get_user_model().objects.select_for_update().get(pk=student.pk)
+    items = list(CartItem.objects.select_for_update().filter(
+        cart__user=student, pk__in=item_ids,
+    ).select_related("course"))
+    if not items or len(items) != len(set(item_ids)):
+        raise ValidationError("Some cart items no longer exist or do not belong to you.")
+    if any(not item.course.is_published or item.effective_price < 0 for item in items):
+        raise ValidationError("A selected course is unavailable. Refresh your cart.")
+    if Enrollment.objects.filter(
+        student=student, course_id__in=[item.course_id for item in items],
+    ).exists():
+        raise AlreadyExists("You already have an enrollment for a selected course. Contact support if it is suspended.")
+    lines = [(item.course, item.effective_price) for item in items]
+    if sum(amount for _, amount in lines) == 0:
+        for course, _ in lines:
+            grant_enrollment(student=student, course=course)
+        CartItem.objects.filter(cart__user=student, pk__in=item_ids).delete()
+        return None
+    return _initialize_order(student, lines)
 
 
 def verify_payment(*, reference, student=None):
@@ -95,11 +133,26 @@ def verify_payment(*, reference, student=None):
             _grant_enrollments_for_payment(payment)
             return payment
 
+        # Preserve recoverable pre-upgrade carts before replacing gateway data.
+        legacy_ids = (payment.gateway_response or {}).get("cart_items")
+        if legacy_ids and not payment.items.exists():
+            from apps.cart.models import CartItem
+            legacy = list(CartItem.objects.filter(pk__in=legacy_ids, cart__user_id=payment.student_id).select_related("course"))
+            if len(legacy) != len(legacy_ids) or sum(item.effective_price for item in legacy) != payment.amount:
+                raise PaymentFailed("This older cart payment requires support reconciliation. Do not pay again.")
+            PaymentItem.objects.bulk_create([
+                PaymentItem(payment=payment, course=item.course, course_title=item.course.title, amount=item.effective_price)
+                for item in legacy
+            ])
+
         data = get_gateway().verify(reference=reference)
 
         # Never trust the client — validate amount and status from Paystack.
         expected = to_minor_unit(payment.amount)
-        paid = int(data.get("amount") or 0)
+        try:
+            paid = int(data.get("amount") or 0)
+        except (ValueError, TypeError):
+            raise PaymentFailed("Gateway returned an invalid amount.") from None
         gateway_status = (data.get("status") or "").lower()
 
         if gateway_status != "success":
@@ -110,9 +163,10 @@ def verify_payment(*, reference, student=None):
             )
             payment.mark_failed(status=new_status, gateway_response=data)
             failure_message = f"Payment not successful (status: {gateway_status})."
-        elif paid < expected:
+        elif (paid != expected or str(data.get("currency", "")).upper() != payment.currency
+              or data.get("reference") != payment.reference):
             payment.mark_failed(gateway_response=data)
-            failure_message = "Paid amount does not match the course price."
+            failure_message = "Payment amount, currency or reference does not match this order. Contact support."
         else:
             payment.mark_success(gateway_response=data)
             _grant_enrollments_for_payment(payment)
@@ -128,24 +182,15 @@ def _grant_enrollments_for_payment(payment):
     Handles both single-course payments and cart-based payments
     (where cart item IDs are stored in gateway_response).
     """
-    student = payment.student
-    # Check if this is a cart-based payment
-    gateway_response = payment.gateway_response or {}
-    cart_item_ids = gateway_response.get("cart_items")
-    
-    if cart_item_ids:
-        # Cart-based payment: enroll in all courses from cart items
-        from apps.cart.models import CartItem
-        cart_items = CartItem.objects.filter(id__in=cart_item_ids).select_related("course")
-        for item in cart_items:
-            grant_enrollment(student=student, course=item.course)
-        # Clear the processed cart items
-        from apps.cart.models import Cart
-        cart = Cart.objects.get(user=student)
-        cart.items.filter(id__in=cart_item_ids).delete()
-    else:
-        # Single-course payment
-        grant_enrollment(student=student, course=payment.course)
+    from apps.cart.models import CartItem
+    lines = list(payment.items.select_related("course"))
+    courses = [line.course for line in lines] if lines else [payment.course]
+    for course in courses:
+        existing = Enrollment.objects.filter(student=payment.student, course=course).first()
+        # Replayed successful callbacks must never reverse an admin suspension.
+        if existing is None:
+            grant_enrollment(student=payment.student, course=course)
+    CartItem.objects.filter(cart__user=payment.student, course__in=courses).delete()
 
 
 def handle_webhook_event(event: dict) -> None:
@@ -161,6 +206,9 @@ def handle_webhook_event(event: dict) -> None:
         return
     try:
         verify_payment(reference=reference)
+    except PaymentProviderUnavailable:
+        # Acknowledge only processed events. Paystack can retry temporary errors.
+        raise
     except (PaymentFailed, NotFound, DomainError):
         # Already handled/marked; nothing else to do. Webhook still returns 200.
         pass

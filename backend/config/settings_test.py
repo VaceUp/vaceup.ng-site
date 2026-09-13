@@ -23,6 +23,9 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 # Run Celery tasks inline (no broker/worker needed in tests).
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
+ACCOUNT_EMAIL_DELIVERY_MODE = "async"
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 # The test client speaks plain HTTP.
 SECURE_SSL_REDIRECT = False
@@ -37,3 +40,4 @@ PAYSTACK_SECRET_KEY = "sk_test_dummy"
 PAYSTACK_PUBLIC_KEY = "pk_test_dummy"
 PAYSTACK_CALLBACK_URL = "http://testserver/payment/callback"
 PAYMENT_CURRENCY = "NGN"
+PAYMENTS_ALLOW_FAKE = True

@@ -415,51 +415,15 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["post"], url_path="certificates/issue")
     def certificates_issue(self, request):
-        """POST /admin/dashboard/certificates/issue/ {student_id, course_id}.
-
-        Issues a certificate for the student on the given course. Marks the
-        enrollment completed if it isn't already. PDF generation failures are
-        non-fatal — the certificate (and its verify page) still exists.
-        """
-        student_id = request.data.get("student_id")
-        course_id = request.data.get("course_id")
-        if not student_id or not course_id:
-            raise DomainError("student_id and course_id are required.", code="params")
-
-        from apps.certificates.services import issue_certificate
-        from apps.enrollment.models import Enrollment
-        from apps.certificates.models import Certificate
-
+        """Issue only for a completed enrollment; PDF failures are not success."""
+        from apps.certificates.services import enrollment_for_issuance, issue_certificate
         try:
-            student = User.objects.get(id=student_id)
-            course = Course.objects.get(id=course_id)
-        except (User.DoesNotExist, Course.DoesNotExist, ValueError, ValidationError):
-            raise DomainError("Student or course not found.", code="not_found")
-
-        enrollment = Enrollment.objects.filter(student=student, course=course).first()
-        if not enrollment:
-            raise DomainError(
-                "That student is not enrolled in this course.", code="not_enrolled"
-            )
-
-        if enrollment.status != Enrollment.Status.COMPLETED:
-            enrollment.status = Enrollment.Status.COMPLETED
-            if not enrollment.completed_at:
-                from django.utils import timezone as _tz
-                enrollment.completed_at = _tz.now()
-            enrollment.save(update_fields=["status", "completed_at", "updated_at"])
-
-        try:
-            certificate = issue_certificate(enrollment=enrollment)
-        except Exception:
-            certificate = Certificate.objects.filter(enrollment=enrollment).first()
-            if not certificate:
-                raise DomainError(
-                    "Certificate could not be generated (PDF engine unavailable on this host).",
-                    code="pdf_failed",
-                )
-            # Certificate record exists — the PDF just failed. Good enough.
-
+            student_id = int(request.data.get("student_id"))
+            course_id = int(request.data.get("course_id"))
+        except (TypeError, ValueError):
+            raise DomainError("Select a valid student and course.", code="params") from None
+        enrollment = enrollment_for_issuance(student_id=student_id, course_id=course_id)
+        certificate = issue_certificate(enrollment=enrollment)
         return Response({
             "detail": "Certificate issued.",
             "certificate_number": certificate.certificate_number,

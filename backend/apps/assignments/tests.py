@@ -74,6 +74,7 @@ class AssignmentTests(APITestCase):
         self.client.force_authenticate(self.student)
         r = self.client.post("/api/v1/assignments/submit/", {
             "assignment": assignment.id,
+            "text_answer": "My answer",
         }, format="json")
         self.assertEqual(r.status_code, 200)
         submission = Submission.objects.get(student=self.student, assignment=assignment)
@@ -88,11 +89,13 @@ class AssignmentTests(APITestCase):
         # First submit
         r = self.client.post("/api/v1/assignments/submit/", {
             "assignment": assignment.id,
+            "text_answer": "My answer",
         }, format="json")
         self.assertEqual(r.status_code, 200)
         # Second submit - should update, not create new
         r = self.client.post("/api/v1/assignments/submit/", {
             "assignment": assignment.id,
+            "text_answer": "My revised answer",
         }, format="json")
         self.assertEqual(r.status_code, 200)  # 200 OK for re-submission
         count = Submission.objects.filter(
@@ -105,6 +108,7 @@ class AssignmentTests(APITestCase):
         self.client.force_authenticate(self.student)
         self.client.post("/api/v1/assignments/submit/", {
             "assignment": assignment.id,
+            "text_answer": "My answer",
         }, format="json")
         # Instructor grades
         self.client.force_authenticate(self.instr)

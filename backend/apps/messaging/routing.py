@@ -16,3 +16,8 @@ websocket_urlpatterns = [
     re_path(r"ws/whiteboard/(?P<room_id>[^/]+)/$", WhiteboardConsumer.as_asgi()),
     re_path(r"ws/breakout/(?P<room_id>[^/]+)/$", BreakoutRoomConsumer.as_asgi()),
 ]
+
+# Only the account-scoped notification channel is eligible for deployment.
+# Collaborative room routes require membership/JWT authentication work before
+# being re-enabled; never expose room-name-only authorization in production.
+notification_urlpatterns = [websocket_urlpatterns[0]]

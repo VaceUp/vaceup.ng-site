@@ -4,6 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+from apps.enrollment.models import Enrollment
 
 from apps.assignments import services
 from apps.assignments.models import Assignment, Submission, Quiz, QuizAttempt
@@ -11,6 +15,7 @@ from apps.assignments import services
 from apps.assignments.serializers import (
     AssignmentSerializer,
     SubmissionSerializer,
+    SubmissionCreateSerializer,
     QuestionSerializer,
     MCQChoiceSerializer,
     QuizSerializer,
@@ -65,6 +70,8 @@ class AssignmentViewSet(
     def get_permissions(self):
         if self.action == "submit":
             return [IsStudent()]
+        if self.action in {"list", "retrieve"}:
+            return [IsAuthenticated()]
         return [IsInstructorOrAdmin()]
 
     def get_queryset(self):
@@ -83,18 +90,19 @@ class AssignmentViewSet(
         ).distinct()
 
     def perform_create(self, serializer):
+        course = serializer.validated_data["course"]
+        if not self.request.user.is_admin and course.instructor_id != self.request.user.pk:
+            raise PermissionDenied("You may only create assignments for your own courses.")
         serializer.save(instructor=self.request.user)
 
     @action(detail=False, methods=["post"])
     def submit(self, request, pk=None):
         """POST /assignments/submit/ {assignment_id, file?, text_answer?}"""
-        assignment_id = request.data.get("assignment")
-        assignment = Assignment.objects.get(id=assignment_id)
-        serializer = SubmissionSerializer(data=request.data)
+        serializer = SubmissionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         submission = services.submission_create(
             student=request.user,
-            assignment=assignment,
+            assignment=serializer.validated_data["assignment"],
             file=serializer.validated_data.get("file"),
             text_answer=serializer.validated_data.get("text_answer"),
         )
@@ -107,7 +115,8 @@ class AssignmentViewSet(
         serializer = AssignmentGradeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         submission = services.submission_grade(
-            submission=Submission.objects.get(id=serializer.validated_data["submission_id"]),
+            submission=get_object_or_404(Submission, id=serializer.validated_data["submission_id"], assignment=assignment),
+            grader=request.user,
             score=serializer.validated_data["score"],
             feedback=serializer.validated_data.get("feedback", ""),
             marked_late=serializer.validated_data.get("marked_late", False),
@@ -116,7 +125,6 @@ class AssignmentViewSet(
 
 
 class SubmissionViewSet(
-    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
@@ -134,7 +142,7 @@ class SubmissionViewSet(
     @action(detail=False, methods=["post"])
     def submit(self, request):
         """POST /assignments/submit/ {assignment_id, file?, text_answer?}"""
-        serializer = SubmissionSerializer(data=request.data)
+        serializer = SubmissionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         submission = services.submission_create(
             student=request.user,
@@ -143,6 +151,9 @@ class SubmissionViewSet(
             text_answer=serializer.validated_data.get("text_answer"),
         )
         return Response(SubmissionSerializer(submission).data)
+
+    def create(self, request):
+        return self.submit(request)
 
     @action(detail=True, methods=["get"])
     def status(self, request, pk=None):
@@ -160,6 +171,7 @@ class SubmissionViewSet(
 
 class QuizViewSet(
     mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
@@ -170,13 +182,32 @@ class QuizViewSet(
     permission_classes = [IsInstructorOrAdmin]
     queryset = Quiz.objects.all()
 
+    def get_permissions(self):
+        if self.action in {"start", "submit"}:
+            return [IsStudent()]
+        if self.action in {"list", "retrieve"}:
+            return [IsAuthenticated()]
+        return [IsInstructorOrAdmin()]
+
     def get_serializer_class(self):
-        if self.action == "create":
+        if self.action in {"create", "update", "partial_update"}:
             return QuizWriteSerializer
         return QuizSerializer
 
     def perform_create(self, serializer):
+        course = serializer.validated_data["course"]
+        if not self.request.user.is_admin and course.instructor_id != self.request.user.pk:
+            raise PermissionDenied("You may only create quizzes for your own courses.")
         serializer.save(instructor=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.attempts.exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("This quiz has attempts and cannot be edited. Create a new quiz.")
+        course = serializer.validated_data.get("course", serializer.instance.course)
+        if not self.request.user.is_admin and course.instructor_id != self.request.user.pk:
+            raise PermissionDenied("You may only use your own courses.")
+        serializer.save()
 
     def get_queryset(self):
         user = self.request.user
@@ -186,6 +217,7 @@ class QuizViewSet(
             return Quiz.objects.filter(course__instructor=user)
         # Students: quizzes of courses they're enrolled in
         return Quiz.objects.filter(
+            status=Quiz.Status.PUBLISHED,
             course__enrollments__student=user,
             course__enrollments__status__in=(
                 Enrollment.Status.ACTIVE,
@@ -197,32 +229,43 @@ class QuizViewSet(
     def question(self, request, pk=None):
         """POST /quizzes/{pk}/questions/ — add a question to a quiz."""
         quiz = self.get_object()
-        serializer = QuestionSerializer(data=request.data, context={"quiz_id": quiz.id})
+        if quiz.status != Quiz.Status.DRAFT or quiz.attempts.exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Questions may only be added to an unused draft quiz.")
+        serializer = QuestionSerializer(data=request.data, context={"quiz_id": quiz.id, "request": request})
         serializer.is_valid(raise_exception=True)
         question = serializer.save()
         question.quiz = quiz
         question.save()
-        return Response(QuestionSerializer(question).data, status=status.HTTP_201_CREATED)
+        return Response(QuestionSerializer(question, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
-        """POST /quizzes/{id}/submit/ {answers}"""
+        """Start/resume the one permitted attempt; never submit implicitly."""
         quiz = self.get_object()
-        attempt = QuizAttempt.objects.get(
-            student=request.user, quiz=quiz, status=QuizAttempt.Status.IN_PROGRESS
-        )
-        answers_data = request.data.get("answers", [])
-        for ad in answers_data:
-            question = quiz.questions.get(id=ad["question_id"])
-            services.answer_submit(
-                student=request.user,
-                question=question,
-                choice_id=ad.get("choice_id"),
-                short_text=ad.get("short_text"),
-            )
-        # Mark attempt submitted (e.g., time limit check)
-        services.attempt_submit(attempt=attempt, time_spent_seconds=0)
-        # Grade the attempt
+        attempt = services.attempt_create(student=request.user, quiz=quiz)
+        return Response(QuizAttemptSerializer(attempt).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def submit(self, request, pk=None):
+        quiz = self.get_object()
+        attempt = get_object_or_404(QuizAttempt.objects.select_for_update(), student=request.user, quiz=quiz)
+        if attempt.status != QuizAttempt.Status.IN_PROGRESS:
+            return Response(QuizAttemptSerializer(attempt).data)
+        serializer = AnswerCreateSerializer(data=request.data.get("answers", []), many=True)
+        serializer.is_valid(raise_exception=True)
+        services.check_attempt_deadline(attempt)
+        seen = set()
+        for answer in serializer.validated_data:
+            question = get_object_or_404(quiz.questions, id=answer["question_id"])
+            if question.pk in seen:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError("Submit each question only once.")
+            seen.add(question.pk)
+            services.answer_submit(student=request.user, question=question,
+                                   choice_id=answer.get("choice_id"), short_text=answer.get("short_text"))
+        services.attempt_submit(attempt=attempt)
         services.attempt_grade(attempt=attempt, auto_grade=True)
         return Response(QuizAttemptSerializer(attempt).data)
 
@@ -250,4 +293,13 @@ class MCQChoiceListView(ListAPIView):
 
     def get_queryset(self):
         from apps.assignments.models import Question
-        return Question.objects.get(id=self.kwargs["question_id"]).choices.all()
+        user = self.request.user
+        questions = Question.objects.all()
+        if user.is_instructor:
+            questions = questions.filter(quiz__course__instructor=user)
+        elif not user.is_admin:
+            questions = questions.filter(
+                quiz__status=Quiz.Status.PUBLISHED, quiz__course__enrollments__student=user,
+                quiz__course__enrollments__status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+            )
+        return get_object_or_404(questions, id=self.kwargs["question_id"]).choices.all()

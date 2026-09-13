@@ -1,22 +1,29 @@
 """Certificate services: generation, PDF rendering, verification."""
 from __future__ import annotations
 
-import base64
 import hashlib
-import os
+import logging
 import uuid
-from decimal import Decimal
+from html import escape
+from html.parser import HTMLParser
+from ipaddress import ip_address
 from io import BytesIO
 
-from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 from django.template import Template, Context
+from django.urls import reverse
 from django.utils import timezone
 
+from apps.certificates.exceptions import CertificateConflict, CertificateNotFound, CertificateUnavailable
 from apps.certificates.models import Certificate, CertificateTemplate, CertificateVerificationLog
 from apps.core.exceptions import DomainError
+from apps.courses.models import Course
 from apps.enrollment.models import Enrollment
+
+logger = logging.getLogger(__name__)
 
 
 def generate_verification_code() -> str:
@@ -27,29 +34,39 @@ def generate_verification_code() -> str:
 
 
 def get_template_for_course(course) -> CertificateTemplate:
-    """Get the appropriate template for a course."""
-    # Try course-specific default template first
-    template = CertificateTemplate.objects.filter(
-        course__in=[course, None],
-        is_default=True,
-        is_active=True,
-    ).order_by("-course").first()
+    """Prefer a course default, then a global default, then scoped fallbacks."""
+    active = CertificateTemplate.objects.filter(is_active=True)
+    for scope in (
+        {"course": course, "is_default": True},
+        {"course__isnull": True, "is_default": True},
+        {"course": course},
+        {"course__isnull": True},
+    ):
+        template = active.filter(**scope).order_by("pk").first()
+        if template:
+            return template
+    raise CertificateUnavailable(
+        "No active certificate template applies to this course. Activate a template "
+        "for this course or a global template, then retry.", code="no_template",
+    )
 
-    if not template:
-        # Fallback to any active template
-        template = CertificateTemplate.objects.filter(is_active=True).first()
 
-    if not template:
-        raise DomainError("No active certificate template available.", code="no_template")
-
-    return template
-
-
-def generate_verification_code_short() -> str:
-    """Generate a shorter verification code (8 chars)."""
-    import random
-    import string
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+def enrollment_for_issuance(*, student_id: int, course_id: int) -> Enrollment:
+    user_model = get_user_model()
+    student = user_model.objects.filter(pk=student_id).first()
+    if student is None:
+        raise CertificateNotFound("Student not found. Select an existing student.", code="student_not_found")
+    if not student.is_student:
+        raise DomainError("Select a student account to issue a certificate.", code="not_student")
+    if not Course.objects.filter(pk=course_id).exists():
+        raise CertificateNotFound("Course not found. Select an existing course.", code="course_not_found")
+    enrollment = Enrollment.objects.filter(student_id=student_id, course_id=course_id).first()
+    if enrollment is None:
+        raise DomainError(
+            "That student is not enrolled in this course. Select their enrolled course.",
+            code="not_enrolled",
+        )
+    return enrollment
 
 
 def render_certificate_html(certificate: "Certificate") -> str:
@@ -66,7 +83,6 @@ def render_certificate_html(certificate: "Certificate") -> str:
         "instructor_name": certificate.instructor_name_at_issue,
         "institution_name": certificate.institution_name_at_issue,
         "issue_date": certificate.issue_date.strftime("%B %d, %Y"),
-        "certificate": certificate,
     }
 
     template_obj = Template(template.html_template)
@@ -117,90 +133,220 @@ def render_certificate_html(certificate: "Certificate") -> str:
     return full_html
 
 
-def generate_certificate_pdf(html: str) -> bytes:
+def _embedded_resource_fetcher(url, *args, **kwargs):
+    """Certificate rendering may read embedded data, never network or local files."""
+    if not url.startswith("data:"):
+        raise ValueError("Certificate assets must be embedded as data URLs.")
+    from weasyprint import default_url_fetcher
+    return default_url_fetcher(url, *args, **kwargs)
+
+
+def generate_certificate_pdf(html: str, *, page_size="A4", orientation="portrait") -> bytes:
     """Generate PDF from HTML using WeasyPrint."""
     try:
-        from weasyprint import HTML, CSS
+        from weasyprint import HTML
         from weasyprint.text.fonts import FontConfiguration
-
-        font_config = FontConfiguration()
-        html_doc = HTML(string=html)
-        pdf_bytes = html_doc.write_pdf(font_config=font_config)
-        return pdf_bytes
-    except ImportError:
-        # Fallback to reportlab if WeasyPrint not available
-        return generate_pdf_fallback(html)
+        return HTML(string=html, url_fetcher=_embedded_resource_fetcher).write_pdf(
+            font_config=FontConfiguration(),
+        )
+    except (ImportError, OSError):
+        # Shared hosts may lack WeasyPrint's native font libraries.
+        return generate_pdf_fallback(html, page_size=page_size, orientation=orientation)
 
 
-def generate_pdf_fallback(html: str) -> bytes:
-    """Fallback PDF generation using reportlab."""
-    from reportlab.lib.pagesizes import A4, letter
+class _CertificateText(HTMLParser):
+    """Extract visible text without accidentally printing CSS or executing markup."""
+
+    blocks = {"p", "div", "br", "h1", "h2", "h3", "li", "tr", "section"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in {"head", "script", "style"}:
+            self.hidden += 1
+        if not self.hidden and tag in self.blocks:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in {"head", "script", "style"}:
+            self.hidden = max(0, self.hidden - 1)
+        if not self.hidden and tag in self.blocks:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def generate_pdf_fallback(html: str, *, page_size="A4", orientation="portrait") -> bytes:
+    """Readable text-only PDF when WeasyPrint and its native libraries are absent."""
+    from reportlab.lib.pagesizes import A4, letter, landscape
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.units import inch
-
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    size = letter if page_size == "Letter" else A4
+    if orientation == "landscape":
+        size = landscape(size)
+    doc = SimpleDocTemplate(buffer, pagesize=size)
     styles = getSampleStyleSheet()
     story = []
 
-    # Simple fallback - just extract text from HTML
-    import re
-    text = re.sub('<[^<]+?>', '', html)
-    for line in text.split('\n'):
+    parser = _CertificateText()
+    parser.feed(html)
+    for line in "".join(parser.parts).splitlines():
         if line.strip():
-            story.append(Paragraph(line.strip(), styles['Normal']))
+            story.append(Paragraph(escape(line.strip()), styles['Normal']))
             story.append(Spacer(1, 12))
-
+    if not story:
+        raise ValueError("Certificate template contains no visible text.")
     doc.build(story)
     return buffer.getvalue()
 
 
 def issue_certificate(*, enrollment: Enrollment) -> "Certificate":
-    """Issue a certificate for a completed enrollment."""
-    from apps.certificates.models import Certificate
+    """Serialize issuance and retries; success requires a persisted PDF.
 
-    if enrollment.status != Enrollment.Status.COMPLETED:
-        raise DomainError("Enrollment must be completed to issue certificate.", code="not_completed")
+    An enrollment lock serializes requests before a certificate exists. A
+    certificate lock also serializes retries with revocation. PDF/storage
+    failures roll back new rows; existing pending rows retain their identity.
+    """
+    saved_file = None
+    try:
+        with transaction.atomic():
+            enrollment = Enrollment.objects.select_for_update().get(pk=enrollment.pk)
+            certificate = Certificate.objects.select_for_update().filter(enrollment=enrollment).first()
+            if certificate:
+                if certificate.status == Certificate.Status.REVOKED or certificate.revoked_at:
+                    raise CertificateConflict(
+                        "This certificate was revoked and cannot be reissued. Review its revocation record.",
+                        code="certificate_revoked",
+                    )
+                if is_expired(certificate):
+                    raise CertificateConflict(
+                        "This certificate has expired and cannot be reissued through this action.",
+                        code="certificate_expired",
+                    )
+                if certificate.status == Certificate.Status.ISSUED and certificate.pdf_file:
+                    return certificate
 
-    # Check if certificate already exists
-    existing = Certificate.objects.filter(enrollment=enrollment).first()
-    if existing:
-        return existing
+            if enrollment.status != Enrollment.Status.COMPLETED:
+                raise DomainError(
+                    "Enrollment is not completed. The student must finish the course requirements "
+                    "before a certificate can be issued.", code="not_completed",
+                )
+            if enrollment.completed_at is None:
+                raise DomainError(
+                    "The completed enrollment has no completion date. Correct its completion record, then retry.",
+                    code="completion_date_missing",
+                )
+            if not enrollment.student.is_student:
+                raise DomainError("Certificates can only be issued to student accounts.", code="not_student")
 
-    course = enrollment.course
-    student = enrollment.student
+            if certificate is None:
+                student = enrollment.student
+                course = enrollment.course
+                certificate = Certificate.objects.create(
+                    student=student, course=course, enrollment=enrollment,
+                    template=get_template_for_course(course),
+                    verification_code=generate_verification_code(),
+                    student_name_at_issue=student.full_name or student.email,
+                    course_title_at_issue=course.title,
+                    instructor_name_at_issue=course.instructor.full_name or course.instructor.email,
+                    institution_name_at_issue="VaceUp",
+                    completion_date=enrollment.completed_at.date(),
+                    issue_date=timezone.now().date(),
+                )
+            try:
+                html = render_certificate_html(certificate)
+            except Exception as exc:
+                logger.exception("Certificate template rendering failed")
+                raise CertificateUnavailable(
+                    "The certificate template could not be rendered. Correct its Django template syntax, then retry.",
+                    code="template_invalid",
+                ) from exc
+            try:
+                pdf_bytes = generate_certificate_pdf(
+                    html, page_size=certificate.template.page_size,
+                    orientation=certificate.template.orientation,
+                )
+                if not isinstance(pdf_bytes, bytes) or not pdf_bytes.startswith(b"%PDF-"):
+                    raise ValueError("Renderer did not produce a PDF.")
+            except Exception as exc:
+                logger.exception("Certificate PDF generation failed")
+                raise CertificateUnavailable(
+                    "The certificate PDF could not be generated. Ask the server administrator to check "
+                    "ReportLab (or WeasyPrint and its font libraries) and the template, then retry.",
+                    code="pdf_failed",
+                ) from exc
 
-    # Get template
-    template = get_template_for_course(course)
+            validate_pdf_storage(certificate.pdf_file.storage)
+            try:
+                certificate.pdf_file.save(
+                    f"certificate_{certificate.certificate_number}.pdf", ContentFile(pdf_bytes), save=False,
+                )
+                saved_file = (certificate.pdf_file.storage, certificate.pdf_file.name)
+            except Exception as exc:
+                logger.exception("Certificate PDF storage failed")
+                raise CertificateUnavailable(
+                    "The certificate PDF could not be stored. Ask the server administrator to check "
+                    "the private media bucket, credentials and write permissions, then retry.",
+                    code="storage_failed",
+                ) from exc
+            certificate.pdf_generated_at = timezone.now()
+            certificate.status = Certificate.Status.ISSUED
+            certificate.save(update_fields=["pdf_file", "pdf_generated_at", "status", "updated_at"])
+        return certificate
+    except Exception:
+        if saved_file:
+            storage, name = saved_file
+            try:
+                storage.delete(name)
+            except Exception:
+                logger.exception("Could not clean up uncommitted certificate PDF %s", name)
+        raise
 
-    # Create certificate
-    certificate = Certificate.objects.create(
-        student=student,
-        course=course,
-        enrollment=enrollment,
-        template=template,
-        status=Certificate.Status.PENDING,
-        verification_code=generate_verification_code()[:12],
-        student_name_at_issue=student.full_name or student.email,
-        course_title_at_issue=course.title,
-        instructor_name_at_issue=course.instructor.full_name if course.instructor else "VaceUp Instructor",
-        institution_name_at_issue="VaceUp",
-        completion_date=enrollment.completed_at.date() if enrollment.completed_at else timezone.now().date(),
-        issue_date=timezone.now().date(),
+
+def validate_pdf_storage(storage):
+    from storages.backends.s3 import S3Storage
+    if isinstance(storage, S3Storage) and not (
+        storage.bucket_name and storage.access_key and storage.secret_key
+    ):
+        raise CertificateUnavailable(
+            "Private certificate storage is not configured. Set AWS_STORAGE_BUCKET_NAME, "
+            "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and AWS_S3_ENDPOINT_URL for R2), then retry.",
+            code="storage_not_configured",
+        )
+
+
+def is_expired(certificate):
+    return certificate.status == Certificate.Status.EXPIRED or bool(
+        certificate.expires_at and certificate.expires_at <= timezone.now()
     )
 
-    # Render HTML and generate PDF
-    html = render_certificate_html(certificate)
-    pdf_bytes = generate_certificate_pdf(html)
 
-    # Save PDF
-    pdf_filename = f"certificate_{certificate.certificate_number}.pdf"
-    certificate.pdf_file.save(pdf_filename, ContentFile(pdf_bytes), save=False)
-    certificate.pdf_generated_at = timezone.now()
-    certificate.status = Certificate.Status.ISSUED
-    certificate.save()
+def certificate_pdf_url(certificate, request=None):
+    """Use the authorized streaming endpoint without consulting remote storage."""
+    if certificate.status != Certificate.Status.ISSUED or certificate.revoked_at or is_expired(certificate) or not certificate.pdf_file:
+        return None
+    url = reverse("certificate-download-pdf", kwargs={"certificate_number": certificate.certificate_number})
+    return request.build_absolute_uri(url) if request else url
 
+
+@transaction.atomic
+def revoke_certificate(*, certificate, user, reason=""):
+    certificate = Certificate.objects.select_for_update().get(pk=certificate.pk)
+    if certificate.status == Certificate.Status.REVOKED:
+        return certificate
+    if certificate.status != Certificate.Status.ISSUED:
+        raise CertificateConflict("Only an issued certificate can be revoked.", code="invalid_status")
+    certificate.status = Certificate.Status.REVOKED
+    certificate.revoked_at = timezone.now()
+    certificate.revoked_by = user
+    certificate.revocation_reason = reason
+    certificate.save(update_fields=["status", "revoked_at", "revoked_by", "revocation_reason", "updated_at"])
     return certificate
 
 
@@ -209,12 +355,14 @@ def verify_certificate(verification_code: str, request=None) -> dict:
     Verify a certificate by its verification code.
     Returns dict with verification result and certificate details if valid.
     """
-    from apps.certificates.models import Certificate
-
+    code = str(verification_code).strip()
+    lookup = Q(verification_code=code.upper())
     try:
-        certificate = Certificate.objects.select_related(
-            "student", "course", "template"
-        ).get(verification_code=verification_code)
+        lookup |= Q(certificate_number=uuid.UUID(code))
+    except (ValueError, AttributeError):
+        pass
+    try:
+        certificate = Certificate.objects.get(lookup)
     except Certificate.DoesNotExist:
         return {
             "valid": False,
@@ -222,41 +370,34 @@ def verify_certificate(verification_code: str, request=None) -> dict:
             "code": "not_found",
         }
 
-    # Log verification attempt
-    if request:
-        CertificateVerificationLog.objects.create(
-            certificate=certificate,
-            ip_address=get_client_ip(request),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
-            verified=True,
-            referrer=request.META.get("HTTP_REFERER", ""),
-        )
-    else:
-        CertificateVerificationLog.objects.create(
-            certificate=certificate,
-            verified=True,
-        )
-
-    if certificate.status != Certificate.Status.ISSUED:
-        return {
+    data = certificate_data(certificate)
+    if certificate.status != Certificate.Status.ISSUED or certificate.revoked_at:
+        result = {
             "valid": False,
             "error": f"Certificate is {certificate.status}.",
             "code": "invalid_status",
-            "certificate": certificate_data(certificate),
+            "certificate": data,
         }
 
-    if certificate.expires_at and certificate.expires_at < timezone.now():
-        return {
+    elif is_expired(certificate):
+        result = {
             "valid": False,
             "error": "Certificate has expired.",
             "code": "expired",
-            "certificate": certificate_data(certificate),
+            "certificate": data,
         }
 
-    return {
-        "valid": True,
-        "certificate": certificate_data(certificate),
-    }
+    else:
+        # Retain the nested API shape and the flat fields consumed by /verify.
+        result = {"valid": True, "certificate": data, **data, "issued_at": data["issue_date"]}
+    client_ip = get_client_ip(request) if request is not None else None
+    if client_ip:
+        CertificateVerificationLog.objects.create(
+            certificate=certificate, ip_address=client_ip,
+            user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000],
+            verified=result["valid"], referrer=request.META.get("HTTP_REFERER", "")[:500],
+        )
+    return result
 
 
 def certificate_data(certificate: "Certificate") -> dict:
@@ -272,15 +413,16 @@ def certificate_data(certificate: "Certificate") -> dict:
         "issue_date": certificate.issue_date.isoformat(),
         "expires_at": certificate.expires_at.isoformat() if certificate.expires_at else None,
         "status": certificate.status,
-        "pdf_url": certificate.pdf_file.url if certificate.pdf_file else None,
+        "pdf_url": certificate_pdf_url(certificate),
     }
 
 
 def get_client_ip(request):
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    # Forwarded headers are user-controlled unless a trusted proxy strips them.
+    try:
+        return str(ip_address(request.META.get("REMOTE_ADDR", "")))
+    except ValueError:
+        return None
 
 
 def auto_issue_on_completion(enrollment: "Enrollment"):
@@ -288,7 +430,6 @@ def auto_issue_on_completion(enrollment: "Enrollment"):
     try:
         if enrollment.status == Enrollment.Status.COMPLETED:
             issue_certificate(enrollment=enrollment)
-    except Exception as e:
-        # Log error but don't block enrollment completion
-        import logging
-        logging.getLogger(__name__).error(f"Certificate issuance failed: {e}")
+    except Exception:
+        # Do not roll back legitimate course completion if PDF/storage is down.
+        logger.exception("Automatic certificate issuance failed for enrollment %s", enrollment.pk)

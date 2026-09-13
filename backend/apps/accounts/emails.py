@@ -1,12 +1,14 @@
 """Transactional email senders for the accounts lifecycle.
 
-Kept dependency-light (Django send_mail) and called from services via
+Every sender uses the checked delivery helper. Services dispatch only after
 transaction.on_commit so a rolled-back registration never emails a link.
 """
 from __future__ import annotations
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+
+from apps.accounts import mail_delivery
 
 
 def _frontend(path: str) -> str:
@@ -69,7 +71,7 @@ def send_verification_email(*, email: str, token: str) -> None:
         to=[email],
     )
     msg.attach_alternative(html, "text/html")
-    msg.send(fail_silently=False)
+    mail_delivery.send_account_message(msg)
 
 
 def send_welcome_email(*, email: str, full_name: str = "") -> None:
@@ -87,7 +89,7 @@ def send_welcome_email(*, email: str, full_name: str = "") -> None:
         "— The VaceUp Team"
     )
     html = _brand_shell(
-        f"Welcome aboard, {first}! 🎉",
+        f"Welcome aboard, {first}!",
         '<p style="color:#3d4452;font-size:15px;line-height:1.7;margin:0 0 12px;">'
         "Your VaceUp account is verified and active. You just joined a community "
         "of builders learning practical, career-changing digital skills.</p>"
@@ -104,13 +106,13 @@ def send_welcome_email(*, email: str, full_name: str = "") -> None:
         courses,
     )
     msg = EmailMultiAlternatives(
-        subject=f"Welcome to VaceUp, {first}! 🎉",
+        subject=f"Welcome to VaceUp, {first}!",
         body=text,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         to=[email],
     )
     msg.attach_alternative(html, "text/html")
-    msg.send(fail_silently=False)
+    mail_delivery.send_account_message(msg)
 
 
 def send_password_reset_email(*, email: str, token: str) -> None:
@@ -136,4 +138,4 @@ def send_password_reset_email(*, email: str, token: str) -> None:
         to=[email],
     )
     msg.attach_alternative(html, "text/html")
-    msg.send(fail_silently=False)
+    mail_delivery.send_account_message(msg)

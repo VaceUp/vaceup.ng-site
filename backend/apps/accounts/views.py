@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from apps.core.throttling import DatabaseScopedRateThrottle as ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -51,7 +51,7 @@ class RegisterView(APIView):
                 "detail": (
                     "Account created. Check your email to verify your address before logging in."
                     if user.verification_email_queued else
-                    "Account created, but the verification email could not be queued. "
+                    "Account created, but verification email delivery could not be started. "
                     "Please request a new verification link shortly. Do not register again."
                 ),
                 "verification_email_queued": user.verification_email_queued,

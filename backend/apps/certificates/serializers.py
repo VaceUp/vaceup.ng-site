@@ -33,6 +33,7 @@ class CertificateSerializer(serializers.ModelSerializer):
     course_title = serializers.CharField(source="course.title", read_only=True)
     template_name = serializers.CharField(source="template.name", read_only=True)
     pdf_url = serializers.SerializerMethodField()
+    pdf_file = serializers.SerializerMethodField()
 
     class Meta:
         model = Certificate
@@ -70,12 +71,11 @@ class CertificateSerializer(serializers.ModelSerializer):
         )
 
     def get_pdf_url(self, obj):
-        if obj.pdf_file:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.pdf_file.url)
-            return obj.pdf_file.url
-        return None
+        from apps.certificates.services import certificate_pdf_url
+        return certificate_pdf_url(obj, self.context.get("request"))
+
+    def get_pdf_file(self, obj):
+        return self.get_pdf_url(obj)
 
 
 class CertificateVerificationSerializer(serializers.Serializer):

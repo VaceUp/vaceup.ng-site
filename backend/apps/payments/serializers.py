@@ -1,7 +1,7 @@
 """Serializers for the payments API."""
 from rest_framework import serializers
 
-from apps.cart.models import Cart
+from apps.cart.models import CartItem
 from apps.courses.models import Course
 from apps.payments.models import Payment
 
@@ -45,16 +45,16 @@ class CartCheckoutSerializer(serializers.Serializer):
     """Write shape: checkout for cart items."""
 
     cart_items = serializers.ListField(
-        child=serializers.UUIDField(),
+        child=serializers.IntegerField(min_value=1),
         min_length=1,
         max_length=20,
-        help_text="List of CartItem UUIDs to checkout"
+        help_text="List of CartItem IDs to checkout"
     )
 
     def validate_cart_items(self, value):
         user = self.context["request"].user
-        items = Cart.objects.filter(user=user).filter(items__id__in=value)
-        if items.count() != len(value):
+        items = CartItem.objects.filter(cart__user=user, id__in=value)
+        if len(set(value)) != len(value) or items.count() != len(value):
             raise serializers.ValidationError("Some cart items not found or not yours.")
         return value
 

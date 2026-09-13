@@ -206,3 +206,30 @@ class PasswordResetToken(_BaseAccountToken):
 
     def __str__(self):
         return f"reset<{self.user_id}> used={self.used}"
+
+
+class MailJob(TimeStampedModel):
+    """Durable outbox. Store row references, not email bodies or secret links."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSING = "processing", "Processing"
+        SENT = "sent", "Accepted by SMTP"
+        SKIPPED = "skipped", "No longer applicable"
+        FAILED = "failed", "Needs attention"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mail_jobs")
+    kind = models.CharField(max_length=24)
+    object_id = models.PositiveBigIntegerField()
+    dedupe_key = models.CharField(max_length=180, unique=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    claim_id = models.UUIDField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=48, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "available_at"], name="mail_job_due_idx")]

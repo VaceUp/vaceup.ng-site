@@ -1,7 +1,7 @@
 """Services for assignments and quizzes — business logic, kept thin so
 views stay trivial and tests can patch this layer."""
 
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 
@@ -16,6 +16,14 @@ from apps.assignments.models import (
 )
 from apps.courses.models import Course
 from apps.enrollment.models import Enrollment
+
+
+def require_enrollment(student, course):
+    if not student.is_student or not Enrollment.objects.filter(
+        student=student, course=course,
+        status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED],
+    ).exists():
+        raise PermissionDenied("An active enrollment is required for this assessment.")
 
 
 def assignment_create(*, instructor, course, title, description, due_at,
@@ -36,10 +44,15 @@ def assignment_create(*, instructor, course, title, description, due_at,
     return assignment
 
 
+@transaction.atomic
 def submission_create(*, student, assignment, file=None, text_answer=None):
     """A student submits an assignment (idempotent — re‑submission updates row)."""
     # Enrollment check
-    Enrollment.objects.get(student=student, course=assignment.course)
+    require_enrollment(student, assignment.course)
+    assignment = Assignment.objects.select_for_update().get(pk=assignment.pk)
+    late = timezone.now() > assignment.due_at
+    if late and not assignment.allow_late_submission:
+        raise ValidationError("This assignment no longer accepts submissions.")
     # If already submitted, we update in place (idempotent)
     submission, created = Submission.objects.get_or_create(
         student=student,
@@ -51,6 +64,8 @@ def submission_create(*, student, assignment, file=None, text_answer=None):
         },
     )
     if not created:
+        if submission.score is not None:
+            raise ValidationError("A graded submission cannot be overwritten. Contact your tutor.")
         # Update existing submission
         if file is not None:
             submission.file = file
@@ -68,11 +83,20 @@ def submission_create(*, student, assignment, file=None, text_answer=None):
         submission.save(
             update_fields=["status", "submitted_at"]
         )
+    submission.is_late = late
+    submission.save(update_fields=["is_late", "updated_at"])
     return submission
 
 
-def submission_grade(*, submission, score, feedback="", marked_late=False):
+@transaction.atomic
+def submission_grade(*, submission, grader, score, feedback="", marked_late=False):
     """Instructor grades a submission."""
+    Assignment.objects.select_for_update().get(pk=submission.assignment_id)
+    submission = Submission.objects.select_for_update().select_related("assignment__course").get(pk=submission.pk)
+    if not grader.is_admin and submission.assignment.course.instructor_id != grader.pk:
+        raise PermissionDenied("You may only grade submissions for your own courses.")
+    if score < 0 or score > submission.assignment.max_score:
+        raise ValidationError("Score must be between zero and the assignment maximum.")
     submission.score = score
     submission.feedback = feedback
     if marked_late:
@@ -132,15 +156,16 @@ def answer_submit(*, student, question, choice_id=None, short_text=None):
     """A student submits an answer for a question (idempotent)."""
     # Validate student is enrolled in the quiz's course
     course = question.quiz.course
-    Enrollment.objects.get(student=student, course=course)
+    require_enrollment(student, course)
 
     # Determine if answer is correct
     is_correct = False
     if choice_id is not None:
         from apps.assignments.models import MCQChoice
         choice = MCQChoice.objects.filter(id=choice_id, question=question).first()
-        if choice:
-            is_correct = choice.is_correct == MCQChoice.CorrectChoice.CORRECT
+        if not choice:
+            raise ValidationError("That choice does not belong to this question.")
+        is_correct = choice.is_correct == MCQChoice.CorrectChoice.CORRECT
 
     # Upsert the answer
     answer, created = Answer.objects.get_or_create(
@@ -166,6 +191,11 @@ def answer_submit(*, student, question, choice_id=None, short_text=None):
 
 def attempt_create(*, student, quiz):
     """Start a new quiz attempt (idempotent — re‑uses existing if not completed)."""
+    require_enrollment(student, quiz.course)
+    if quiz.status != Quiz.Status.PUBLISHED:
+        raise PermissionDenied("This quiz is not published.")
+    if not quiz.questions.exists():
+        raise ValidationError("This quiz has no questions yet.")
     attempt, created = QuizAttempt.objects.get_or_create(
         student=student,
         quiz=quiz,
@@ -174,10 +204,12 @@ def attempt_create(*, student, quiz):
             "started_at": timezone.now(),
         },
     )
-    if not created and attempt.status == QuizAttempt.Status.GRADED:
-        # Already graded, cannot restart
-        raise ValidationError("This quiz has already been graded.")
     return attempt
+
+
+def check_attempt_deadline(attempt):
+    if (timezone.now() - attempt.started_at).total_seconds() > attempt.quiz.time_limit_minutes * 60:
+        raise ValidationError("The time limit for this attempt has expired.")
 
 
 def attempt_submit(*, attempt, time_spent_seconds=None):
@@ -185,8 +217,7 @@ def attempt_submit(*, attempt, time_spent_seconds=None):
     from django.utils import timezone
     attempt.status = QuizAttempt.Status.SUBMITTED
     attempt.completed_at = timezone.now()
-    if time_spent_seconds is not None:
-        attempt.time_spent_seconds = time_spent_seconds
+    attempt.time_spent_seconds = max(0, int((attempt.completed_at - attempt.started_at).total_seconds()))
     attempt.save(
         update_fields=["status", "completed_at", "time_spent_seconds", "updated_at"]
     )
@@ -196,11 +227,14 @@ def attempt_submit(*, attempt, time_spent_seconds=None):
 def attempt_grade(*, attempt, auto_grade=False):
     """Grade a quiz attempt. If auto_grade, compute score from answers."""
     from decimal import Decimal
+    if attempt.quiz.questions.filter(question_type=Question.Type.SHORT_ANSWER).exists():
+        # Manual marking is not implemented yet: never invent a final grade.
+        return attempt
     attempt.status = QuizAttempt.Status.GRADED
     attempt.save(update_fields=["status", "updated_at"])
 
     # Re-compute score from answers
-    total_possible = Decimal("0.00")
+    total_possible = Decimal(attempt.quiz.questions.count())
     total_earned = Decimal("0.00")
 
     for answer in Answer.objects.filter(
@@ -209,19 +243,16 @@ def attempt_grade(*, attempt, auto_grade=False):
     ).select_related("question", "choice"):
         if answer.question.question_type == Question.Type.MCQ:
             if answer.is_correct:
-                total_possible += Decimal("1.00")
                 total_earned += Decimal("1.00")
             else:
-                total_possible += Decimal("1.00")
+                pass
         elif answer.question.question_type == Question.Type.TRUE_FALSE:
-            total_possible += Decimal("1.00")
             if answer.is_correct:
                 total_earned += Decimal("1.00")
         elif answer.question.question_type == Question.Type.SHORT_ANSWER:
-            total_possible += Decimal("1.00")
+            pass
 
-    attempt.total_score = (total_earned / total_possible * Decimal(str(
-        attempt.quiz.pass_mark))) if total_possible > 0 else Decimal("0.00")
+    attempt.total_score = (total_earned / total_possible * Decimal("100")) if total_possible > 0 else Decimal("0.00")
     attempt.passed = attempt.total_score >= Decimal(str(attempt.quiz.pass_mark))
     attempt.save(
         update_fields=["total_score", "passed", "updated_at"]

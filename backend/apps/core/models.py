@@ -15,3 +15,22 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
         ordering = ("-created_at",)
+
+
+class CacheEntry(models.Model):
+    """Schema required by Django's DatabaseCache; installed by migrations."""
+
+    cache_key = models.CharField(max_length=255, primary_key=True)
+    value = models.TextField()
+    expires = models.DateTimeField(db_index=True)
+
+    class Meta:
+        db_table = "vaceup_cache"
+
+
+class RateLimitBucket(models.Model):
+    """Shared fixed-window counter, serialized by a database row lock."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    expires_at = models.DateTimeField(db_index=True)
+    count = models.PositiveIntegerField(default=0)

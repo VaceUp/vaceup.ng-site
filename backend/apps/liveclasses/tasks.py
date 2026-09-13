@@ -19,6 +19,9 @@ from apps.liveclasses.models import LiveClass
 
 @shared_task(name="liveclasses.send_live_class_reminders")
 def send_live_class_reminders():
+    if settings.ACCOUNT_EMAIL_DELIVERY_MODE == "database":
+        from apps.accounts.outbox import enqueue_reminders
+        return enqueue_reminders()
     lead = getattr(settings, "LIVE_CLASS_REMINDER_LEAD_MINUTES", 30)
     now = timezone.now()
     horizon = now + timedelta(minutes=lead)

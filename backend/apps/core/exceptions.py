@@ -52,6 +52,12 @@ class PaymentFailed(DomainError):
     default_code = "payment_failed"
 
 
+class PaymentProviderUnavailable(DomainError):
+    status_code = 503
+    default_detail = "The payment provider is temporarily unavailable. Please retry shortly."
+    default_code = "payment_provider_unavailable"
+
+
 class IllegalStateTransition(DomainError):
     status_code = 409
     default_detail = "That state change is not allowed."

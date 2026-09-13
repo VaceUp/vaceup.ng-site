@@ -58,6 +58,43 @@ course (and one global default), unset the others in Django admin, then retry.
 Do not fake migrations to bypass an error. MySQL DDL cannot be rolled back like
 an ordinary database transaction; retain the backup before starting.
 
+## Restore the original homepage courses (one-time data import)
+
+Migrations create the schema; they do not import the former homepage cards.
+The backend ZIP already includes `import_homepage_catalog`. It creates ordinary
+editable Course records for Virtual Assistant, Data Analysis, UI/UX Design,
+Graphic Design and Web Development, with their original homepage prices,
+descriptions, durations and cover image URLs. It also creates any missing
+Professional Skills, Data & Analytics, Design and Development categories.
+It does not invent lessons, enrollments, reviews or student counts.
+
+After migrations, preview without changing the database:
+
+```bash
+python manage.py import_homepage_catalog
+```
+
+To import, enter the email of an existing active tutor when prompted:
+
+```bash
+read -r -p "Existing active tutor email: " COURSE_TUTOR_EMAIL
+python manage.py import_homepage_catalog --apply --instructor-email "$COURSE_TUTOR_EMAIL"
+```
+
+The selected tutor initially owns every newly imported course. No account is
+created or promoted by the command. If there is no active tutor, create/activate
+the intended tutor first. An admin can reassign each course afterward.
+
+New courses are drafts: open Admin > Courses, review their details, prices and
+tutor assignments, then publish each course that should be visible on the
+homepage. Imported courses use the same admin editing controls as manually
+created courses. Refresh the homepage after publishing to load the API data.
+
+Rerunning the import skips courses matched by their original slug or title;
+it does not overwrite admin edits or change existing publication states.
+If the preview says KEEP, inspect that existing course instead of creating a
+duplicate. Do not bulk-publish unrelated drafts to restore the homepage.
+
 ## Mail cron (required for database mode)
 
 In cPanel Cron Jobs, select **Once Per Minute** and enter this command:

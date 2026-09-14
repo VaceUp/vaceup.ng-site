@@ -93,7 +93,7 @@ class EmailCampaignSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
-    def get_recipient_count(self, obj):
+    def get_recipient_count(self, obj) -> int:
         return obj.recipients.count()
 
 
@@ -125,7 +125,28 @@ class EmailCampaignCreateSerializer(serializers.ModelSerializer):
             "status",
             "scheduled_at",
         )
-        read_only_fields = ("created_at", "updated_at")
+        read_only_fields = ("id", "status", "scheduled_at", "from_email", "track_opens", "track_clicks")
+
+    def validate(self, attrs):
+        from django.conf import settings
+        from email.utils import parseaddr
+        if self.instance and self.instance.status != "draft":
+            raise serializers.ValidationError("Only drafts can be edited. Cancel or pause sending instead.")
+        audience = attrs.get("audience_filter", getattr(self.instance, "audience_filter", "never_purchased"))
+        if audience == "custom" or attrs.get("custom_query"):
+            raise serializers.ValidationError({"audience_filter": "Choose a supported audience; arbitrary database queries are not allowed."})
+        targets = attrs.get("target_courses", self.instance.target_courses.all() if self.instance else [])
+        if audience == "specific_courses" and not targets:
+            raise serializers.ValidationError({"target_courses": "Select at least one course."})
+        text = attrs.get("custom_text", getattr(self.instance, "custom_text", ""))
+        if not text.strip():
+            raise serializers.ValidationError({"custom_text": "Write the campaign message before saving."})
+        attrs.update(exclude_unsubscribed=True, exclude_bounced=True, track_opens=False, track_clicks=False,
+                     from_email=parseaddr(settings.DEFAULT_FROM_EMAIL)[1], custom_query={}, custom_html="", template=None)
+        for field in ("subject", "from_name", "reply_to"):
+            if any(char in attrs.get(field, "") for char in ("\r", "\n")):
+                raise serializers.ValidationError({field: "Use a single line."})
+        return attrs
 
     def validate_batch_size(self, value):
         if value > 1000:
@@ -156,11 +177,12 @@ class EmailRecipientSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.full_name", read_only=True)
 
     class Meta:
-        model = "EmailRecipient"
+        model = EmailRecipient
         fields = (
             "id",
             "campaign",
             "user",
+            "user_name",
             "email",
             "status",
             "sent_at",
@@ -199,7 +221,7 @@ class EmailLogSerializer(serializers.ModelSerializer):
     """Serializer for email logs."""
 
     class Meta:
-        model = "EmailLog"
+        model = EmailLog
         fields = (
             "id",
             "campaign",
@@ -217,7 +239,7 @@ class EmailSuppressionSerializer(serializers.ModelSerializer):
     """Serializer for email suppressions."""
 
     class Meta:
-        model = "EmailSuppression"
+        model = EmailSuppression
         fields = (
             "id",
             "email",
@@ -234,7 +256,7 @@ class EmailUnsubscribeSerializer(serializers.ModelSerializer):
     """Serializer for unsubscribe preferences."""
 
     class Meta:
-        model = "EmailUnsubscribe"
+        model = EmailUnsubscribe
         fields = (
             "user",
             "unsubscribe_all",
@@ -247,44 +269,3 @@ class EmailUnsubscribeSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("user", "unsubscribe_token")
 
-
-class EmailCampaignCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating campaigns with recipient preview."""
-
-    estimated_recipients = serializers.SerializerMethodField()
-
-    class Meta:
-        model = EmailCampaign
-        fields = (
-            "id",
-            "name",
-            "subject",
-            "template",
-            "custom_html",
-            "custom_text",
-            "from_name",
-            "from_email",
-            "reply_to",
-            "audience_filter",
-            "target_courses",
-            "custom_query",
-            "exclude_purchased",
-            "exclude_unsubscribed",
-            "exclude_bounced",
-            "batch_size",
-            "delay_between_batches",
-            "track_opens",
-            "track_clicks",
-            "status",
-            "scheduled_at",
-            "estimated_recipients",
-        )
-
-    def get_estimated_recipients(self, obj):
-        if obj.pk:
-            from apps.marketing.services import get_campaign_recipients
-            try:
-                return get_campaign_recipients(obj).count()
-            except Exception:
-                return 0
-        return 0

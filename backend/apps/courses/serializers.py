@@ -6,6 +6,7 @@ Admins bypass the ownership check.
 """
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from django.contrib.auth import get_user_model
 
 from apps.courses.models import Category, Course, Lesson, Module
 from apps.enrollment.models import Enrollment
@@ -44,6 +45,12 @@ class LessonSerializer(serializers.ModelSerializer):
     """Read + write. ``module`` is writable and ownership-checked."""
 
     module = serializers.PrimaryKeyRelatedField(queryset=Module.objects.all())
+
+    def get_validators(self):
+        if not self.instance and "order" not in getattr(self, "initial_data", {}):
+            # The view appends under the parent lock after field validation.
+            return []
+        return super().get_validators()
 
     class Meta:
         model = Lesson
@@ -132,6 +139,11 @@ class ModuleSerializer(serializers.ModelSerializer):
 
     lessons = LessonSerializer(many=True, read_only=True)
 
+    def get_validators(self):
+        if not self.instance and "order" not in getattr(self, "initial_data", {}):
+            return []
+        return super().get_validators()
+
     class Meta:
         model = Module
         fields = ("id", "course", "title", "order", "lessons")
@@ -200,6 +212,10 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     """Full course tree: modules -> lessons nested inside the course."""
 
     modules = NestedModuleSerializer(many=True, read_only=True)
+    instructor = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.filter(role="instructor", is_active=True),
+        required=False,
+    )
     instructor_name = serializers.CharField(
         source="instructor.full_name", read_only=True
     )
@@ -229,7 +245,22 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "image_url",
         )
         # instructor is bound from request.user server-side; slug is derived.
-        read_only_fields = ("instructor", "slug")
+        read_only_fields = ("slug",)
+        extra_kwargs = {"price": {"min_value": 0}}
+
+    def validate(self, attrs):
+        user = _user(self)
+        if user and user.is_admin:
+            if not self.instance and "instructor" not in attrs:
+                raise serializers.ValidationError({"instructor": "Select an active tutor."})
+        elif "instructor" in attrs and attrs["instructor"].pk != getattr(user, "pk", None):
+            raise PermissionDenied("Only an administrator can assign another tutor.")
+        return attrs
+
+    def validate_thumbnail(self, image):
+        if image and image.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Choose a cover image smaller than 5 MB.")
+        return image
 
     def to_representation(self, course):
         # Decide once per course whether this viewer sees full lesson bodies;

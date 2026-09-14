@@ -17,6 +17,7 @@ class AdminActionLog(TimeStampedModel):
         USER_ACTIVATE = "user_activate", _("User Activated")
         USER_PROMOTE = "user_promote", _("User Promoted")
         USER_DEMOTE = "user_demote", _("User Demoted")
+        USER_DELETE = "user_delete", _("User Permanently Deleted")
         COURSE_CREATE = "course_create", _("Course Created")
         COURSE_UPDATE = "course_update", _("Course Updated")
         COURSE_PUBLISH = "course_publish", _("Course Published")

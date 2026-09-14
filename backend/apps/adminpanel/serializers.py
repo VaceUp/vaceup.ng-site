@@ -54,6 +54,24 @@ class AdminSettingsSerializer(serializers.ModelSerializer):
         read_only_fields = ("created_at", "updated_at")
 
 
+    def validate(self, attrs):
+        from apps.adminpanel.platform_settings import DEFINITIONS
+        key = attrs.get("key", getattr(self.instance, "key", None))
+        if key not in DEFINITIONS:
+            raise serializers.ValidationError({"key": "Choose a supported setting. Do not store API keys or passwords here."})
+        if self.instance and key != self.instance.key:
+            raise serializers.ValidationError({"key": "A setting key cannot be renamed."})
+        definition = DEFINITIONS[key]
+        value = attrs.get("value", getattr(self.instance, "value", definition["default"]))
+        if definition["type"] == "boolean" and type(value) is not bool:
+            raise serializers.ValidationError({"value": "Choose on or off."})
+        if definition["type"] == "integer" and (type(value) is not int or not definition["min"] <= value <= definition["max"]):
+            raise serializers.ValidationError({"value": f"Enter a whole number between {definition['min']} and {definition['max']}."})
+        attrs["is_public"] = definition["public"]
+        attrs["description"] = definition["description"]
+        return attrs
+
+
 class SystemAnnouncementSerializer(serializers.ModelSerializer):
     """Serializer for system announcements."""
 

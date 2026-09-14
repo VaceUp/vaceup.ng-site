@@ -1,6 +1,7 @@
 """Router + wiring for admin panel (mount under /api/v1/)."""
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from apps.adminpanel.user_deletion import UserDeletionPreviewView, UserDeleteView
 
 from apps.adminpanel.views import (
     AdminActionLogViewSet,
@@ -24,7 +25,8 @@ urlpatterns = [
     path("admin/dashboard/courses/bulk-price/", AdminDashboardViewSet.as_view({"post": "bulk_price_update"}), name="admin-bulk-price"),
     path("admin/dashboard/users/", AdminDashboardViewSet.as_view({"get": "users_list"}), name="admin-users-list"),
     path("admin/dashboard/users/password/", AdminDashboardViewSet.as_view({"post": "user_password"}), name="admin-user-password"),
-    path("admin/dashboard/users/delete/", AdminDashboardViewSet.as_view({"post": "users_delete"}), name="admin-users-delete"),
+    path("admin/dashboard/users/delete/", UserDeleteView.as_view(), name="admin-users-delete"),
+    path("admin/dashboard/users/<int:user_id>/deletion/", UserDeletionPreviewView.as_view(), name="admin-user-deletion-preview"),
     path("admin/dashboard/certificates/issue/", AdminDashboardViewSet.as_view({"post": "certificates_issue"}), name="admin-certificates-issue"),
     path("admin/dashboard/payments/", AdminDashboardViewSet.as_view({"get": "payments_list"}), name="admin-payments-list"),
     path("admin/dashboard/enrollments/", AdminDashboardViewSet.as_view({"get": "enrollments_list"}), name="admin-enrollments-list"),

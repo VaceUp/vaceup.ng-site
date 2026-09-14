@@ -7,10 +7,11 @@ from django.db import transaction, models
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from apps.adminpanel import services
+from apps.adminpanel.schema import admin_dashboard_schema
 from apps.adminpanel.models import AdminActionLog, AdminSettings, SystemAnnouncement
 from apps.adminpanel.serializers import (
     AdminActionLogSerializer,
@@ -78,6 +79,16 @@ class AdminSettingsViewSet(viewsets.ModelViewSet):
     queryset = AdminSettings.objects.all()
     lookup_field = "key"
 
+    @action(detail=False, methods=["get"])
+    def definitions(self, request):
+        from apps.adminpanel.platform_settings import DEFINITIONS, setting_value
+        return Response([{"key": key, **definition, "value": setting_value(key)} for key, definition in DEFINITIONS.items()])
+
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny], authentication_classes=[])
+    def public(self, request):
+        from apps.adminpanel.platform_settings import DEFINITIONS, setting_value
+        return Response({key: setting_value(key) for key, definition in DEFINITIONS.items() if definition["public"]}, headers={"Cache-Control": "no-store"})
+
 
 class SystemAnnouncementViewSet(viewsets.ModelViewSet):
     """System-wide announcements."""
@@ -111,6 +122,7 @@ class SystemAnnouncementViewSet(viewsets.ModelViewSet):
         return Response(SystemAnnouncementSerializer(announcement).data)
 
 
+@admin_dashboard_schema
 class AdminDashboardViewSet(viewsets.GenericViewSet):
     """Admin dashboard stats and actions."""
 
@@ -357,61 +369,6 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         user.set_password(new_password)
         user.save(update_fields=["password", "updated_at"])
         return Response({"detail": f"Password updated for {user.full_name or user.email}."})
-
-    @action(detail=False, methods=["post"], url_path="users/delete")
-    def users_delete(self, request):
-        """POST /admin/dashboard/users/delete/ {user_id} — permanently delete a user.
-
-        Admins cannot be deleted. Users with payment history are refused
-        (deactivate instead) — financial records must be kept.
-        """
-        user_id = request.data.get("user_id")
-        if not user_id:
-            raise DomainError("user_id is required.", code="user_id_required")
-        try:
-            user = User.objects.get(id=user_id)
-        except (User.DoesNotExist, ValueError, ValidationError):
-            raise DomainError("User not found (check the user id).", code="user_not_found")
-
-        if user.is_superuser or user.is_admin:
-            raise DomainError(
-                "Admin accounts cannot be deleted — deactivate instead.",
-                code="cannot_delete_admin",
-            )
-
-        from django.db import transaction as db_transaction
-        from django.db.models import ProtectedError
-
-        try:
-            with db_transaction.atomic():
-                # Clear related rows that would block deletion (safe to remove).
-                user.messages.all().delete() if hasattr(user, "messages") else None
-                user.notifications.all().delete() if hasattr(user, "notifications") else None
-                user.enrollments.all().delete() if hasattr(user, "enrollments") else None
-                user.applications.all().delete() if hasattr(user, "applications") else None
-                user.certificates.all().delete() if hasattr(user, "certificates") else None
-                user.submissions.all().delete() if hasattr(user, "submissions") else None
-                user.tokens.all().delete() if hasattr(user, "tokens") else None
-                user.outstandingtoken_set.all().delete()
-                if hasattr(user, "cart"):
-                    user.cart.delete() if user.cart else None
-                if hasattr(user, "tutor_profile"):
-                    user.tutor_profile.delete() if user.tutor_profile else None
-                user.delete()
-        except ProtectedError:
-            raise DomainError(
-                "This user has records that prevent deletion (e.g. payment history). "
-                "Use Deactivate instead.",
-                code="protected",
-            )
-
-        services.log_admin_action(
-            admin=request.user,
-            action_type=AdminActionLog.ActionType.STAFF_DEACTIVATE,
-            description=f"Deleted user {user_id}",
-            request=request,
-        )
-        return Response({"detail": "User deleted permanently."})
 
     @action(detail=False, methods=["post"], url_path="certificates/issue")
     def certificates_issue(self, request):

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { api } from '@/lib/api';
 import { ArrowRight } from 'lucide-react';
 import { courseHref, courseImage, formatPrice, getCategories, getPublicCourses, type CatalogCourse, type CatalogCategory } from '@/lib/public-catalog';
 
@@ -9,6 +10,12 @@ export const catalogInput = 'mt-2 block min-h-11 w-full rounded-xl border border
 
 export default function PublicCatalog({ featured = false }: { featured?: boolean }) {
   const [courses, setCourses] = useState<CatalogCourse[]>([]);
+  const [featuredLimit, setFeaturedLimit] = useState(6);
+  useEffect(() => {
+    if (featured) api.request<{ homepage_courses_limit: number }>('/admin/settings/public/', {}, false)
+      .then((settings) => { if (Number.isInteger(settings.homepage_courses_limit) && settings.homepage_courses_limit >= 1 && settings.homepage_courses_limit <= 20) setFeaturedLimit(settings.homepage_courses_limit); })
+      .catch(() => { /* Older backends retain the existing six-course layout. */ });
+  }, [featured]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [category, setCategory] = useState('');
   const [search, setSearch] = useState('');
@@ -43,7 +50,7 @@ export default function PublicCatalog({ featured = false }: { featured?: boolean
       {loading && <p role="status">Loading courses...</p>}
       {!loading && !error && courses.length === 0 && <div className="rounded-2xl border border-line bg-surface p-8"><h3 className="text-2xl font-bold">No courses available here yet</h3><p className="mt-2 text-content-muted">Try another category or contact admissions for upcoming programmes.</p></div>}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" aria-busy={loading}>
-        {(featured ? courses.slice(0, 6) : courses).map((course) => <article key={course.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+        {(featured ? courses.slice(0, featuredLimit) : courses).map((course) => <article key={course.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
           <img src={courseImage(course)} alt="" loading="lazy" className="aspect-video w-full bg-navy-50 object-cover" />
           <div className="flex flex-1 flex-col gap-4 p-5">
             <p className="text-xs font-semibold text-navy-900">{course.category} / <span className="capitalize">{course.level}</span></p>

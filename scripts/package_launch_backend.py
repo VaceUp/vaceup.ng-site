@@ -22,6 +22,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--revision", help="Use a committed revision instead of the staged index")
     parser.add_argument("--base", default="b37b42d")
+    parser.add_argument("--document", default="LAUNCH-STABILIZATION.md")
+    parser.add_argument("--label", default="launch")
     options = parser.parse_args()
     root = Path(git("rev-parse", "--show-toplevel").decode().strip())
     tree = options.revision or git("write-tree").decode().strip()
@@ -31,7 +33,7 @@ def main():
     with tarfile.open(fileobj=io.BytesIO(git("archive", tree, "backend"))) as archive:
         archive.extractall(release / "release", filter="data")
     changed = git("diff", "--name-only", "--diff-filter=ACM", options.base, tree, "--", "backend").decode().splitlines()
-    docs = git("show", f"{tree}:LAUNCH-STABILIZATION.md")
+    docs = git("show", f"{tree}:{options.document}")
     forbidden = {".env", "vaceup-production.env", "repair_vaceup_env.py"}
 
     def permitted(name):
@@ -45,7 +47,7 @@ def main():
         ("patch", changed),
         ("full-backend", git("ls-tree", "-r", "--name-only", tree, "backend").decode().splitlines()),
     ]:
-        output = release / f"vaceup-launch-{label}-20260913.zip"
+        output = release / f"vaceup-{options.label}-{label}-20260913.zip"
         manifest = {}
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("DEPLOY-LAUNCH.md", docs)

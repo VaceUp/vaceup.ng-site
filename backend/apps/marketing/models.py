@@ -242,6 +242,11 @@ class EmailRecipient(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True)
 
+    attempts = models.PositiveSmallIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now, db_index=True)
+    claim_id = models.UUIDField(null=True, blank=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ("-created_at",)
         indexes = [

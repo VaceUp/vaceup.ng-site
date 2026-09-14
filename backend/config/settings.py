@@ -205,6 +205,7 @@ ACCOUNT_EMAIL_DELIVERY_MODE = env(
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
 # Base URL of the frontend that renders the emailed verify/reset links.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="https://vaceup.ng")
+MARKETING_PUBLIC_API_URL = env("MARKETING_PUBLIC_API_URL", default="https://api.vaceup.ng")
 
 # Token lifetimes (read by apps/accounts/models.py).
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)

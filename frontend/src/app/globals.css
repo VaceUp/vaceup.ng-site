@@ -32,6 +32,10 @@
   --color-feedback-error: var(--color-red-700);
   --color-feedback-error-surface: var(--color-red-50);
   --color-feedback-error-line: var(--color-red-200);
+  --color-action-destructive: var(--color-red-700);
+  --color-action-destructive-hover: var(--color-red-800);
+  --color-action-destructive-active: var(--color-red-900);
+  --color-on-destructive: var(--color-white);
   /* Navy scale — brand primary #00088A at 900 */
   --color-navy-50: #e8ebfc;
   --color-navy-100: #d1d5f9;

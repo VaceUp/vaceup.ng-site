@@ -3,16 +3,6 @@
 import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'success' | 'link';
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'iconOnly' | 'iconOnlySm' | 'iconOnlyLg';
-  loading?: boolean;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
-  fullWidth?: boolean;
-  glass?: 'light' | 'dark' | 'primary' | 'none';
-}
-
 const sizeStyles = {
   xs: 'h-7 px-2.5 text-xs gap-1.5',
   sm: 'h-9 px-3 text-sm gap-2',
@@ -30,7 +20,7 @@ const variantStyles = {
   secondary: 'bg-navy-900 text-white hover:bg-navy-950 active:bg-navy-800 focus:ring-navy-900/50',
   outline: 'border-2 border-navy-900 text-navy-900 hover:bg-navy-50 active:bg-navy-100 focus:ring-navy-900/50',
   ghost: 'text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800/50 focus:ring-gray-500/50',
-  destructive: 'bg-red-500 text-white hover:bg-red-600 active:bg-red-700 focus:ring-red-500/50',
+  destructive: 'bg-action-destructive text-on-destructive hover:bg-action-destructive-hover active:bg-action-destructive-active focus-visible:ring-action-destructive',
   success: 'bg-teal-brand text-white hover:bg-teal-700 active:bg-teal-800 focus:ring-teal-brand/50',
   link: 'text-navy-900 hover:text-navy-700 underline-offset-2 hover:underline',
 };

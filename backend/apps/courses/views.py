@@ -1,7 +1,12 @@
 """ViewSets for the course catalog with action-scoped permissions."""
 import uuid
+from io import StringIO
+from django.core.management import call_command
+from django.contrib.auth import get_user_model
 
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Q, Max
+from django.db.models.deletion import ProtectedError
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
@@ -10,10 +15,12 @@ from rest_framework.response import Response
 
 from apps.core.permissions import (
     IsAdminOrReadOnly,
+    IsAdmin,
     IsEnrolledStudent,
     IsInstructorOrAdmin,
 )
 from apps.core.storage import presigned_download_url, presigned_upload_url
+from apps.core.exceptions import IllegalStateTransition
 from apps.courses.models import Category, Course, Lesson, Module
 from apps.courses.serializers import (
     CategorySerializer,
@@ -32,6 +39,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
     lookup_field = "slug"
+
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError:
+            raise IllegalStateTransition(
+                "This category still has courses. Reassign those courses before deleting it."
+            )
 
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -56,8 +71,10 @@ class CourseViewSet(viewsets.ModelViewSet):
         ).prefetch_related("modules__lessons")
 
         user = self.request.user
-        if user.is_authenticated and (user.is_admin or user.is_instructor):
+        if user.is_authenticated and user.is_admin:
             return qs
+        if user.is_authenticated and user.is_instructor:
+            return qs.filter(Q(is_published=True) | Q(instructor=user))
         return qs.filter(is_published=True)
 
     def get_serializer_class(self):
@@ -66,19 +83,60 @@ class CourseViewSet(viewsets.ModelViewSet):
         return CourseDetailSerializer
 
     def get_permissions(self):
+        if self.action == "import_homepage":
+            return [IsAdmin()]
         if self.action in ("create", "update", "partial_update", "destroy"):
             return [IsInstructorOrAdmin()]
         return [IsAuthenticatedOrReadOnly()]
 
+    @action(detail=False, methods=["post"], url_path="import-homepage")
+    def import_homepage(self, request):
+        try:
+            tutor = get_user_model().objects.get(
+                pk=request.data.get("instructor"), role="instructor", is_active=True
+            )
+        except (get_user_model().DoesNotExist, ValueError, TypeError):
+            raise ValidationError({"instructor": "Select an existing active tutor."})
+        output = StringIO()
+        call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=output)
+        return Response({"detail": output.getvalue()})
+
     def perform_create(self, serializer):
-        # Bind the new course to the authenticated instructor.
-        serializer.save(instructor=self.request.user)
+        if self.request.user.is_admin:
+            serializer.save()
+        else:
+            serializer.save(instructor=self.request.user)
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        instance = Course.objects.select_for_update().get(pk=instance.pk)
+        if instance.is_published:
+            raise IllegalStateTransition("Unpublish the course before deleting it.")
+        # Preserve learning and financial history. Unpublishing is the safe
+        # option for courses that already have content or other linked records.
+        for relation in instance._meta.related_objects:
+            accessor = relation.get_accessor_name()
+            if accessor and getattr(instance, accessor).exists():
+                raise IllegalStateTransition(
+                    "This course has content or linked records. Keep it unpublished instead of deleting it."
+                )
+        instance.delete()
 
 
 class ModuleViewSet(viewsets.ModelViewSet):
     """CRUD for modules; ownership enforced by the serializer + permissions."""
 
     serializer_class = ModuleSerializer
+    filterset_fields = ["course"]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        course = Course.objects.select_for_update().get(pk=serializer.validated_data["course"].pk)
+        if "order" not in self.request.data:
+            last = course.modules.aggregate(value=Max("order"))["value"]
+            serializer.save(order=0 if last is None else last + 1)
+        else:
+            serializer.save()
 
     def get_queryset(self):
         qs = Module.objects.select_related("course").prefetch_related("lessons")
@@ -108,6 +166,16 @@ class LessonViewSet(viewsets.ModelViewSet):
     """CRUD for lessons; content reads are gated by active enrollment."""
 
     serializer_class = LessonSerializer
+    filterset_fields = ["module"]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        module = Module.objects.select_for_update().get(pk=serializer.validated_data["module"].pk)
+        if "order" not in self.request.data:
+            last = module.lessons.aggregate(value=Max("order"))["value"]
+            serializer.save(order=0 if last is None else last + 1)
+        else:
+            serializer.save()
 
     def get_queryset(self):
         qs = Lesson.objects.select_related("module__course")

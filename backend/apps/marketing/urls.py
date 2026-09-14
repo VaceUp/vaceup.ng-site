@@ -8,7 +8,6 @@ from apps.marketing.views import (
     EmailRecipientViewSet,
     EmailLogViewSet,
     EmailSuppressionViewSet,
-    EmailUnsubscribeViewSet,
     track_open,
     track_click,
     unsubscribe,

@@ -39,8 +39,9 @@ class ApiClient {
     authenticated = true
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(multipart ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     };
 

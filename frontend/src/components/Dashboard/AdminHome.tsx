@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { adminHref, type AdminTab as Tab } from '@/lib/admin-sections';
 import { useAdminTab } from '@/lib/use-admin-tab';
 import AdminGuide from './admin/AdminGuide';
-import CategoryManager from './admin/CategoryManager';
-import CourseDetailsEditor from './admin/CourseDetailsEditor';
-import { getCategories, type CatalogCategory } from '@/lib/public-catalog';
+import CourseManager from './admin/CourseManager';
+import MarketingManager from './admin/MarketingManager';
+import PlatformSettings from './admin/PlatformSettings';
+import DeleteUserDialog from './admin/DeleteUserDialog';
+import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import LiveClassesTab from '@/components/Dashboard/admin/LiveClassesTab';
@@ -56,7 +58,6 @@ function naira(v: number | string) {
   }).format(parseFloat(String(v)) || 0);
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function AdminHome() {
   const tab = useAdminTab();
@@ -71,24 +72,7 @@ export function AdminHome() {
   const [usersLoading, setUsersLoading] = useState(true);
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'instructor' });
   const [staffMsg, setStaffMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  // ── Courses ──
-  const [courses, setCourses] = useState<any[]>([]);
-  const [coursesLoading, setCoursesLoading] = useState(true);
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
-  const [instructors, setInstructors] = useState<{ id: string; full_name: string; email: string }[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [courseMsg, setCourseMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newCourse, setNewCourse] = useState({
-    title: '',
-    category_id: '',
-    instructor_id: '',
-    description: '',
-    level: 'beginner',
-    price: '',
-    is_published: false,
-  });
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
 
   // ── Applications ──
   const [applications, setApplications] = useState<any[]>([]);
@@ -104,13 +88,6 @@ export function AdminHome() {
   const [annMsg, setAnnMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
-  // ── Flags ──
-  const [flags, setFlags] = useState<{ key: string; value: string }[]>([]);
-  const [flagMsg, setFlagMsg] = useState('');
-
-  // ── Marketing ──
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-
   const loadAll = useCallback(() => {
     api
       .request('/admin/dashboard/')
@@ -123,25 +100,11 @@ export function AdminHome() {
         setStatsError(err?.message || 'Request failed');
       });
     loadUsers();
-    loadCourses();
     loadApplications();
     loadPayments();
     api
       .request('/admin/announcements/')
       .then((res: any) => setAnnouncements(res.results ?? res ?? []))
-      .catch(() => undefined);
-    api
-      .request('/admin/settings/')
-      .then((res: any) => setFlags(res.results ?? res ?? []))
-      .catch(() => undefined);
-    api
-      .request('/marketing/campaigns/')
-      .then((res: any) => setCampaigns(res.results ?? res ?? []))
-      .catch(() => undefined);
-    getCategories().then(setCategories).catch(() => setCourseMsg({ ok: false, text: 'Categories could not be loaded. Please refresh before creating a course.' }));
-    api
-      .request('/admin/dashboard/users/?role=instructor')
-      .then((res: any) => setInstructors(res.results ?? res ?? []))
       .catch(() => undefined);
   }, []);
 
@@ -159,15 +122,6 @@ export function AdminHome() {
     },
     [userSearch, userRole]
   );
-
-  const loadCourses = useCallback(() => {
-    setCoursesLoading(true);
-    api
-      .request('/admin/dashboard/courses/')
-      .then((res: any) => setCourses(res.results ?? res ?? []))
-      .catch((err) => { setCourses([]); setCourseMsg({ ok: false, text: err instanceof Error ? err.message : 'Courses could not be loaded. Please refresh and try again.' }); })
-      .finally(() => setCoursesLoading(false));
-  }, []);
 
   const loadApplications = useCallback(() => {
     setAppsLoading(true);
@@ -195,32 +149,20 @@ export function AdminHome() {
     router.push(adminHref(t));
   };
 
-  const post = async (url: string, body: any) => {
-    const res = await fetch(`${api.baseUrl}${url}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${api.getToken()}`,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data));
-    return data;
-  };
+  const post = (url: string, body: unknown) => api.request(url, { method: 'POST', body: JSON.stringify(body) });
 
   // ── User actions ──
   const userAction = async (action: 'deactivate' | 'activate' | 'promote', user_id: string) => {
-    if (!UUID_RE.test(user_id.trim())) {
+    if (!/^\d+$/.test(String(user_id))) {
       setStaffMsg({
         ok: false,
-        text: 'That is not a valid user id. Copy the full id (UUID) from the directory above or Django admin.',
+        text: 'That user identifier is invalid. Refresh the directory and try again.',
       });
       return;
     }
     setStaffMsg(null);
     try {
-      await post(`/admin/dashboard/staff/${action}/`, { user_id: user_id.trim(), role: 'admin' });
+      await post(`/admin/dashboard/staff/${action}/`, { user_id: String(user_id), role: 'admin' });
       setStaffMsg({ ok: true, text: `User ${action}d successfully.` });
       loadUsers();
     } catch (err: any) {
@@ -240,61 +182,8 @@ export function AdminHome() {
       setInvite({ email: '', full_name: '', role: 'instructor' });
       loadUsers();
       loadAll();
-      api
-        .request('/admin/dashboard/users/?role=instructor')
-        .then((res: any) => setInstructors(res.results ?? res ?? []))
-        .catch(() => undefined);
     } catch (err: any) {
       setStaffMsg({ ok: false, text: err.message });
-    }
-  };
-
-  // ── Course actions ──
-  const handleCreateCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCourseMsg(null);
-    setCreating(true);
-    try {
-      await post('/admin/dashboard/courses/create/', {
-        title: newCourse.title,
-        category_id: newCourse.category_id,
-        instructor_id: newCourse.instructor_id,
-        description: newCourse.description,
-        level: newCourse.level,
-        price: parseFloat(newCourse.price) || 0,
-        is_published: newCourse.is_published,
-      });
-      setCourseMsg({ ok: true, text: `“${newCourse.title}” created.` });
-      setNewCourse({
-        title: '',
-        category_id: '',
-        instructor_id: '',
-        description: '',
-        level: 'beginner',
-        price: '',
-        is_published: false,
-      });
-      setShowCreate(false);
-      loadCourses();
-      loadAll();
-    } catch (err: any) {
-      setCourseMsg({ ok: false, text: err.message });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const updateCourse = async (courseId: string, payload: any, okText: string) => {
-    setCourseMsg(null);
-    try {
-      await api.request('/admin/dashboard/courses/update/', {
-        method: 'POST', body: JSON.stringify({ course_id: courseId, ...payload }),
-      });
-      setCourseMsg({ ok: true, text: okText });
-      loadCourses();
-      loadAll();
-    } catch (err: any) {
-      setCourseMsg({ ok: false, text: err.message });
     }
   };
 
@@ -332,32 +221,6 @@ export function AdminHome() {
       loadAll();
     } catch (err: any) {
       setAnnMsg({ ok: false, text: err.message });
-    }
-  };
-
-  const saveFlag = async (key: string, value: string) => {
-    setFlagMsg('');
-    try {
-      await fetch(`${api.baseUrl}/admin/settings/${encodeURIComponent(key)}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${api.getToken()}`,
-        },
-        body: JSON.stringify({ value }),
-      });
-      setFlagMsg(`Saved “${key}”.`);
-    } catch {
-      setFlagMsg(`Could not save “${key}”.`);
-    }
-  };
-
-  const campaignAction = async (id: string, action: string) => {
-    try {
-      await post(`/marketing/campaigns/${id}/${action}/`, {});
-      loadAll();
-    } catch (err: any) {
-      setFlagMsg(err.message);
     }
   };
 
@@ -495,7 +358,7 @@ export function AdminHome() {
                 value={userRole}
                 onChange={(e) => {
                   setUserRole(e.target.value);
-                  setTimeout(() => loadUsers(), 0);
+                  loadUsers(userSearch, e.target.value);
                 }}
                 className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm sm:w-44"
               >
@@ -587,6 +450,7 @@ export function AdminHome() {
                       >
                         Set Password
                       </button>
+                      {u.role !== 'admin' && <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => setDeleteTarget(u)} aria-label={`Permanently delete ${u.full_name || u.email}`}>Delete user</Button>}
                     </div>
                   </li>
                 ))}
@@ -607,192 +471,11 @@ export function AdminHome() {
       )}
 
       {/* ═══ Courses ═══ */}
-      {tab === 'courses' && (
-        <div className="space-y-6">
-          <CategoryManager categories={categories} onChanged={async () => { setCategories(await getCategories()); }} />
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-navy-950">All Courses ({courses.length})</h3>
-              <button
-                type="button"
-                onClick={() => setShowCreate((v) => !v)}
-                className="rounded-xl bg-gold-brand px-5 py-2.5 text-sm font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover"
-              >
-                {showCreate ? 'Close' : '+ New Course'}
-              </button>
-            </div>
-
-            {/* Create form */}
-            {showCreate && (
-              <form onSubmit={handleCreateCourse} className="mt-5 space-y-4 rounded-2xl bg-gray-50 p-5">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Course title"
-                    value={newCourse.title}
-                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                    className={inputCls}
-                  />
-                  <select
-                    required
-                    aria-label="Course category"
-                    value={newCourse.category_id}
-                    onChange={(e) => setNewCourse({ ...newCourse, category_id: e.target.value })}
-                    className={inputCls}
-                  >
-                    <option value="">Select category…</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    required
-                    value={newCourse.instructor_id}
-                    onChange={(e) => setNewCourse({ ...newCourse, instructor_id: e.target.value })}
-                    className={inputCls}
-                  >
-                    <option value="">Assign a tutor…</option>
-                    {instructors.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.full_name || t.email}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={newCourse.level}
-                    onChange={(e) => setNewCourse({ ...newCourse, level: e.target.value })}
-                    className={inputCls}
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">
-                      Price (₦)
-                    </span>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder="e.g. 100000"
-                      value={newCourse.price}
-                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                      className={inputCls}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-semibold text-navy-950">
-                    <input
-                      type="checkbox"
-                      checked={newCourse.is_published}
-                      onChange={(e) => setNewCourse({ ...newCourse, is_published: e.target.checked })}
-                      className="h-4 w-4"
-                    />
-                    Publish immediately
-                  </label>
-                </div>
-                <textarea
-                  rows={3}
-                  placeholder="Course description…"
-                  value={newCourse.description}
-                  onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                  className={inputCls}
-                />
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="rounded-xl bg-gold-brand px-8 py-3 font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover disabled:opacity-60"
-                >
-                  {creating ? 'Creating…' : 'Create Course'}
-                </button>
-                {courseMsg && (
-                  <p
-                    className={cn(
-                      'rounded-xl px-4 py-3 text-sm',
-                      courseMsg.ok ? 'bg-teal-brand/10 text-teal-700' : 'bg-red-50 text-red-700'
-                    )}
-                  >
-                    {courseMsg.text}
-                  </p>
-                )}
-              </form>
-            )}
-
-            {/* List with inline management */}
-            {coursesLoading ? (
-              <div className="mt-5 space-y-2">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />
-                ))}
-              </div>
-            ) : courses.length === 0 ? (
-              <p className="mt-5 text-sm text-gray-500">No courses yet.</p>
-            ) : (
-              <ul className="mt-5 divide-y divide-gray-100">
-                {courses.map((c: any) => (
-                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-navy-950">
-                        {c.title}
-                        <span
-                          className={cn(
-                            'ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold',
-                            c.is_published
-                              ? 'bg-teal-brand/10 text-teal-700'
-                              : 'bg-gold-light text-gold-800'
-                          )}
-                        >
-                          {c.is_published ? 'Published' : 'Draft'}
-                        </span>
-                      </p>
-                      <p className="text-xs capitalize text-gray-500">
-                        {c.level} · {naira(c.price)} · {categories.find((category) => category.id === c.category)?.name || 'Category unavailable'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateCourse(c.id, { is_published: !c.is_published }, 'Publish state saved.')
-                        }
-                        className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
-                      >
-                        {c.is_published ? 'Unpublish' : 'Publish'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const v = window.prompt(`New price for “${c.title}” (₦):`, String(c.price));
-                          if (v !== null && v.trim() !== '') {
-                            updateCourse(c.id, { price: parseFloat(v) }, 'Price updated.');
-                          }
-                        }}
-                        className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
-                      >
-                        Change price
-                      </button>
-                    </div>
-                    <CourseDetailsEditor course={c} categories={categories} instructors={instructors} onSaved={loadCourses} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {courseMsg && !showCreate && (
-              <p
-                className={cn(
-                  'mt-4 rounded-xl px-4 py-3 text-sm',
-                  courseMsg.ok ? 'bg-teal-brand/10 text-teal-700' : 'bg-red-50 text-red-700'
-                )}
-              >
-                {courseMsg.text}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      {deleteTarget && <DeleteUserDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={(id) => {
+        setUsers((current) => current.filter((item) => String(item.id) !== String(id)));
+        setStaffMsg({ ok: true, text: 'User and the listed database records were permanently deleted. Backups, external files and audit records were retained.' });
+      }} />}
+      {tab === 'courses' && <CourseManager />}
 
       {/* ═══ Content Manager ═══ */}
       {tab === 'content' && <ContentTab />}
@@ -1016,89 +699,8 @@ export function AdminHome() {
         </div>
       )}
 
-      {/* ═══ Feature Flags ═══ */}
-      {tab === 'flags' && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="font-black text-navy-950">Platform Settings</h3>
-          <p className="mb-5 text-xs text-gray-500">
-            Key–value settings stored server-side (admin/settings API).
-          </p>
-          {flags.length === 0 ? (
-            <p className="text-sm text-gray-500">No settings configured yet.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {flags.map((f) => (
-                <li key={f.key} className="flex items-center justify-between gap-4 py-3">
-                  <span className="font-mono text-sm text-navy-950">{f.key}</span>
-                  <input
-                    defaultValue={f.value}
-                    onBlur={(e) => {
-                      if (e.target.value !== f.value) saveFlag(f.key, e.target.value);
-                    }}
-                    className="w-48 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-navy-900 focus:outline-none"
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          {flagMsg && <p className="mt-3 text-xs font-bold text-teal-700">{flagMsg}</p>}
-        </div>
-      )}
-
-      {/* ═══ Marketing ═══ */}
-      {tab === 'marketing' && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 font-black text-navy-950">Marketing Campaigns</h3>
-          <p className="mb-5 text-xs text-gray-500">
-            Email campaigns to registered users and newsletter leads (backend marketing app).
-          </p>
-          {campaigns.length === 0 ? (
-            <p className="text-sm text-gray-500">No campaigns yet. Create them from Django admin → Marketing.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {campaigns.map((c: any) => (
-                <li key={c.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-navy-950">{c.name ?? c.subject}</p>
-                    <p className="text-xs text-gray-500">
-                      {c.status} · {c.recipient_count ?? 0} recipients
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {c.status === 'draft' && (
-                      <button
-                        type="button"
-                        onClick={() => campaignAction(c.id, 'send-now')}
-                        className="rounded-lg bg-gold-brand px-3 py-1.5 text-xs font-bold text-navy-950"
-                      >
-                        Send now
-                      </button>
-                    )}
-                    {c.status === 'sending' && (
-                      <button
-                        type="button"
-                        onClick={() => campaignAction(c.id, 'pause')}
-                        className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-navy-950"
-                      >
-                        Pause
-                      </button>
-                    )}
-                    {c.status === 'paused' && (
-                      <button
-                        type="button"
-                        onClick={() => campaignAction(c.id, 'resume')}
-                        className="rounded-lg bg-teal-brand/10 px-3 py-1.5 text-xs font-bold text-teal-700"
-                      >
-                        Resume
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {tab === 'flags' && <PlatformSettings />}
+      {tab === 'marketing' && <MarketingManager />}
     </div>
   );
 }

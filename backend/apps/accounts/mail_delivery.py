@@ -13,6 +13,8 @@ from django.core.mail import get_connection
 from django.core.mail.backends.smtp import EmailBackend as SMTPBackend
 from django.core.validators import validate_email
 
+from apps.accounts.local_smtp import EmailBackend as LocalRelayEmailBackend, LocalRelayConfigurationError
+
 
 logger = logging.getLogger("accounts.mail")
 MAX_DELIVERY_RETRIES = 3
@@ -96,6 +98,9 @@ def email_configuration_errors():
         errors.append("EMAIL_BACKEND does not deliver mail. Configure SMTP or a delivery provider; do not log account links.")
     try:
         connection = get_connection(fail_silently=False)
+    except LocalRelayConfigurationError as exc:
+        connection = None
+        errors.append(str(exc))  # this exception contains static guidance only
     except Exception:
         connection = None
         errors.append("Email backend could not be initialized. Check EMAIL_BACKEND and mutually exclusive TLS/SSL flags.")
@@ -106,7 +111,8 @@ def email_configuration_errors():
             errors.append("EMAIL_HOST is missing.")
         if settings.EMAIL_USE_TLS and settings.EMAIL_USE_SSL:
             errors.append("EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be True.")
-        if not settings.EMAIL_USE_TLS and not settings.EMAIL_USE_SSL:
+        if (not settings.EMAIL_USE_TLS and not settings.EMAIL_USE_SSL
+                and not isinstance(connection, LocalRelayEmailBackend)):
             errors.append("Account emails require STARTTLS or implicit TLS; configure the provider's secure SMTP mode.")
         if settings.EMAIL_PORT == 465 and not settings.EMAIL_USE_SSL:
             errors.append("Port 465 normally requires EMAIL_USE_SSL=True and EMAIL_USE_TLS=False.")

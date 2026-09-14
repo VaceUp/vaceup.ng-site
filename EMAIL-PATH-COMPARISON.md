@@ -1,5 +1,11 @@
 # Straep and VaceUp email paths
 
+Update: the local-relay patch is now implemented. See
+`EMAIL-LOCAL-RELAY-DEPLOY.md` for the exact backend selection, environment entries
+and test commands. The analysis below describes the restriction in the earlier
+release; selecting the new strictly loopback-only backend resolves that
+restriction without changing the standard remote SMTP backend.
+
 ## What the supplied evidence shows
 
 Straep's supplied configuration points Django at `localhost:25`, with TLS and SSL off and both SMTP credential fields empty. Its Redis URL is commented out. The supplied screenshot shows one delivered verification email, but does not show the running server's effective settings or implementation.

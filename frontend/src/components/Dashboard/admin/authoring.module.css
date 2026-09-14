@@ -1,6 +1,6 @@
 @reference "../../../app/globals.css";
 
-.root { color: var(--workspace-text); overflow-wrap: anywhere; }
+.root { color: var(--workspace-text); background: var(--workspace-page); overflow-wrap: anywhere; }
 .root *, .dialog * { min-inline-size: 0; }
 .root :is(input, select, textarea, button, a, summary):focus-visible, .dialog :is(input, select, textarea, button):focus-visible { outline: calc(var(--spacing) / 2) solid var(--workspace-focus); outline-offset: var(--spacing); }
 .stack { display: grid; gap: calc(var(--spacing) * 5); }

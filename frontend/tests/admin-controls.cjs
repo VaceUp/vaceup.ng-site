@@ -81,7 +81,7 @@ const pass = (name) => { results.push(name); console.log(`PASS ${name}`); };
       fs.writeFileSync(path.join(out, name + '.html'), html);
     }
   };
-  await page.goto(base + '/dashboard?tab=courses');
+  await page.goto(base + '/dashboard?tab=courses', { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Course management', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'UI/UX Design', exact: true }).waitFor();
   await screenshot('courses', 'section[aria-label="Course management"]');
@@ -100,8 +100,8 @@ const pass = (name) => { results.push(name); console.log(`PASS ${name}`); };
   await page.getByRole('button', { name: 'Manage content for UI/UX Design', exact: true }).click();
   for (const title of ['Getting started', 'Design practice']) { await page.getByLabel('New module title').fill(title); await page.getByRole('button', { name: 'Add module', exact: true }).click(); await page.getByRole('heading', { name: new RegExp(title) }).waitFor(); }
   assert.equal(modules.length, 2); assert.equal(modules[1].order, 1); pass('multiple modules append and appear without full refresh');
-  await page.goto(base + '/dashboard/courses/'); await page.getByRole('heading', { name: 'Course management', exact: true }).waitFor(); pass('direct courses route renders admin authoring');
-  await page.goto(base + '/dashboard?tab=marketing');
+  await page.goto(base + '/dashboard/courses/', { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Course management', exact: true }).waitFor(); pass('direct courses route renders admin authoring');
+  await page.goto(base + '/dashboard?tab=marketing', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'New campaign', exact: true }).click();
   await page.getByLabel('Campaign name (internal)').fill('September enrolment'); await page.getByLabel('Email subject', { exact: true }).fill('Your next skill starts here');
   await page.getByLabel('Message', { exact: true }).fill('Explore our published courses at https://vaceup.ng/courses and choose your next learning step.');
@@ -116,7 +116,7 @@ const pass = (name) => { results.push(name); console.log(`PASS ${name}`); };
   await page.getByRole('checkbox').check(); await page.getByRole('button', { name: 'Confirm and queue', exact: true }).click(); await page.getByRole('button', { name: 'Pause campaign', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Pause campaign', exact: true }).click(); await page.getByRole('button', { name: 'Resume campaign', exact: true }).waitFor(); pass('audience confirmation, modal focus trap, queue and pause work');
   await page.getByText('Recipient delivery report', { exact: true }).click(); await page.getByText('learner@example.test - pending', { exact: true }).waitFor(); pass('campaign recipient report reads backend delivery records');
-  await page.goto(base + '/dashboard?tab=flags');
+  await page.goto(base + '/dashboard?tab=flags', { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Platform settings', exact: true }).waitFor();
   await page.getByLabel('Homepage course count', { exact: true }).fill('3'); await page.getByRole('button', { name: 'Save setting', exact: true }).first().click();
   await page.getByText('Setting saved.', { exact: true }).waitFor(); assert.equal(settings[0].value, 3);
@@ -125,7 +125,7 @@ const pass = (name) => { results.push(name); console.log(`PASS ${name}`); };
   await screenshot('settings', 'section[aria-label="Platform settings"]');
   for (const width of [280, 320, 414]) { await page.setViewportSize({ width, height: 1000 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}`); }
   await screenshot('settings-mobile'); pass('settings page has no horizontal overflow at 280, 320 and 414');
-  await page.setViewportSize({ width: 1440, height: 1080 }); await page.goto(base + '/dashboard?tab=users');
+  await page.setViewportSize({ width: 1440, height: 1080 }); await page.goto(base + '/dashboard?tab=users', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Permanently delete Test Learner', exact: true }).click();
   await page.getByRole('dialog').getByText('Records to remove', { exact: true }).waitFor();
   await screenshot('delete-user');

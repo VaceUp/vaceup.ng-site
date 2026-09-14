@@ -8,6 +8,7 @@ import { Action, Field, Feedback, styles } from './AuthoringUI';
 export default function LessonForm({ lesson, moduleId, onSaved }: { lesson?: ManagedLesson; moduleId: number; onSaved: () => Promise<void> }) {
   const [form, setForm] = useState({ title: lesson?.title || '', content: lesson?.content || '', video_url: lesson?.video_url || '', order: lesson?.order ?? 0, duration_seconds: lesson?.duration_seconds ?? 0, is_preview: lesson?.is_preview || false });
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState(''), [playback, setPlayback] = useState('');
+  const [externalPlayback, setExternalPlayback] = useState(false);
   async function save(event: FormEvent) {
     event.preventDefault(); if (busy) return; setBusy(true); setError(''); setMessage('');
     try {
@@ -48,8 +49,8 @@ export default function LessonForm({ lesson, moduleId, onSaved }: { lesson?: Man
         finally { setBusy(false); }
       }} /></Field>
       <p className={styles.muted}>{lesson.video_key ? 'A private uploaded video is attached and takes priority over the external link.' : 'Save a video link or upload a file. R2 credentials and bucket CORS must be configured.'}</p>
-      <div><Action disabled={busy} onClick={async () => { setBusy(true); setError(''); try { const result = await api.request<{ playback_url: string }>(`/lessons/${lesson.id}/play/`); const url = webUrl(result.playback_url); if (!url) throw new Error('Playback URL is not a supported secure address.'); setPlayback(url); } catch (err) { setError(failureMessage(err)); } finally { setBusy(false); } }}>Preview lesson video</Action></div>
-      {playback && <video controls src={playback} className={styles.preview} aria-label={`Video preview for ${lesson.title}`} />}
+      <div><Action disabled={busy} onClick={async () => { setBusy(true); setError(''); try { const result = await api.request<{ playback_url: string; source: string }>(`/lessons/${lesson.id}/play/`); const url = webUrl(result.playback_url); if (!url) throw new Error('Playback URL is not a supported secure address.'); setExternalPlayback(result.source === 'external'); setPlayback(url); } catch (err) { setError(failureMessage(err)); } finally { setBusy(false); } }}>Preview lesson video</Action></div>
+      {playback && (externalPlayback ? <a href={playback} target="_blank" rel="noopener noreferrer" className={styles.action}>Open external video in a new tab</a> : <video controls src={playback} className={styles.preview} aria-label={`Video preview for ${lesson.title}`} />)}
     </>}
     <Feedback error={error} message={message} />
   </div>;

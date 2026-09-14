@@ -268,4 +268,3 @@ class EmailUnsubscribeSerializer(serializers.ModelSerializer):
             "unsubscribe_token",
         )
         read_only_fields = ("user", "unsubscribe_token")
-

@@ -26,13 +26,15 @@ from apps.payments.models import Payment, PaymentItem
 
 
 @transaction.atomic
-def initialize_payment(*, student, course):
+def initialize_payment(*, student, course, expected_total=None):
     """Create a pending Payment and get a Paystack authorization URL.
 
     Idempotent-ish: an existing PENDING payment for the same (student, course)
     is reused rather than creating a duplicate.
     """
     get_user_model().objects.select_for_update().get(pk=student.pk)
+    from apps.courses.models import Course
+    course = Course.objects.select_for_update().get(pk=course.pk)
     if not course.is_published:
         raise DomainError("This course is not open for enrollment.",
                           code="not_available")
@@ -41,12 +43,18 @@ def initialize_payment(*, student, course):
                           code="course_free")
     already = Enrollment.objects.filter(
         student=student, course=course,
-        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
     ).exists()
     if already:
         raise AlreadyExists("You are already enrolled in this course.")
 
+    _check_quote(course.price, expected_total)
     return _initialize_order(student, [(course, course.price)])
+
+
+def _check_quote(total, expected_total):
+    # Client values may reject a changed quote, never set the amount to charge.
+    if expected_total is not None and total != expected_total:
+        raise ValidationError("The course price has changed. Refresh checkout and review the updated total.")
 
 
 def _initialize_order(student, lines):
@@ -56,7 +64,7 @@ def _initialize_order(student, lines):
         [currency, sorted((course.pk, format(Decimal(amount), ".2f")) for course, amount in lines)],
     ).encode()).hexdigest()
     payment = Payment.objects.filter(
-        student=student, checkout_fingerprint=fingerprint, status=Payment.Status.PENDING,
+        student=student, checkout_fingerprint=fingerprint, status=Payment.Status.PENDING, pricing_version=1,
     ).first()
     if payment is None:
         payment = Payment.objects.create(
@@ -82,7 +90,7 @@ def _initialize_order(student, lines):
 
 
 @transaction.atomic
-def checkout_cart(*, student, item_ids):
+def checkout_cart(*, student, item_ids, expected_total=None):
     from apps.cart.models import CartItem
     get_user_model().objects.select_for_update().get(pk=student.pk)
     items = list(CartItem.objects.select_for_update().filter(
@@ -97,6 +105,7 @@ def checkout_cart(*, student, item_ids):
     ).exists():
         raise AlreadyExists("You already have an enrollment for a selected course. Contact support if it is suspended.")
     lines = [(item.course, item.effective_price) for item in items]
+    _check_quote(sum(amount for _, amount in lines), expected_total)
     if sum(amount for _, amount in lines) == 0:
         for course, _ in lines:
             grant_enrollment(student=student, course=course)
@@ -130,8 +139,12 @@ def verify_payment(*, reference, student=None):
 
         if payment.status == Payment.Status.SUCCESS:
             # Handle both single-course and cart-based payments
-            _grant_enrollments_for_payment(payment)
+            if payment.pricing_version == 1:
+                _grant_enrollments_for_payment(payment)
             return payment
+
+        if payment.pricing_version != 1:
+            raise PaymentFailed("This pre-upgrade payment requires support reconciliation. Do not pay again. Share the payment reference with support.")
 
         # Preserve recoverable pre-upgrade carts before replacing gateway data.
         legacy_ids = (payment.gateway_response or {}).get("cart_items")
@@ -155,6 +168,9 @@ def verify_payment(*, reference, student=None):
             raise PaymentFailed("Gateway returned an invalid amount.") from None
         gateway_status = (data.get("status") or "").lower()
 
+        if gateway_status in {"pending", "ongoing", "processing", "queued"}:
+            payment.mark_failed(status=Payment.Status.PENDING, gateway_response=data)
+            return payment
         if gateway_status != "success":
             new_status = (
                 Payment.Status.ABANDONED

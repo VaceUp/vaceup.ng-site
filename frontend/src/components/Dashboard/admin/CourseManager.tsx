@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { managedCourses, managedCategories, managedTutors, courseEndpoint, failureMessage, type ManagedCourse, type ManagedCategory, type ManagedTutor } from '@/lib/course-management';
 import { Action, Field, Feedback, ConfirmDelete, styles } from './AuthoringUI';
@@ -41,7 +41,9 @@ export default function CourseManager() {
     {mode === 'import' && <form className={`${styles.panel} ${styles.stack}`} onSubmit={async (event) => {
       event.preventDefault(); if (busy) return; setBusy(true); setError(''); setMessage('');
       try { await api.request('/courses/import-homepage/', { method: 'POST', body: JSON.stringify({ instructor: Number(importTutor) }) }); setMessage('Homepage import completed. Missing courses were added as drafts; matching courses and their edits were preserved. Open All courses to review them.'); await refresh(); }
-      catch (err) { setError(failureMessage(err)); }
+      catch (err) { setError(err instanceof ApiError && [404, 405].includes(err.status)
+        ? 'The installed backend does not expose the homepage-import action. Upload the full backend release to the cPanel Application Root, run check_release_routes, and restart the Python app. Existing courses have not been overwritten.'
+        : failureMessage(err)); }
       finally { setBusy(false); }
     }}><h3>Restore the original homepage catalogue</h3><p className={styles.muted}>Import Virtual Assistant, Data Analysis, UI/UX Design, Graphic Design and Web Development, including their original prices and categories. This creates catalogue records, not lesson content. Existing matching courses are not overwritten.</p>
       <Field label="Tutor for newly imported courses"><select required disabled={busy} value={importTutor} onChange={(event) => setImportTutor(event.target.value)}><option value="">Select an active tutor</option>{tutors.map((tutor) => <option key={tutor.id} value={tutor.id}>{tutor.full_name || tutor.email}</option>)}</select></Field>

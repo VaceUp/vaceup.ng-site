@@ -106,14 +106,14 @@ class AssignmentTests(APITestCase):
     def test_instructor_can_grade_submission(self):
         assignment = self._create_assignment()
         self.client.force_authenticate(self.student)
-        self.client.post("/api/v1/assignments/submit/", {
+        submitted = self.client.post("/api/v1/assignments/submit/", {
             "assignment": assignment.id,
             "text_answer": "My answer",
         }, format="json")
         # Instructor grades
         self.client.force_authenticate(self.instr)
         r = self.client.post("/api/v1/assignments/{}/grade/".format(assignment.id), {
-            "submission_id": assignment.id,
+            "submission_id": submitted.data["id"],
             "score": 85.00,
             "feedback": "Good work!",
         }, format="json")
@@ -213,7 +213,7 @@ class QuizTests(APITestCase):
         from apps.assignments.models import Answer
         answer = Answer.objects.create(
             student=self.student, question=question,
-            choice_id=1, is_correct=False)
+            choice=question.choices.order_by("order").first(), is_correct=False)
         self.assertIsNotNone(answer.id)
 
     def test_student_answers_true_false(self):
@@ -231,7 +231,7 @@ class QuizTests(APITestCase):
             status=QuizAttempt.Status.IN_PROGRESS)
         answer = Answer.objects.create(
             student=self.student, question=question,
-            choice_id=2, is_correct=False)
+            choice=question.choices.order_by("order").last(), is_correct=False)
         self.assertIsNotNone(answer.id)
 
     # --- attempt grading ---

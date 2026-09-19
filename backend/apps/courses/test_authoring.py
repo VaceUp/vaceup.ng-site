@@ -80,3 +80,18 @@ class CourseAuthoringTests(APITestCase):
         imported.price = 90000; imported.save()
         self.client.post(endpoint, {"instructor": self.tutor.pk}, format='json')
         imported.refresh_from_db(); self.assertEqual(imported.price, 90000)
+
+    def test_import_route_resolves_to_action_not_course_slug(self):
+        from django.urls import resolve
+        route = resolve('/api/v1/courses/import-homepage/')
+        self.assertEqual(route.func.actions['post'], 'import_homepage')
+
+    def test_homepage_import_requires_admin_and_active_tutor(self):
+        endpoint = '/api/v1/courses/import-homepage/'
+        self.client.force_authenticate(self.tutor)
+        self.assertEqual(self.client.post(endpoint, {'instructor': self.tutor.pk}, format='json').status_code, 403)
+        self.client.force_authenticate(self.admin)
+        self.tutor.is_active = False
+        self.tutor.save(update_fields=['is_active'])
+        self.assertEqual(self.client.post(endpoint, {'instructor': self.tutor.pk}, format='json').status_code, 400)
+        self.assertEqual(Course.objects.count(), 1)

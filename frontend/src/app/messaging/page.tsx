@@ -1,402 +1,184 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ConversationSummary } from '@/lib/api';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { api, ApiError, type ConversationSummary, type Message, type MessageContact, type PaginatedResponse } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { cn } from '@/lib/utils';
+import MemberAccess from '@/components/Dashboard/MemberAccess';
+import { WorkspaceHeading, WorkspacePagination } from '@/components/Dashboard/WorkspaceUI';
+import { Action, Field, Feedback, styles } from '@/components/Dashboard/admin/AuthoringUI';
+import chatStyles from './messages.module.css';
 
-/**
- * VaceUp Messages — WhatsApp-style chat on the live messaging API.
- * Chat list: GET /messages/ (summaries). Thread: GET /messages/thread/?with=<id>.
- * Send: POST /messages/ {recipient, body}. Live polling keeps it fresh.
- */
-
-interface ChatMessage {
-  id: string;
-  sender: string;
-  sender_name: string;
-  recipient: string;
-  body: string;
-  is_read: boolean;
-  created_at: string;
-}
-
-function timeLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  if (sameDay) return d.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
-  return (
-    d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) +
-    ' ' +
-    d.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
-  );
-}
-
-export default function MessagingPage() {
+function MessagingWorkspace() {
   const { user } = useAuth();
-  const myId = user?.id;
-
-  const [chats, setChats] = useState<ConversationSummary[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [mode, setMode] = useState('conversations');
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [directory, setDirectory] = useState<PaginatedResponse<MessageContact | ConversationSummary> | null>(null);
+  const [selected, setSelected] = useState<MessageContact | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [olderCursor, setOlderCursor] = useState<number | null>(null);
+  const [viewingOlder, setViewingOlder] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState('');
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingThread, setLoadingThread] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [showNewChat, setShowNewChat] = useState(false);
-  const [newChatId, setNewChatId] = useState('');
-  const [newChatError, setNewChatError] = useState('');
-  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [listError, setListError] = useState('');
-  const threadEndRef = useRef<HTMLDivElement>(null);
-  const activeIdRef = useRef<string | null>(null);
+  const [threadError, setThreadError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [denied, setDenied] = useState(false);
+  const [listRevision, setListRevision] = useState(0);
+  const [threadRevision, setThreadRevision] = useState(0);
+  const active = useRef<number | null>(null);
+  const requestSequence = useRef(0);
+  const pending = useRef<{ recipient: number; body: string; id: string } | null>(null);
+  active.current = selected?.user_id ?? null;
 
-  activeIdRef.current = activeId;
-
-  const loadChats = useCallback(async () => {
-    try {
-      const list = await api.getConversations();
-      setChats(Array.isArray(list) ? list : []);
-      setListError('');
-    } catch (err: any) {
-      if (!listError) setListError(err?.message || 'Could not load chats.');
-    } finally {
-      setLoadingList(false);
+  useEffect(() => {
+    let cancelled = false, running = false;
+    async function load() {
+      if (running || document.visibilityState !== 'visible') return;
+      running = true; setListLoading(true);
+      try {
+        const result = mode === 'contacts' ? await api.getMessageContacts(page, query)
+          : mode === 'blocks' ? await api.request<PaginatedResponse<MessageContact>>('/messages/blocks/?page=' + page)
+          : await api.getConversations(page);
+        if (!cancelled) { setDirectory(result); setListError(''); }
+      } catch (err) { if (!cancelled) { setDirectory(null); setListError(err instanceof Error ? err.message : 'Could not load your contacts. Try again.'); } }
+      finally { running = false; if (!cancelled) setListLoading(false); }
     }
-  }, [listError]);
+    void load();
+    const timer = window.setInterval(load, 30000);
+    const visible = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [mode, page, query, listRevision]);
 
-  const loadThread = useCallback(async (withId: string, silent = false) => {
-    if (!silent) setLoadingThread(true);
+  const loadThread = useCallback(async (id: number, before?: number) => {
+    const sequence = ++requestSequence.current;
+    setThreadLoading(true);
     try {
-      const msgs = await api.getThread(withId);
-      setMessages(msgs);
-    } catch {
-      if (!silent) setMessages([]);
-    } finally {
-      setLoadingThread(false);
-    }
+      const result = await api.getThread(String(id), before ? { before_id: before } : undefined);
+      if (active.current !== id || requestSequence.current !== sequence) return;
+      setMessages([...result.results].reverse()); setOlderCursor(result.next_before_id);
+      setViewingOlder(Boolean(before)); setDenied(false); setThreadError('');
+    } catch (err) {
+      if (active.current !== id || requestSequence.current !== sequence) return;
+      if (err instanceof ApiError && [403, 404].includes(err.status)) { setMessages([]); setDenied(true); }
+      setThreadError(err instanceof Error ? err.message : 'Could not load this conversation. Try again.');
+    } finally { if (active.current === id && requestSequence.current === sequence) setThreadLoading(false); }
   }, []);
 
-  const openChat = useCallback(
-    (c: ConversationSummary) => {
-      setActiveId(c.user_id);
-      setMobileThreadOpen(true);
-      loadThread(c.user_id);
-      loadChats();
-    },
-    [loadThread, loadChats]
-  );
-
-  // Initial load + polling (list every 10s, open thread every 4s)
   useEffect(() => {
-    if (!myId) return;
-    loadChats();
-    const listTimer = setInterval(loadChats, 10000);
-    const threadTimer = setInterval(() => {
-      if (activeIdRef.current) loadThread(activeIdRef.current, true);
-    }, 4000);
-    return () => {
-      clearInterval(listTimer);
-      clearInterval(threadTimer);
-    };
-  }, [myId, loadChats, loadThread]);
-
+    if (!selected) return;
+    void loadThread(selected.user_id);
+  }, [selected, loadThread, threadRevision]);
   useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const body = draft.trim();
-    if (!body || !activeId || sending) return;
-    setSending(true);
-    try {
-      await api.sendUserMessage(activeId, body);
-      setDraft('');
-      await loadThread(activeId, true);
-      await loadChats();
-    } catch {
-      /* keep the draft so nothing is lost */
-    } finally {
-      setSending(false);
+    if (!selected || viewingOlder || denied) return;
+    let running = false;
+    async function refresh() {
+      if (running || document.visibilityState !== 'visible') return;
+      running = true;
+      try { await loadThread(selected!.user_id); } finally { running = false; }
     }
-  };
+    const timer = window.setInterval(refresh, 15000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [selected, viewingOlder, denied, loadThread]);
 
-  const handleNewChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setNewChatError('');
-    const id = newChatId.trim();
-    if (!id) return;
-    try {
-      await api.getThread(id); // verifies the user exists
-      setActiveId(id);
-      setMessages([]);
-      setMobileThreadOpen(true);
-      setShowNewChat(false);
-      setNewChatId('');
-      loadChats();
-    } catch {
-      setNewChatError('No user found with that ID.');
+  function open(contact: MessageContact) {
+    if (busy) return;
+    active.current = contact.user_id; requestSequence.current++;
+    setSelected(contact); setMessages([]); setDraft(''); pending.current = null;
+    setFeedback(''); setThreadError(''); setViewingOlder(false); setDenied(false);
+  }
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || busy || !draft.trim() || denied) return;
+    const recipient = selected.user_id, body = draft.trim();
+    if (!pending.current || pending.current.recipient !== recipient || pending.current.body !== body) {
+      pending.current = { recipient, body, id: crypto.randomUUID() };
     }
-  };
-
-  const activeChat = chats.find((c) => c.user_id === activeId);
-  const threadTitle = activeChat?.full_name || (activeId ? `Chat · ${activeId.slice(0, 8)}…` : 'Select a chat');
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto flex h-[100dvh] max-w-7xl border-x border-gray-100">
-        {/* ══ Chat list ══ */}
-        <aside
-          className={cn(
-            'w-full flex-col border-r border-gray-200 bg-white sm:flex sm:w-[340px]',
-            mobileThreadOpen ? 'hidden' : 'flex'
-          )}
-        >
-          <div className="flex items-center justify-between bg-navy-950 px-5 py-4 text-white">
-            <div>
-              <h1 className="text-lg font-black">Messages</h1>
-              <p className="text-[11px] text-navy-200">{chats.length} conversation{chats.length === 1 ? '' : 's'}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowNewChat((v) => !v)}
-              aria-label="New chat"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-gold-brand text-navy-950 transition-transform hover:scale-105"
-            >
-              <i className={cn('bi', showNewChat ? 'bi-x-lg' : 'bi-chat-dots')} aria-hidden="true" />
-            </button>
+    setBusy(true); setFeedback(''); setThreadError('');
+    try {
+      await api.sendUserMessage(String(recipient), body, pending.current.id);
+      pending.current = null; setDraft(''); setFeedback('Message sent.');
+      await loadThread(recipient); setListRevision(value => value + 1);
+    } catch (err) { setThreadError((err instanceof Error ? err.message : 'Message could not be sent.') + ' Your draft is saved here; retrying the same text will not send it twice.'); }
+    finally { setBusy(false); }
+  }
+  async function acknowledge() {
+    if (!selected || !messages.length) return;
+    setBusy(true);
+    try { await api.readThread(selected.user_id, messages[messages.length - 1].id); setFeedback('Displayed messages marked read.'); setListRevision(value => value + 1); }
+    catch (err) { setThreadError(err instanceof Error ? err.message : 'Could not mark messages read. Try again.'); }
+    finally { setBusy(false); }
+  }
+  async function block(contact: MessageContact, unblock = false) {
+    setBusy(true); setFeedback(''); setThreadError('');
+    try {
+      await api.request('/messages/' + (unblock ? 'unblock' : 'block') + '/', { method: 'POST', body: JSON.stringify({ user_id: contact.user_id }) });
+      setSelected(null); active.current = null; setMessages([]); setDraft(''); pending.current = null;
+      setFeedback(unblock ? 'Your block was removed. Course permissions and the other person’s block still apply.' : 'Contact blocked. You can undo this in Blocked contacts.');
+      setListRevision(value => value + 1);
+    } catch (err) { setThreadError(err instanceof Error ? err.message : 'Could not change this block. Try again.'); }
+    finally { setBusy(false); }
+  }
+  return <div className={styles.root + ' ' + styles.stack}>
+    <WorkspaceHeading title="Messages" description="Contact your tutors, enrolled classmates and academy support. Open conversations refresh every 15 seconds while this page is visible." />
+    <div className={chatStyles.layout}>
+      <section className={styles.panel + ' ' + styles.stack} aria-label="Contacts and conversations">
+        <Field label="Show"><select value={mode} disabled={busy} onChange={event => { setMode(event.target.value); setPage(1); }}><option value="conversations">Conversations</option><option value="contacts">Find a contact</option><option value="blocks">Blocked contacts</option></select></Field>
+        {mode === 'contacts' && <form className={styles.stack} onSubmit={event => { event.preventDefault(); setQuery(search); setPage(1); }}>
+          <Field label="Search by name"><input value={search} maxLength={100} onChange={event => setSearch(event.target.value)} /></Field><Action type="submit">Search contacts</Action>
+        </form>}
+        <Feedback error={listError} />
+        <Action loading={listLoading} onClick={() => setListRevision(value => value + 1)}>Refresh contacts</Action>
+        {directory && directory.results.length === 0 && <p>No contacts here yet. Choose Find a contact to see who you can message.</p>}
+        <ul className={styles.list}>{directory?.results.map(contact => <li key={contact.user_id} className={styles.stack}>
+          {mode === 'blocks' ? <><p>{contact.full_name}</p><Action disabled={busy} onClick={() => block(contact, true)}>Unblock contact</Action></> : <Action disabled={busy} aria-pressed={selected?.user_id === contact.user_id} onClick={() => open(contact)}>
+            {contact.full_name} / {contact.role}{'unread' in contact && contact.unread > 0 ? ' / ' + contact.unread + ' unread' : ''}
+          </Action>}
+        </li>)}</ul>
+        {directory && <WorkspacePagination page={page} count={directory.count} hasNext={Boolean(directory.next)} loading={listLoading || busy} onPage={setPage} />}
+      </section>
+      <section className={styles.panel + ' ' + styles.stack} aria-label="Current conversation">
+        <Feedback error={threadError} message={feedback} />
+        {!selected ? <div className={styles.empty}><h2>Choose someone to talk to</h2><p>Start with Find a contact. You never need to know their account ID.</p></div> : <>
+          <h2 className={chatStyles.threadTitle}>{selected.full_name}</h2>
+          <div className={styles.row}><Action loading={threadLoading} disabled={busy} onClick={() => setThreadRevision(value => value + 1)}>Latest messages</Action>
+            {selected.role !== 'admin' && <Action intent="danger" disabled={busy} onClick={() => block(selected)}>Block contact</Action>}
           </div>
-
-          {showNewChat && (
-            <form onSubmit={handleNewChat} className="border-b border-gray-100 bg-gray-50 p-4">
-              <label className="mb-2 block text-xs font-bold text-gray-500">
-                Enter the user ID of the person to message
-                <span className="block font-normal text-gray-400">
-                  (IDs are visible in Django admin → Users)
-                </span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  autoFocus
-                  value={newChatId}
-                  onChange={(e) => setNewChatId(e.target.value)}
-                  placeholder="user id"
-                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2.5 font-mono text-sm focus:border-navy-900 focus:outline-none"
-                />
-                <button type="submit" className="rounded-xl bg-navy-950 px-4 text-sm font-bold text-white">
-                  Open
-                </button>
-              </div>
-              {newChatError && <p className="mt-2 text-xs text-red-600">{newChatError}</p>}
-            </form>
-          )}
-
-          <div className="flex-1 overflow-y-auto">
-            {loadingList ? (
-              <div className="space-y-3 p-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />
-                ))}
-              </div>
-            ) : listError ? (
-              <div className="p-6 text-center text-sm text-gray-500">
-                <p>{listError}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoadingList(true);
-                    loadChats();
-                  }}
-                  className="mt-2 font-bold text-teal-700 hover:underline"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : chats.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-500">
-                <i className="bi bi-chat-dots mb-3 block text-4xl text-gray-200" aria-hidden="true" />
-                No conversations yet.
-                <button
-                  type="button"
-                  onClick={() => setShowNewChat(true)}
-                  className="mt-3 block w-full font-bold text-teal-700 hover:underline"
-                >
-                  Start your first chat
-                </button>
-              </div>
-            ) : (
-              <ul>
-                {chats.map((c) => {
-                  const initials = c.full_name
-                    ? c.full_name
-                        .split(' ')
-                        .map((w) => w[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase()
-                    : '?';
-                  return (
-                    <li key={c.user_id}>
-                      <button
-                        type="button"
-                        onClick={() => openChat(c)}
-                        className={cn(
-                          'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50',
-                          activeId === c.user_id && 'bg-navy-50'
-                        )}
-                      >
-                        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-navy-950 text-sm font-black text-gold-brand">
-                          {initials}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center justify-between gap-2">
-                            <span className="truncate font-bold text-navy-950">
-                              {c.full_name || 'Unknown'}
-                            </span>
-                            <span className="flex-shrink-0 text-[11px] text-gray-400">
-                              {c.last_at ? timeLabel(c.last_at) : ''}
-                            </span>
-                          </span>
-                          <span className="mt-0.5 flex items-center justify-between gap-2">
-                            <span
-                              className={cn(
-                                'truncate text-sm',
-                                c.unread > 0 ? 'font-semibold text-navy-950' : 'text-gray-500'
-                              )}
-                            >
-                              {c.last_from_me ? 'You: ' : ''}
-                              {c.last_message}
-                            </span>
-                            {c.unread > 0 && (
-                              <span className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-teal-brand px-1.5 text-[11px] font-black text-white">
-                                {c.unread}
-                              </span>
-                            )}
-                          </span>
-                          {c.role && (
-                            <span className="mt-0.5 block text-[11px] capitalize text-gray-400">
-                              {c.role}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </aside>
-
-        {/* ══ Thread pane ══ */}
-        <section
-          className={cn(
-            'min-w-0 flex-1 flex-col bg-[#efeae2]',
-            mobileThreadOpen ? 'flex' : 'hidden sm:flex'
-          )}
-        >
-          {!activeId ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#efeae2] text-center">
-              <span className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-sm">
-                <i className="bi bi-chat-heart text-5xl text-navy-900" aria-hidden="true" />
-              </span>
-              <h2 className="text-xl font-black text-navy-950">VaceUp Messages</h2>
-              <p className="max-w-xs text-sm text-gray-500">
-                Select a chat to message your tutors and coursemates — or start a new conversation.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 bg-navy-950 px-4 py-3 text-white">
-                <button
-                  type="button"
-                  onClick={() => setMobileThreadOpen(false)}
-                  aria-label="Back to chats"
-                  className="mr-1 text-xl sm:hidden"
-                >
-                  <i className="bi bi-arrow-left" aria-hidden="true" />
-                </button>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-black text-gold-brand">
-                  {(activeChat?.full_name || 'C').slice(0, 1).toUpperCase()}
-                </span>
-                <div>
-                  <p className="font-bold">{threadTitle}</p>
-                  <p className="text-xs capitalize text-navy-200">{activeChat?.role ?? 'member'}</p>
-                </div>
-              </div>
-
-              <div className="flex-1 space-y-2 overflow-y-auto p-4">
-                {loadingThread ? (
-                  <div className="space-y-3">
-                    {[...Array(4)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={cn('h-10 w-2/3 animate-pulse rounded-2xl bg-white/70', i % 2 && 'ml-auto')}
-                      />
-                    ))}
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="mt-10 text-center text-sm text-gray-500">
-                    No messages yet — say hello 👋
-                  </div>
-                ) : (
-                  messages.map((m) => {
-                    const mine = m.sender === myId;
-                    return (
-                      <div key={m.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-                        <div
-                          className={cn(
-                            'max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
-                            mine
-                              ? 'rounded-br-md bg-[#d9fdd3] text-navy-950'
-                              : 'rounded-bl-md bg-white text-navy-950'
-                          )}
-                        >
-                          {!mine && (
-                            <p className="mb-0.5 text-xs font-bold text-teal-700">{m.sender_name}</p>
-                          )}
-                          <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                          <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-gray-500">
-                            {timeLabel(m.created_at)}
-                            {mine && (
-                              <i
-                                className={cn('bi', m.is_read ? 'bi-check2-all text-teal-700' : 'bi-check2')}
-                                aria-hidden="true"
-                                title={m.is_read ? 'Read' : 'Delivered'}
-                              />
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                <div ref={threadEndRef} />
-              </div>
-
-              <form onSubmit={handleSend} className="flex items-center gap-2 bg-[#f0f2f5] p-3">
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type a message"
-                  className="flex-1 rounded-full border border-gray-200 bg-white px-5 py-3 text-sm focus:border-navy-900 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!draft.trim() || sending}
-                  aria-label="Send"
-                  className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gold-brand text-navy-950 shadow-md transition-all hover:bg-gold-hover disabled:opacity-40"
-                >
-                  <i className={cn('bi', sending ? 'bi-hourglass' : 'bi-send-fill')} aria-hidden="true" />
-                </button>
-              </form>
-            </>
-          )}
-        </section>
-      </div>
+          {viewingOlder && <p role="status">Viewing older messages. Choose Latest messages to resume updates.</p>}
+          {olderCursor && <Action disabled={threadLoading || busy} onClick={() => loadThread(selected.user_id, olderCursor)}>Older messages</Action>}
+          {!messages.length && !threadLoading && !denied && <p>No messages yet. Send the first message below.</p>}
+          <ol className={styles.list} aria-label="Messages in chronological order">{messages.map(message => <li key={message.id} className={styles.panel}>
+            <div className={styles.row + ' ' + styles.between}><strong>{String(message.sender) === String(user?.id) ? 'You' : message.sender_name}</strong><time className={styles.muted} dateTime={message.created_at}>{new Date(message.created_at).toLocaleString()}</time></div>
+            <p className={chatStyles.body}>{message.body}</p>
+            {String(message.sender) === String(user?.id) && <p className={styles.muted}>{message.is_read ? 'Read' : 'Sent'}</p>}
+            <ReportMessage messageId={message.id} />
+          </li>)}</ol>
+          {!denied && messages.length > 0 && <Action disabled={busy || threadLoading} onClick={acknowledge}>Mark displayed messages read</Action>}
+          {!denied && <form onSubmit={send} className={styles.stack}><Field label="Your message"><textarea value={draft} maxLength={5000} rows={4} disabled={busy} onChange={event => setDraft(event.target.value)} /></Field>
+            <Action intent="primary" type="submit" loading={busy} disabled={!draft.trim() || threadLoading}>Send message</Action>
+          </form>}
+        </>}
+      </section>
     </div>
-  );
+  </div>;
 }
+
+function ReportMessage({ messageId }: { messageId: number }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+  return <details><summary>Report message</summary><form className={styles.stack} onSubmit={async event => {
+    event.preventDefault(); if (busy) return; setBusy(true); setError('');
+    try { await api.request('/messages/report/', { method: 'POST', body: JSON.stringify({ message_id: messageId, reason }) }); setSent(true); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not submit the report. Try again.'); }
+    finally { setBusy(false); }
+  }}><Feedback error={error} message={sent ? 'Report saved for academy review.' : ''} />{!sent && <><Field label="Reason for reporting"><textarea required maxLength={1000} value={reason} onChange={event => setReason(event.target.value)} /></Field><Action type="submit" loading={busy} disabled={!reason.trim()}>Submit report</Action></>}</form></details>;
+}
+
+export default function MessagingPage() { return <MemberAccess><MessagingWorkspace /></MemberAccess>; }

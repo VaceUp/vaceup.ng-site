@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, X } from 'react-bootstrap-icons';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
 
 export interface DropdownProps {
   trigger: React.ReactNode;
@@ -113,7 +113,6 @@ export function Dropdown({
               // Position would be calculated by a proper positioning library
               // This is a simplified version
             }}
-            ref={contentRef}
           >
             <div className="py-1">
               {content}

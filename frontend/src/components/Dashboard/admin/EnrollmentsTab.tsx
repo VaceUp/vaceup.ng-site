@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import ManualEnrollmentForm from './ManualEnrollmentForm';
 
 /**
  * Enrollments management — every enrollment on the platform, with status
@@ -48,6 +49,7 @@ export function EnrollmentsTab() {
 
   return (
     <div className="space-y-5">
+      <ManualEnrollmentForm onGranted={load} />
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h3 className="mb-4 font-black text-navy-950">
           All Enrollments ({enrollments.length})

@@ -56,6 +56,51 @@ class OrderIntegrityTests(APITestCase):
         self.assertEqual(first.pk, second.pk)
         self.assertEqual(Payment.objects.count(), 1)
 
+    def test_changed_quote_does_not_initialize_a_charge(self):
+        with patch("apps.payments.services.get_gateway") as gateway:
+            response = self.client.post("/api/v1/payments/checkout/", {
+                "cart_items": [item.pk for item in self.items], "expected_total": "1.00",
+            }, format="json")
+        self.assertEqual(response.status_code, 400)
+        gateway.assert_not_called()
+        self.assertFalse(Payment.objects.exists())
+
+    def test_changed_single_course_quote_does_not_initialize_a_charge(self):
+        with patch("apps.payments.services.get_gateway") as gateway:
+            response = self.client.post("/api/v1/payments/initialize/", {
+                "course": self.courses[0].pk, "expected_total": "4000.00",
+            }, format="json")
+        self.assertEqual(response.status_code, 400)
+        gateway.assert_not_called()
+
+    def test_pending_gateway_status_is_not_reported_as_failed(self):
+        payment = self.checkout()
+        result = self.verified(payment, status="processing")
+        self.assertEqual(result.status, Payment.Status.PENDING)
+        self.assertFalse(Enrollment.objects.exists())
+
+    def test_legacy_unverified_orders_require_reconciliation(self):
+        payment = self.checkout()
+        Payment.objects.filter(pk=payment.pk).update(pricing_version=0)
+        with patch("apps.payments.services.get_gateway") as gateway:
+            with self.assertRaisesMessage(PaymentFailed, "support reconciliation"):
+                verify_payment(reference=payment.reference, student=self.student)
+        gateway.assert_not_called()
+        self.assertFalse(Enrollment.objects.exists())
+
+    def test_legacy_success_does_not_create_new_access_on_replay(self):
+        payment = self.checkout()
+        Payment.objects.filter(pk=payment.pk).update(pricing_version=0, status=Payment.Status.SUCCESS)
+        self.verified(payment)
+        self.assertFalse(Enrollment.objects.exists())
+
+    def test_cart_add_retry_has_one_item_and_prices_are_authoritative(self):
+        for _ in range(2):
+            response = self.client.post("/api/v1/cart/", {"course": self.courses[0].pk}, format="json")
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.data["effective_price"], "5000.00")
+        self.assertEqual(CartItem.objects.filter(cart=self.cart, course=self.courses[0]).count(), 1)
+
     def test_currency_reference_and_amount_must_match(self):
         for changes in [{"currency": "USD"}, {"reference": "wrong"}, {"amount": 800001}, {"amount": 799999}]:
             payment = self.checkout()

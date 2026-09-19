@@ -126,14 +126,14 @@ export default function CodeEditorPage() {
             <div className="hidden md:flex items-center gap-2">
               <Select
                 value={language}
-                onValueChange={setLanguage}
+                onChange={event => setLanguage(event.target.value)}
                 options={languageOptions}
                 className="w-48"
                 placeholder="Language"
               />
               <Select
                 value={theme}
-                onValueChange={setTheme}
+                onChange={event => setTheme(event.target.value === 'light' ? 'light' : 'dark')}
                 options={[
                   { value: 'dark', label: 'Dark' },
                   { value: 'light', label: 'Light' },
@@ -142,13 +142,13 @@ export default function CodeEditorPage() {
               />
               <Select
                 value={fontSize}
-                onValueChange={setFontSize}
+                onChange={event => setFontSize(Number(event.target.value))}
                 options={[
-                  { value: 12, label: '12px' },
-                  { value: 14, label: '14px' },
-                  { value: 16, label: '16px' },
-                  { value: 18, label: '18px' },
-                  { value: 20, label: '20px' },
+                  { value: '12', label: '12px' },
+                  { value: '14', label: '14px' },
+                  { value: '16', label: '16px' },
+                  { value: '18', label: '18px' },
+                  { value: '20', label: '20px' },
                 ]}
                 className="w-28"
               />

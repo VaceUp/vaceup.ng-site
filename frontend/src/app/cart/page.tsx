@@ -1,276 +1,54 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/utils';
-import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { api, ApiError, type Cart } from '@/lib/api';
+import { formatPrice } from '@/lib/public-catalog';
+import { Action, Feedback, styles } from '@/components/Dashboard/admin/AuthoringUI';
+import { StandalonePanel } from '@/components/ui/StandalonePanel';
 
-interface CartItem {
-  id: string;
-  course: {
-    id: string;
-    title: string;
-    thumbnail: string;
-    instructor: string;
-    price: number;
-  };
-  quantity: number;
-}
-
-function CartContent() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+export default function CartPage() {
+  const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
-  const [coupon, setCoupon] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [applyingCoupon, setApplyingCoupon] = useState(false);
-  const [couponError, setCouponError] = useState('');
-  const router = useRouter();
-
-  useEffect(() => {
-    fetchCart();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    if (!api.getToken()) { setNeedsLogin(true); setLoading(false); return; }
+    try { setCart(await api.getCart()); setNeedsLogin(false); }
+    catch (err) {
+      setCart(null);
+      setNeedsLogin(err instanceof ApiError && err.status === 401);
+      setError(err instanceof Error ? err.message : 'Could not load your cart. Try again.');
+    } finally { setLoading(false); }
   }, []);
-
-  const fetchCart = async () => {
-    setLoading(true);
+  useEffect(() => { void load(); }, [load]);
+  async function remove(id?: number) {
+    if (busy) return;
+    setBusy(true); setError(''); setMessage('');
     try {
-      const res = await fetch('/api/v1/cart/');
-      if (res.ok) {
-        const data = await res.json();
-        setCartItems(data.items || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch cart:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateQuantity = async (itemId: string, quantity: number) => {
-    if (quantity < 1) {
-      removeItem(itemId);
-      return;
-    }
-    try {
-      const res = await fetch(`/api/v1/cart/items/${itemId}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCartItems(prev => prev.map(item =>
-          item.id === itemId ? { ...item, quantity: data.quantity } : item
-        ));
-      }
-    } catch (error) {
-      console.error('Failed to update quantity:', error);
-    }
-  };
-
-  const removeItem = async (itemId: string) => {
-    try {
-      const res = await fetch(`/api/v1/cart/items/${itemId}/`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setCartItems(prev => prev.filter(item => item.id !== itemId));
-      }
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-    }
-  };
-
-  const applyCoupon = async () => {
-    if (!coupon.trim()) return;
-    setApplyingCoupon(true);
-    setCouponError('');
-    try {
-      const res = await fetch('/api/v1/coupons/apply/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: coupon }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDiscount(data.discount);
-        setCouponError('');
-      } else {
-        const data = await res.json();
-        setCouponError(data.detail || 'Invalid coupon code');
-      }
-    } catch (error) {
-      setCouponError('Failed to apply coupon');
-    } finally {
-      setApplyingCoupon(false);
-    }
-  };
-
-  const subtotal = cartItems.reduce((sum, item) => sum + item.course.price * item.quantity, 0);
-  const total = subtotal - discount;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
-      </div>
-    );
+      if (id === undefined) await api.clearCart();
+      else await api.removeFromCart(String(id));
+      setMessage(id === undefined ? 'Cart cleared.' : 'Course removed from your cart.');
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not remove the course. Refresh your cart and try again.'); }
+    finally { setBusy(false); }
   }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Shopping Cart</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Review your courses and proceed to checkout
-          </p>
-        </div>
-
-        {cartItems.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-              <LordIconComponent src={LordIcons.shoppingCart} size={48} className="text-gray-400 dark:text-gray-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your cart is empty</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Looks like you haven't added any courses yet.</p>
-            <button onClick={() => window.location.href = '/courses'} className="px-8 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors">
-              Browse Courses
-            </button>
-          </div>
-        ) : (
-          <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Cart ({cartItems.length} items)</h2>
-                  {cartItems.length > 0 && (
-                    <button
-                      onClick={() => cartItems.forEach(item => removeItem(item.id))}
-                      className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 hover:text-red-300"
-                    >
-                      Clear Cart
-                    </button>
-                  )}
-                </div>
-                <div className="divide-y divide-gray-200 dark:divide-slate-700">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="p-6 flex flex-col md:flex-row gap-6 items-start">
-                      <img
-                        src={item.course.thumbnail || '/placeholder-course.jpg'}
-                        alt={item.course.title}
-                        className="w-24 h-16 rounded-xl object-cover flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 dark:text-white truncate">{item.course.title}</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.course.instructor}</p>
-                          </div>
-                          <Badge variant="outline" className="whitespace-nowrap">
-                            {item.course.price === 0 ? 'Free' : formatCurrency(item.course.price)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 mt-4">
-                          <div className="flex items-center border border-gray-300 dark:border-slate-700 rounded-xl overflow-hidden">
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
-                              className="px-3 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-l-xl text-gray-600 dark:text-gray-300 disabled:opacity-50"
-                            >
-                              <LordIconComponent src={LordIcons.minus} size={20} />
-                            </button>
-                            <span className="w-10 text-center font-medium">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-r-xl text-gray-600 dark:text-gray-300"
-                            >
-                              <LordIconComponent src={LordIcons.plus} size={20} />
-                            </button>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeItem(item.id)}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 hover:text-red-500"
-                          >
-                            <LordIconComponent src={LordIcons.trash2} size={20} />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Order Summary</h2>
-                <div className="space-y-4">
-                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                    <span>Subtotal ({cartItems.length} items)</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                    <span>Discount</span>
-                    <span className="text-green-600 dark:text-green-400">-{formatCurrency(discount)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                    <span>Tax (Estimated)</span>
-                    <span>{formatCurrency(subtotal * 0.05)}</span>
-                  </div>
-                  <div className="border-t border-gray-200 dark:border-slate-700 pt-4">
-                    <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white">
-                      <span>Total</span>
-                      <span>{formatCurrency(total + subtotal * 0.05)}</span>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex gap-2 mb-4">
-                      <Input
-                        placeholder="Coupon code"
-                        value={coupon}
-                        onChange={(e) => setCoupon(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        variant={applyingCoupon ? 'secondary' : 'primary'}
-                        onClick={applyCoupon}
-                        disabled={applyingCoupon || !coupon.trim()}
-                      >
-                        {applyingCoupon ? 'Applying...' : 'Apply'}
-                      </Button>
-                    </div>
-                    {couponError && <p className="text-sm text-red-600 dark:text-red-400">{couponError}</p>}
-                  </div>
-                  <Button
-                    size="lg"
-                    className="w-full"
-                    onClick={() => router.push('/checkout')}
-                    disabled={cartItems.length === 0}
-                  >
-                    Proceed to Checkout
-                    <LordIconComponent src={LordIcons.creditCard} size={20} className="ml-2" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <StandalonePanel title="Your cart" description="One enrollment per course, for your account. Review the academy's current prices before checkout.">
+    <Feedback error={error} message={message} />
+    {loading ? <p role="status">Loading your courses...</p> : needsLogin ? <div className={styles.stack}>
+      <p>Sign in to see the courses saved to your account.</p><Link className={styles.action} href="/login?next=%2Fcart%2F">Sign in</Link>
+    </div> : !cart ? <Action onClick={load}>Retry cart</Action> : cart.items.length === 0 ? <div className={styles.empty}>
+      <h2>Your cart is empty</h2><p>Choose a course to start learning.</p><Link className={styles.action} href="/courses/">Browse courses</Link>
+    </div> : <div className={styles.stack}>
+      <ul className={styles.list}>{cart.items.map(item => <li key={item.id} className={styles.panel}>
+        <div className={styles.row + ' ' + styles.between}><h2>{item.course.title}</h2><strong>{formatPrice(item.effective_price)}</strong></div>
+        <div className={styles.row}><Link className={styles.action} href={'/course?slug=' + encodeURIComponent(item.course.slug)}>Course details</Link><Action intent="danger" disabled={busy || loading} onClick={() => remove(item.id)} aria-label={'Remove ' + item.course.title + ' from cart'}>Remove course</Action></div>
+      </li>)}</ul>
+      <p className={styles.row + ' ' + styles.between}><strong>Total</strong><strong>{formatPrice(cart.total)}</strong></p>
+      <div className={styles.row}><Action intent="danger" loading={busy} onClick={() => remove()}>Clear cart</Action><Link className={styles.action + ' ' + styles.primary} aria-disabled={busy || loading} onClick={event => { if (busy || loading) event.preventDefault(); }} href="/checkout/">Review checkout</Link></div>
+    </div>}
+  </StandalonePanel>;
 }
-
-function CartPage() {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <CartContent />
-    </div>
-  );
-}
-
-export default CartPage;

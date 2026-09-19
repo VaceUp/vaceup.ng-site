@@ -63,7 +63,8 @@ class PaymentViewSet(
         serializer = InitializePaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payment = services.initialize_payment(
-            student=request.user, course=serializer.validated_data["course"]
+            student=request.user, course=serializer.validated_data["course"],
+            expected_total=serializer.validated_data.get("expected_total"),
         )
         return Response(
             PaymentSerializer(payment).data, status=status.HTTP_201_CREATED
@@ -85,7 +86,7 @@ class PaymentViewSet(
         serializer = CartCheckoutSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        payment = services.checkout_cart(student=request.user, item_ids=serializer.validated_data["cart_items"])
+        payment = services.checkout_cart(student=request.user, item_ids=serializer.validated_data["cart_items"], expected_total=serializer.validated_data.get("expected_total"))
         if payment is None:
             return Response({"detail": "Free courses enrolled successfully."}, status=status.HTTP_200_OK)
 

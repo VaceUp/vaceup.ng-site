@@ -27,7 +27,12 @@ class CartItemSerializer(serializers.ModelSerializer):
             "subtotal",
             "created_at",
         )
-        read_only_fields = ("course", "effective_price", "subtotal")
+        read_only_fields = fields
+
+    def validate(self, attrs):
+        if any(key in self.initial_data for key in ("price_override", "price", "effective_price", "subtotal", "quantity")):
+            raise serializers.ValidationError("Course prices are set by the academy. A course can only be purchased once.")
+        return attrs
 
 
 class CartItemCreateSerializer(serializers.ModelSerializer):
@@ -35,28 +40,30 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CartItem
-        fields = ("course", "price_override")
+        fields = ("course",)
+
+    def validate(self, attrs):
+        if any(key in self.initial_data for key in ("price_override", "price", "effective_price", "subtotal", "quantity")):
+            raise serializers.ValidationError("Course prices are set by the academy. A course can only be purchased once.")
+        return attrs
 
     def validate_course(self, course):
+        if not course.is_published:
+            raise serializers.ValidationError("This course is not open for enrollment.")
         user = self.context["request"].user
         # Check if already enrolled
         from apps.enrollment.models import Enrollment
         if Enrollment.objects.filter(
-            student=user, course=course, status=Enrollment.Status.ACTIVE
+            student=user, course=course
         ).exists():
             raise serializers.ValidationError("Already enrolled in this course.")
-        # Check if already in cart
-        from apps.cart.models import Cart
-        cart, _ = Cart.objects.get_or_create(user=user)
-        if CartItem.objects.filter(cart=cart, course=course).exists():
-            raise serializers.ValidationError("Course already in cart.")
         return course
 
     def create(self, validated_data):
         user = self.context["request"].user
         cart, _ = Cart.objects.get_or_create(user=user)
-        validated_data["cart"] = cart
-        return super().create(validated_data)
+        item, _ = CartItem.objects.get_or_create(cart=cart, course=validated_data["course"])
+        return item
 
 
 class CartSerializer(serializers.ModelSerializer):

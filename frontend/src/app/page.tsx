@@ -31,7 +31,7 @@ export default function Home() {
           <WhyVaceUp />
         </Reveal>
         <Reveal>
-          <KidsAcademy onEnrollChild={() => openAuth('signup')} />
+          <KidsAcademy />
         </Reveal>
         <Reveal>
           <SuccessStories />

@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.codeeditor import services
+from apps.core.collaboration import CollaborationUnavailable
 from apps.codeeditor.models import CodeEditorSession, CodeExecution
 from apps.codeeditor.serializers import (
     CodeEditorSessionSerializer,
@@ -23,7 +24,7 @@ User = get_user_model()
 class CodeEditorSessionViewSet(viewsets.GenericViewSet):
     """Code editor session management."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CollaborationUnavailable]
     serializer_class = CodeEditorSessionSerializer
 
     def get_queryset(self):

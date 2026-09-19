@@ -32,7 +32,7 @@ OWNED_RECORDS = {
     "assignments.quizattempt", "cart.cart", "cart.cartitem",
     "certificates.certificate", "certificates.certificateverificationlog",
     "enrollment.enrollment", "enrollment.lessonprogress", "liveclasses.attendance",
-    "messaging.message", "messaging.notification", "codeeditor.codeexecution",
+    "messaging.message", "messaging.notification", "messaging.messageblock", "messaging.messagereport", "codeeditor.codeexecution",
     "whiteboard.whiteboardstroke", "announcements.announcementreadreceipt",
     "announcements.announcementcomment", "token_blacklist.outstandingtoken",
     "token_blacklist.blacklistedtoken",

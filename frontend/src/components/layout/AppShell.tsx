@@ -10,7 +10,7 @@ import { Footer } from '@/components/landing/Footer';
  * app pages (dashboard, messaging, editor tools) where each page provides
  * its own full-height chrome.
  */
-const APP_PREFIXES = ['/dashboard', '/messaging', '/codeeditor', '/whiteboard', '/design', '/excel', '/liveclasses'];
+const APP_PREFIXES = ['/dashboard', '/messaging', '/notification', '/codeeditor', '/whiteboard', '/design', '/excel', '/liveclasses', '/forgot-password', '/reset-password', '/cart', '/checkout', '/payment'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/';

@@ -54,7 +54,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
           'backdrop-blur-xl',
           variantStyles[variant],
           paddingStyles[padding],
-          hoverStyles[hover],
+          hoverStyles[hover ? 'true' : 'false'],
           interactive && 'cursor-pointer active:scale-[0.98]',
           className
         )}
@@ -68,13 +68,13 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
 Card.displayName = 'Card';
 
 export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  title: string;
+  title?: string;
   subtitle?: string;
   action?: React.ReactNode;
 }
 
 export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
-  ({ title, subtitle, action, className, ...props }, ref) => {
+  ({ title, subtitle, action, className, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
@@ -85,9 +85,10 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
         {...props}
       >
         <div className="flex-1 min-w-0">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white truncate">
+          {title && <h3 className="text-xl font-semibold text-gray-900 dark:text-white truncate">
             {title}
-          </h3>
+          </h3>}
+          {children}
           {subtitle && (
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {subtitle}

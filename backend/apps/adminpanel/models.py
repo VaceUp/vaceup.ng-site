@@ -31,6 +31,7 @@ class AdminActionLog(TimeStampedModel):
         STAFF_ACTIVATE = "staff_activate", _("Staff Activated")
         STAFF_PROMOTE = "staff_promote", _("Staff Promoted")
         APPLICATION_REVIEW = "application_review", _("Application Reviewed")
+        ENROLLMENT_GRANT = "enrollment_grant", _("Off-platform Course Access Granted")
         ANNOUNCEMENT_CREATE = "announcement_create", _("Announcement Created")
         SETTINGS_UPDATE = "settings_update", _("Settings Updated")
 

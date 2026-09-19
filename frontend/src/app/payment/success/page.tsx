@@ -1,119 +1,49 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, ApiError, type Payment } from '@/lib/api';
+import { Action, Feedback, styles } from '@/components/Dashboard/admin/AuthoringUI';
+import { StandalonePanel } from '@/components/ui/StandalonePanel';
 
-/**
- * Paystack callback (PRD §4.3.4): verifies the transaction server-side
- * and confirms enrollment.
- */
 export default function PaymentSuccessPage() {
-  const [reference, setReference] = useState<string | null>(null);
-  const [status, setStatus] = useState<'verifying' | 'success' | 'pending'>('verifying');
-  const [course, setCourse] = useState<string | null>(null);
-
+  const [reference, setReference] = useState('');
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [status, setStatus] = useState<'verifying' | 'success' | 'pending' | 'error' | 'missing' | 'login'>('verifying');
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get('reference') || params.get('trxref');
-    setReference(ref);
-    if (!ref) {
-      setStatus('pending');
-      return;
-    }
     let cancelled = false;
-    api
-      .verifyPayment(ref)
-      .then((res) => {
-        if (cancelled) return;
-        setStatus('success');
-        setCourse(res.course?.title ?? null);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setStatus('pending');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
-      <div className="w-full max-w-lg rounded-3xl border border-gray-100 bg-white p-10 text-center shadow-xl">
-        {status === 'verifying' && (
-          <>
-            <img src="/logo.webp" alt="" className="mx-auto mb-6 h-16 w-16 animate-pulse object-contain" />
-            <h1 className="text-2xl font-black text-navy-950">Verifying your payment…</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Reference: <span className="font-mono">{reference}</span>
-            </p>
-          </>
-        )}
-
-        {status === 'success' && (
-          <>
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-teal-brand/10">
-              <i className="bi bi-check-circle-fill text-4xl text-teal-brand" aria-hidden="true" />
-            </div>
-            <h1 className="text-3xl font-black text-navy-950">Payment successful! 🎉</h1>
-            <p className="mt-3 text-sm text-gray-600">
-              {course ? (
-                <>
-                  You&apos;re enrolled in <span className="font-bold">{course}</span>. A receipt is
-                  on its way to your email.
-                </>
-              ) : (
-                <>Your payment was confirmed and your seat is secured. A receipt is on its way to your email.</>
-              )}
-            </p>
-            <div className="mt-8 flex flex-col gap-3">
-              <Link
-                href="/dashboard"
-                className="rounded-xl bg-gold-brand py-3.5 font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover"
-              >
-                Go to My Dashboard
-              </Link>
-              <Link
-                href="/courses"
-                className="rounded-xl border-2 border-navy-900 py-3.5 font-bold text-navy-900 transition-colors hover:bg-navy-50"
-              >
-                Explore More Courses
-              </Link>
-            </div>
-          </>
-        )}
-
-        {status === 'pending' && (
-          <>
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gold-brand/15">
-              <i className="bi bi-hourglass-split text-3xl text-gold-700" aria-hidden="true" />
-            </div>
-            <h1 className="text-2xl font-black text-navy-950">
-              {reference ? 'Payment received — confirming' : 'Almost there'}
-            </h1>
-            <p className="mx-auto mt-3 max-w-sm text-sm text-gray-600">
-              {reference
-                ? 'Your payment is confirmed with Paystack and is being synced with your account. This usually takes a few minutes — your dashboard will update automatically.'
-                : 'We could not find a payment reference for this visit. If you just paid, check your email for the receipt — your enrollment is tied to your account.'}
-            </p>
-            <div className="mt-8 flex flex-col gap-3">
-              <Link
-                href="/dashboard"
-                className="rounded-xl bg-navy-950 py-3.5 font-bold text-white transition-colors hover:bg-navy-900"
-              >
-                Go to My Dashboard
-              </Link>
-              <Link
-                href="/contact"
-                className="rounded-xl border-2 border-navy-900 py-3.5 font-bold text-navy-900 transition-colors hover:bg-navy-50"
-              >
-                Contact Support
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('reference') || params.get('trxref') || '';
+    setReference(ref); setError('');
+    if (!ref || ref.length > 64) { setStatus('missing'); return; }
+    if (!api.getToken()) { setStatus('login'); return; }
+    setStatus('verifying');
+    api.verifyPayment(ref).then(result => {
+      if (cancelled) return;
+      setPayment(result);
+      setStatus(result.status === 'success' ? 'success' : result.status === 'pending' ? 'pending' : 'error');
+    }).catch(err => {
+      if (cancelled) return;
+      setStatus(err instanceof ApiError && err.status === 401 ? 'login' : 'error');
+      setError(err instanceof Error ? err.message : 'Verification is unavailable. Please try again.');
+    });
+    return () => { cancelled = true; };
+  }, [attempt]);
+  const title = status === 'success' ? 'Payment confirmed' : status === 'verifying' ? 'Verifying payment' : 'Check your payment';
+  return <StandalonePanel title={title} description="This page checks the payment reference with the academy's server.">
+    {reference && <p>Reference: <strong>{reference}</strong></p>}
+    <Feedback error={error} />
+    {status === 'verifying' && <p role="status">Checking your payment. Please wait...</p>}
+    {status === 'success' && <div className={styles.stack}><Feedback message="Your payment was verified. Open your courses to check your access." />
+      <ul className={styles.list}>{(payment?.items?.length ? payment.items : [{ course: payment?.course, course_title: payment?.course_title }]).map(item => <li key={item.course}>{item.course_title}</li>)}</ul>
+      <Link className={styles.action + ' ' + styles.primary} href="/dashboard/courses/">Open my courses</Link>
+    </div>}
+    {status === 'pending' && <p role="status">The payment is still processing. Do not pay again; check this reference again shortly.</p>}
+    {status === 'error' && <p>We have not confirmed this payment. If you were debited, do not pay again. Retry verification or share the reference with support.</p>}
+    {status === 'missing' && <p>This link has no valid payment reference. Open the original payment return link, or contact support if you were debited.</p>}
+    {status === 'login' && <div className={styles.stack}><p>Sign in with the account used for this purchase to verify it.</p><Link className={styles.action} href={'/login?next=' + encodeURIComponent('/payment/success/?reference=' + encodeURIComponent(reference))}>Sign in to verify</Link></div>}
+    <div className={styles.row}>{(status === 'pending' || status === 'error') && <Action onClick={() => setAttempt(value => value + 1)}>Retry verification</Action>}<Link className={styles.action} href="/dashboard/billing/">Payment history</Link><Link className={styles.action} href="/contact/">Contact support</Link></div>
+  </StandalonePanel>;
 }

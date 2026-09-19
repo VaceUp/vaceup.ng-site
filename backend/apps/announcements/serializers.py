@@ -1,7 +1,9 @@
 """Serializers for announcements."""
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.announcements.models import Announcement, AnnouncementComment, AnnouncementReadReceipt
+from apps.courses.models import Course
 from apps.courses.serializers import CourseBasicSerializer
 
 
@@ -28,11 +30,12 @@ class AnnouncementCommentSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("author", "created_at", "updated_at")
 
-    def get_author_avatar(self, obj):
+    @extend_schema_field({"type": "string", "nullable": True, "enum": [None]})
+    def get_author_avatar(self, obj) -> None:
         # Placeholder for avatar URL
         return None
 
-    def get_replies_count(self, obj):
+    def get_replies_count(self, obj) -> int:
         return obj.replies.count()
 
 
@@ -86,13 +89,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             "updated_at",
         )
 
-    def get_author_avatar(self, obj):
+    @extend_schema_field({"type": "string", "nullable": True, "enum": [None]})
+    def get_author_avatar(self, obj) -> None:
         return None
 
-    def get_comments_count(self, obj):
+    def get_comments_count(self, obj) -> int:
         return obj.comments.count()
 
-    def get_has_read(self, obj):
+    def get_has_read(self, obj) -> bool:
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return AnnouncementReadReceipt.objects.filter(
@@ -100,7 +104,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             ).exists()
         return False
 
-    def get_unread(self, obj):
+    def get_unread(self, obj) -> bool:
         return not self.get_has_read(obj)
 
 
@@ -108,7 +112,7 @@ class AnnouncementCreateSerializer(serializers.ModelSerializer):
     """Write serializer for creating/updating announcements."""
 
     target_courses = serializers.PrimaryKeyRelatedField(
-        queryset="courses.Course.objects.all()",
+        queryset=Course.objects.all(),
         many=True,
         required=False,
     )

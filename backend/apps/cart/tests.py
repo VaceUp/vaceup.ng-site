@@ -58,11 +58,12 @@ class CartTests(APITestCase):
         self.assertEqual(r.data["course"]["id"], self.course.id)
         self.assertEqual(r.data["effective_price"], "10000.00")
 
-    def test_student_cannot_add_course_twice(self):
+    def test_repeated_add_returns_same_cart_item(self):
         self.client.force_authenticate(self.student)
-        self.client.post("/api/v1/cart/", {"course": self.course.id}, format="json")
+        first = self.client.post("/api/v1/cart/", {"course": self.course.id}, format="json")
         r = self.client.post("/api/v1/cart/", {"course": self.course.id}, format="json")
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["id"], first.data["id"])
 
     def test_student_cannot_add_enrolled_course(self):
         self.client.force_authenticate(self.student)

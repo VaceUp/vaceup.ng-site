@@ -52,6 +52,7 @@ class Payment(TimeStampedModel):
     # Raw gateway verify payload, kept for audit/reconciliation.
     gateway_response = models.JSONField(null=True, blank=True)
     checkout_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
+    pricing_version = models.PositiveSmallIntegerField(default=1)
 
     class Meta:
         ordering = ("-created_at",)

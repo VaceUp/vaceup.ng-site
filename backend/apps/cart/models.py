@@ -68,7 +68,9 @@ class CartItem(TimeStampedModel):
 
     @property
     def effective_price(self):
-        return self.price_override if self.price_override is not None else self.course.price
+        # Legacy overrides were customer-writable. Retain them for audit only;
+        # never use them to calculate a new order or display a payable amount.
+        return self.course.price
 
     @property
     def subtotal(self):

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X } from 'lucide-react';
+import { BookOpen, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { NativeDialog } from '@/components/ui/Modal';
 import { WorkspaceButton, styles } from './WorkspaceUI';
@@ -21,6 +21,7 @@ export default function MemberShell({ children }: { children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
   const instructor = user?.role === 'instructor';
+  const administrator = user?.role === 'admin';
   useEffect(() => { try { setTheme(localStorage.getItem('vaceup:workspace-theme') === 'dark' ? 'dark' : 'light'); } catch {} }, []);
   useEffect(() => { dialog.current?.close(); setMenuOpen(false); }, [pathname]);
   useEffect(() => {
@@ -36,7 +37,11 @@ export default function MemberShell({ children }: { children: ReactNode }) {
     try { localStorage.setItem('vaceup:workspace-theme', next); } catch {}
     return next;
   });
-  const items = [
+  const items = (administrator ? [
+    { title: 'Admin panel', href: '/dashboard', icon: LayoutDashboard },
+    { title: 'Messages', href: '/messaging', icon: MessageSquare },
+    { title: 'Notifications', href: '/notification', icon: Bell },
+  ] : [
     { title: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { title: 'My courses', href: '/dashboard/courses', icon: BookOpen },
     { title: 'Live classes', href: '/dashboard/live-classes', icon: Video },
@@ -45,21 +50,22 @@ export default function MemberShell({ children }: { children: ReactNode }) {
       { title: 'Payment history', href: '/dashboard/billing', icon: CreditCard },
     ]),
     { title: 'Messages', href: '/messaging', icon: MessageSquare },
+    { title: 'Notifications', href: '/notification', icon: Bell },
     { title: 'Code editor', href: '/codeeditor', icon: Code },
     { title: 'Account & appearance', href: '/dashboard/account', icon: Settings },
-  ];
+  ]);
   const navigation = <aside className={styles.sidebar}>
     <Link href="/" className={styles.brand}><img src="/logo.webp" alt="" /><span>VaceUp</span></Link>
     <nav aria-label="Workspace navigation">{items.map(({ title, href, icon: Icon }) => <Link key={href} href={href} className={styles.navLink}
       aria-current={pathname === href || (href.endsWith('/courses') && pathname === '/dashboard/learn') ? 'page' : undefined}
       onClick={() => dialog.current?.close()}><Icon aria-hidden="true" /><span>{title}</span></Link>)}</nav>
-    <div className={styles.profile}><p>{user?.full_name}</p><p>{instructor ? 'Tutor workspace' : 'Student workspace'}</p></div>
+    <div className={styles.profile}><p>{user?.full_name}</p><p>{administrator ? 'Administrator' : instructor ? 'Tutor workspace' : 'Student workspace'}</p></div>
     <WorkspaceButton loading={signingOut} onClick={async () => { setSigningOut(true); try { await logout(); } catch {} finally { router.replace('/login'); setSigningOut(false); } }}>Sign out</WorkspaceButton>
   </aside>;
   return <ThemeContext.Provider value={{ theme, toggle }}><div className={styles.shell} data-workspace-theme={theme}>
     <a href="#workspace-content" className={`${styles.action} ${styles.skipLink}`}>Skip to content</a>
     <div className={styles.desktopSidebar}>{navigation}</div>
-    <div><div className={styles.mobileBar}><Link href="/dashboard">VaceUp / {instructor ? 'Tutor' : 'Student'}</Link>
+    <div><div className={styles.mobileBar}><Link href="/dashboard">VaceUp / {administrator ? 'Admin' : instructor ? 'Tutor' : 'Student'}</Link>
       <WorkspaceButton ref={menuButton} aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={() => { dialog.current?.showModal(); setMenuOpen(true); }}><Menu aria-hidden="true" />Menu</WorkspaceButton></div>
       <main id="workspace-content" tabIndex={-1} className={styles.content}>{children}
         <footer className={styles.footer}>Your workspace refreshes while this page is open. Use Refresh to check for updates now.</footer>

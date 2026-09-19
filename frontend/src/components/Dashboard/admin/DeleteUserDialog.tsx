@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { NativeDialog } from '@/components/ui/Modal';
 import { catalogInput } from '@/components/homepage/PublicCatalog';
@@ -37,7 +37,9 @@ export default function DeleteUserDialog({ target, onClose, onDeleted }: {
     setLoading(true); setError(''); setPreview(null);
     api.request<Preview>(`/admin/dashboard/users/${encodeURIComponent(String(target.id))}/deletion/`)
       .then((data) => { if (!cancelled) setPreview(data); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the deletion preview.'); })
+      .catch((err) => { if (!cancelled) setError(err instanceof ApiError && err.status === 404
+        ? 'The deletion preview is unavailable. This user may have been removed, or the backend deletion update is not installed. Close this dialog and refresh the user directory. If the user is still listed, deploy the matching backend package and restart the Python app. Nothing was deleted.'
+        : err instanceof Error ? err.message : 'Could not load the deletion preview.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [target.id, attempt]);

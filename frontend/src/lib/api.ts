@@ -109,14 +109,14 @@ class ApiClient {
     return this.request<PasswordResetResponse>('/auth/password-reset/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   }
 
   async confirmPasswordReset(data: PasswordResetConfirmRequest): Promise<PasswordResetConfirmResponse> {
     return this.request<PasswordResetConfirmResponse>('/auth/password-reset/confirm/', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, false);
   }
 
   async logout(): Promise<void> {
@@ -212,7 +212,7 @@ class ApiClient {
   }
 
   async enrollInCourse(courseId: string): Promise<Enrollment> {
-    return this.request<Enrollment>(`/courses/${courseId}/enroll/`, { method: 'POST' });
+    return this.request<Enrollment>('/enrollments/', { method: 'POST', body: JSON.stringify({ course: courseId }) });
   }
 
   async getMyEnrollments(): Promise<Enrollment[]> {
@@ -234,11 +234,19 @@ class ApiClient {
   }
 
   async verifyPayment(reference: string): Promise<PaymentVerificationResponse> {
-    return this.request<PaymentVerificationResponse>(`/payments/verify/${reference}/`);
+    return this.request<PaymentVerificationResponse>('/payments/verify/', {
+      method: 'POST', body: JSON.stringify({ reference }),
+    });
   }
 
-  async getPaymentHistory(): Promise<Payment[]> {
-    return this.request<Payment[]>('/payments/history/');
+  async checkoutCart(itemIds: Array<string | number>, expectedTotal: string): Promise<Payment | { detail: string }> {
+    return this.request('/payments/checkout/', {
+      method: 'POST', body: JSON.stringify({ cart_items: itemIds, expected_total: expectedTotal }),
+    });
+  }
+
+  async getPaymentHistory(): Promise<PaginatedResponse<Payment>> {
+    return this.request<PaginatedResponse<Payment>>('/payments/');
   }
 
   // ============================================
@@ -285,20 +293,29 @@ class ApiClient {
   // MESSAGING
   // ============================================
   // NOTE: Message model is direct user-to-user (sender/recipient).
-  async getConversations(): Promise<any[]> {
-    return this.request<any[]>('/messages/');
+  async getConversations(page = 1): Promise<PaginatedResponse<ConversationSummary>> {
+    return this.request(`/messages/?page=${page}`);
   }
 
-  async getThread(withUserId: string): Promise<any[]> {
-    const res = await this.request<any>(`/messages/thread/?with=${encodeURIComponent(withUserId)}`);
-    return res.results ?? res;
+  async getThread(withUserId: string, cursor?: { before_id?: number; after_id?: number }): Promise<MessagePage> {
+    const query = new URLSearchParams({ with: withUserId, page_size: '50' });
+    if (cursor) for (const [key, value] of Object.entries(cursor)) query.set(key, String(value));
+    return this.request(`/messages/thread/?${query}`);
   }
 
-  async sendUserMessage(recipientId: string, body: string): Promise<any> {
-    return this.request<any>('/messages/', {
+  async sendUserMessage(recipientId: string, body: string, clientMessageId: string): Promise<Message> {
+    return this.request<Message>('/messages/', {
       method: 'POST',
-      body: JSON.stringify({ recipient: recipientId, body }),
+      body: JSON.stringify({ recipient: recipientId, body, client_message_id: clientMessageId }),
     });
+  }
+
+  async getMessageContacts(page = 1, search = ''): Promise<PaginatedResponse<MessageContact>> {
+    return this.request(`/messages/contacts/?${new URLSearchParams({ page: String(page), search })}`);
+  }
+
+  async readThread(otherId: number, throughId: number): Promise<{ updated: number; unread: number }> {
+    return this.request('/messages/read/', { method: 'POST', body: JSON.stringify({ with: otherId, through_id: throughId }) });
   }
 
   async getUnreadCount(): Promise<number> {
@@ -331,25 +348,18 @@ class ApiClient {
   }
 
   async addToCart(data: AddToCartRequest): Promise<CartItem> {
-    return this.request<CartItem>('/cart/items/', {
+    return this.request<CartItem>('/cart/', {
       method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateCartItem(itemId: string, quantity: number): Promise<CartItem> {
-    return this.request<CartItem>(`/cart/items/${itemId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
+      body: JSON.stringify({ course: data.course_id }),
     });
   }
 
   async removeFromCart(itemId: string): Promise<void> {
-    return this.request<void>(`/cart/items/${itemId}/`, { method: 'DELETE' });
+    return this.request<void>(`/cart/${encodeURIComponent(itemId)}/`, { method: 'DELETE' });
   }
 
   async clearCart(): Promise<void> {
-    return this.request<void>('/cart/', { method: 'DELETE' });
+    return this.request<void>('/cart/clear/', { method: 'DELETE' });
   }
 
   // ============================================
@@ -609,19 +619,17 @@ export interface Certificate {
 }
 
 export interface InitializePaymentRequest {
-  course_id: string; email: string; amount: number; currency?: string; callback_url?: string;
+  course: string; expected_total: string;
 }
 
-export interface PaymentInitializationResponse {
-  authorization_url: string; access_code: string; reference: string;
+export type PaymentInitializationResponse = Payment;
+export type PaymentVerificationResponse = Payment;
+export interface Payment {
+  reference: string; course: number; course_title: string; amount: string; currency: string;
+  status: 'pending' | 'success' | 'failed' | 'abandoned'; authorization_url: string;
+  paid_at: string | null; created_at: string;
+  items: Array<{ course: number; course_title: string; amount: string }>;
 }
-
-export interface PaymentVerificationResponse {
-  status: string; reference: string; amount: number; currency: string;
-  paid_at: string; course: Course;
-}
-
-export interface Payment { id: string; course: Course; amount: number; currency: string; status: string; reference: string; paid_at: string; }
 
 export interface LiveClass {
   id: string; title: string; instructor: string; instructor_avatar: string;
@@ -639,18 +647,23 @@ export interface Conversation {
 }
 
 export interface Message {
-  id: string;
-  sender: string;
+  id: number;
+  sender: number;
   sender_name: string;
-  recipient: string;
+  recipient: number;
   body: string;
   is_read: boolean;
   read_at: string | null;
   created_at: string;
+  client_message_id: string | null;
 }
 
+export interface MessageContact { user_id: number; full_name: string; role: string; }
+export interface MessagePage extends PaginatedResponse<Message> {
+  has_more: boolean; next_before_id: number | null; next_after_id: number | null;
+}
 export interface ConversationSummary {
-  user_id: string;
+  user_id: number;
   full_name: string;
   role: string;
   unread: number;
@@ -663,11 +676,11 @@ export interface DashboardStats { courses_enrolled: number; hours_learned: numbe
 
 export interface DashboardCourse { id: string; title: string; thumbnail: string; progress: number; next_lesson: string; instructor: string; total_lessons: number; completed_lessons: number; }
 
-export interface Cart { id: string; items: CartItem[]; subtotal: number; discount: number; total: number; item_count: number; }
+export interface Cart { id: number; items: CartItem[]; subtotal: string; total: string; item_count: number; }
 
-export interface CartItem { id: string; course: Course; quantity: number; price: number; }
+export interface CartItem { id: number; course: { id: number; title: string; slug: string; price: string }; effective_price: string; subtotal: string; }
 
-export interface AddToCartRequest { course_id: string; quantity?: number; }
+export interface AddToCartRequest { course_id: string; }
 
 export interface Application { id: string; course_title: string; course_thumbnail: string; student_name: string; student_avatar: string; submitted_at: string; status: 'submitted' | 'under_review' | 'approved' | 'rejected'; motivation: string; reviewed_at?: string; reviewed_by?: string; }
 
@@ -741,7 +754,7 @@ export interface AssignmentListParams { page?: number; page_size?: number; cours
 
 export interface SubmitAssignmentRequest { content?: string; file_url?: string; }
 
-export interface Notification { id: string; title: string; message: string; type: string; is_read: boolean; created_at: string; related_object_id?: string; related_object_type?: string; }
+export interface Notification { id: number; title: string; body: string; type: string; is_read: boolean; read_at: string | null; created_at: string; object_id: number | null; }
 
 export interface NotificationListParams { page?: number; page_size?: number; is_read?: boolean; }
 

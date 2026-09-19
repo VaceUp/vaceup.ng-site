@@ -1,6 +1,7 @@
 """Announcement endpoints: CRUD, publishing, comments, read tracking."""
 from django.db import models
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
@@ -8,6 +9,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
 from apps.announcements import services
+from apps.announcements.access import visible_announcements
+from apps.announcements.schema import announcement_schema
 from apps.announcements.models import Announcement, AnnouncementComment, AnnouncementReadReceipt
 from apps.announcements.serializers import (
     AnnouncementSerializer,
@@ -25,6 +28,7 @@ class IsAuthorOrAdmin(BasePermission):
         return user.is_admin or obj.author_id == user.id
 
 
+@announcement_schema
 class AnnouncementViewSet(viewsets.ModelViewSet):
     """Announcement CRUD and publishing."""
 
@@ -42,35 +46,9 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        user = self.request.user
-        now = timezone.now()
-
-        if user.is_admin:
-            return Announcement.objects.select_related("author").prefetch_related("target_courses").all()
-
-        # Build queryset based on user role and announcement targeting
-        qs = Announcement.objects.select_related("author").prefetch_related("target_courses")
-
-        if user.is_instructor:
-            # Instructors see: their own announcements + announcements targeting their courses + global announcements
-            return qs.filter(
-                models.Q(author=user) |
-                models.Q(target__in=[Announcement.Target.ALL, Announcement.Target.INSTRUCTORS, Announcement.Target.ADMINS]) |
-                models.Q(target_courses__instructor=user)
-            ).distinct()
-        else:
-            # Students see: announcements targeting them + announcements targeting their enrolled courses
-            from apps.enrollment.models import Enrollment
-            enrolled_courses = Enrollment.objects.filter(
-                student=self.request.user,
-                status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED)
-            ).values_list("course_id", flat=True)
-
-            return qs.filter(
-                models.Q(target__in=[Announcement.Target.ALL, Announcement.Target.STUDENTS, Announcement.Target.ENROLLED_USERS]) |
-                models.Q(target=Announcement.Target.COURSE_STUDENTS, target_courses__in=enrolled_courses) |
-                models.Q(target=Announcement.Target.ENROLLED_USERS, target_courses__in=enrolled_courses)
-            ).distinct()
+        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+            return Announcement.objects.none()
+        return visible_announcements(self.request.user)
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy", "publish", "unpublish", "send_email", "send_push"):
@@ -115,10 +93,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
         # Add unread count
         if self.request.user.is_authenticated:
-            unread_count = Announcement.objects.filter(
-                models.Q(target__in=[Announcement.Target.ALL, Announcement.Target.STUDENTS, Announcement.Target.ENROLLED_USERS]) |
-                models.Q(target=Announcement.Target.COURSE_STUDENTS, target_courses__enrollment__student=request.user)
-            ).filter(
+            unread_count = self.get_queryset().filter(
                 status=Announcement.Status.PUBLISHED,
                 publish_at__lte=timezone.now(),
             ).filter(
@@ -217,7 +192,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         serializer = AnnouncementCommentSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
-    @action(detail=True, methods=["post"], url_path="comments")
+    @comments.mapping.post
     def add_comment(self, request, pk=None):
         """POST /announcements/{id}/comments/ - add comment."""
         announcement = self.get_object()
@@ -226,6 +201,9 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
         serializer = AnnouncementCommentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        parent_id = serializer.validated_data.get("parent_id")
+        if parent_id:
+            get_object_or_404(AnnouncementComment, pk=parent_id, announcement=announcement)
 
         comment = AnnouncementComment.objects.create(
             announcement=announcement,
@@ -260,11 +238,15 @@ class AnnouncementCommentViewSet(viewsets.ModelViewSet):
     """Manage comments on announcements."""
 
     serializer_class = AnnouncementCommentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorOrAdmin]
+    http_method_names = ["get", "delete", "head", "options"]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+            return AnnouncementComment.objects.none()
         announcement_id = self.kwargs.get("announcement_pk") or self.request.query_params.get("announcement")
         return AnnouncementComment.objects.filter(
+            announcement__in=visible_announcements(self.request.user),
             announcement_id=announcement_id,
             parent__isnull=True,
         ).select_related("author").order_by("created_at")
@@ -285,7 +267,9 @@ class AnnouncementReadReceiptViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
+            return AnnouncementReadReceipt.objects.none()
         user = self.request.user
         if user.is_admin:
             return AnnouncementReadReceipt.objects.select_related("announcement", "user").all()
-        return AnnouncementReadReceipt.objects.filter(user=user).select_related("announcement")
+        return AnnouncementReadReceipt.objects.filter(user=user, announcement__in=visible_announcements(user)).select_related("announcement")

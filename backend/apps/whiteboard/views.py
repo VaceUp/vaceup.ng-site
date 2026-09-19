@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.whiteboard import services
+from apps.core.collaboration import CollaborationUnavailable
 from apps.whiteboard.models import WhiteboardSession, WhiteboardStroke, WhiteboardSnapshot
 from apps.whiteboard.serializers import (
     WhiteboardSessionSerializer,
@@ -22,7 +23,7 @@ User = get_user_model()
 class WhiteboardSessionViewSet(viewsets.GenericViewSet):
     """Whiteboard session management."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CollaborationUnavailable]
     serializer_class = WhiteboardSessionSerializer
 
     def get_queryset(self):

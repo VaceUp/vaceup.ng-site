@@ -35,7 +35,7 @@ export function Tooltip({
   hideWhenDetached = true,
 }: TooltipProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const triggerRef = React.useRef<HTMLElement>(null);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 

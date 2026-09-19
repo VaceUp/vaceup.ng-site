@@ -2,6 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.adminpanel.user_deletion import UserDeletionPreviewView, UserDeleteView
+from apps.adminpanel.enrollment_grants import EnrollmentGrantView
 
 from apps.adminpanel.views import (
     AdminActionLogViewSet,
@@ -30,6 +31,7 @@ urlpatterns = [
     path("admin/dashboard/certificates/issue/", AdminDashboardViewSet.as_view({"post": "certificates_issue"}), name="admin-certificates-issue"),
     path("admin/dashboard/payments/", AdminDashboardViewSet.as_view({"get": "payments_list"}), name="admin-payments-list"),
     path("admin/dashboard/enrollments/", AdminDashboardViewSet.as_view({"get": "enrollments_list"}), name="admin-enrollments-list"),
+    path("admin/dashboard/enrollments/grant/", EnrollmentGrantView.as_view(), name="admin-enrollment-grant"),
     path("admin/dashboard/submissions/", AdminDashboardViewSet.as_view({"get": "submissions_list"}), name="admin-submissions-list"),
     path("admin/dashboard/courses/", AdminDashboardViewSet.as_view({"get": "courses_list"}), name="admin-courses-list"),
     path("admin/dashboard/courses/create/", AdminDashboardViewSet.as_view({"post": "course_create"}), name="admin-course-create"),

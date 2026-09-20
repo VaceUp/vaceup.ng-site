@@ -1,6 +1,6 @@
 # Production stabilization worklog
 
-Branch: `codex/production-stabilization`. This is ongoing work, not a production sign-off.
+Branch: `codex/production-stabilization`. This release batch is packaged and pushed, not yet installed on production and not a whole-project production sign-off.
 
 ## Current scope and user decisions
 
@@ -31,15 +31,15 @@ Branch: `codex/production-stabilization`. This is ongoing work, not a production
 - TypeScript check passed after checkout changes.
 - Full isolated backend suite before manual-grant addition: 265 tests run, 262 passed, 3 MySQL-only checks skipped.
 - Latest production static export and lint completed successfully. Existing lint warnings remain.
-- Repository-wide design-kit accuracy report: 1/37 checks passed. It targets missing examples and invokes an unavailable python3 command on this Windows machine; this is not a passing product design audit. Product-specific browser checks are still in progress.
+- Repository-wide design-kit accuracy report: 1/37 checks passed. It targets missing examples and invokes an unavailable python3 command on this Windows machine; this is not a passing repository-wide design audit. Completed product-specific checks are recorded below.
 - Live read-only checks: user-directory endpoint returns 401 anonymously, deletion-preview endpoint returns 404. The live server is not exposing the newer route. Server extraction path/restart must be checked after installing the package.
 - No live account was deleted, no live payment was initiated, and no live email was sent by this work.
 
 ## Required next steps
 
-1. Finish scoped browser state checks, package the tested candidate and commit/push the release branch. No production merge until the matching backend is installed.
-2. Run the repaired MySQL CI suite. Local SQLite results do not prove production-database concurrency.
-3. Install on cPanel, run migrations, restart web app, confirm persistent local-relay environment and cron, verify a new reset email/link and deletion preview, then run provider sandbox and workload tests. Local tests do not prove live delivery or capacity.
+1. User installs the supplied backend ZIP on cPanel, runs migrations and restarts the correct Python app. Follow STABILIZATION-DEPLOYMENT.md. Do not replace `.env` or delete the database.
+2. Promote the matching frontend branch only after backend installation. No production merge has been performed by this task.
+3. Confirm persistent local-relay environment and cron, verify a fresh reset email/link and deletion preview, then run provider sandbox and workload tests. Automated tests do not prove live delivery or capacity.
 4. Subsequent scope: announcement delivery, remaining learner/tutor authoring and assessments, secure collaborative classrooms, upload validation and the priorities in PROJECT-EXECUTION-PLAN-2026-09-19.md. These are not declared complete in this release.
 
 ## Latest checkpoint: 20 September 2026
@@ -53,7 +53,9 @@ Branch: `codex/production-stabilization`. This is ongoing work, not a production
 - Deployment steps: STABILIZATION-DEPLOYMENT.md. Do not upload frontend files to cPanel or replace `.env` with this ZIP.
 - Browser rendering: six captured states (including dark messaging) passed scoped axe checks and overflow checks at 280/320/414px. State-contrast gates passed on 18 reset, 21 checkout, 32 light-message, 32 dark-message, 14 notification and 66 admin enrollment element-states. Screenshots inspected; synthetic previews are not live accounts.
 - ZIP created and integrity-checked: `artifacts/stabilization/vaceup-backend-stabilization-2026-09-20.zip`, 254 entries. SHA-256: `2e4363857bb569764eefaebc46d30c26f5444452e8fff8c945feb2481c60a0e1`. Full source overlay excludes `.env`, database, media and virtualenv.
-- Packaging, browser checks and deployment instructions are complete. Commit/push and MySQL CI status are the remaining handoff checks; no merge into production has been performed.
+- Code commit `8d0f4ab5e7dbf14b4b13558ba8b72e1e6e2c6d0e` was pushed to GitHub. Both SQLite and MySQL jobs passed: https://github.com/VaceUp/vaceup.ng-site/actions/runs/35475288757 . No production merge or cPanel installation was performed.
+- Packaging, scoped browser checks and deployment instructions are complete. Preview: `artifacts/stabilization/preview/manual-enrollment.png`; screenshots use synthetic data. The existing branding and shared form components were retained.
+- Unrelated untracked skills, AGENTS.md and local artifacts were deliberately left out of the commit. Resume from the deployment steps above, not by repeating the implementation.
 
 ## Payment compatibility notice
 

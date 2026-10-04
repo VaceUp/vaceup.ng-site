@@ -11,6 +11,7 @@ This is a continuation of the existing LMS, not a rebuild or a promise of zero e
 - Malformed administrator IDs rejected before database lookup; targeted regression tests for incorrect/missing inputs and missing records.
 - Fix grading to use the actual assignment ID rather than a title that can be duplicated. Protect admin self-deactivation and audit logging from untrusted IP header data.
 - Repair staff invitations, tutor profile creation, password setup requests, account activation/deactivation/promotion and password changes. Revoke old refresh tokens on disable/password changes; reject malformed IDs and invalid bulk prices; roll back mutations if their audit write fails. Completed announcement deliveries are not replayed for later enrollments.
+- Repair the rate-limit initialization deadlock reproduced by MySQL concurrency tests, without bypassing abuse protection on failure. Upgrade the frontend runtime to patched Next.js 15.5.24 and apply audited dependency overrides. Full frontend audit currently reports zero known vulnerabilities; resolved Python requirements also passed their audit. Installed cPanel package versions still need separate verification.
 
 ## Priority 0: complete this deployment before expanding usage
 
@@ -30,7 +31,7 @@ This is a continuation of the existing LMS, not a rebuild or a promise of zero e
 
 ## Priority 2: security, operations and capacity evidence
 
-11. Complete administrator MFA/recovery, browser token/XSS/CSP review, proxy trust configuration, dependency audit and security alerting. Existing role checks, database rate limiting and deletion reauthentication are useful controls, not a guarantee against attackers.
+11. Complete administrator MFA/recovery, browser token/XSS/CSP review, proxy trust configuration, ongoing dependency auditing and security alerting. Verify the actual packages installed in cPanel, not just fresh requirements resolution. Existing role checks, database rate limiting and deletion reauthentication are useful controls, not a guarantee against attackers.
 12. Add queue-age/cron and dependency-aware monitoring. Verify production email limits and storage/payment failure recovery.
 13. Repair and run a realistic load model on staging. Define whether 1,000 users/minute means arrivals, active sessions or API requests. Record latency, error rate, database connections/locks and queue age. TrueHost shared-hosting capacity is not proven.
 14. Only then choose and measure any process, cache, hosting or load-balancing changes. Redis is not required for the database-queue path; disabling Redis is not a capacity test.

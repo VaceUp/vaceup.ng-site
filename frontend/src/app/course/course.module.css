@@ -1,0 +1,6 @@
+.page { color: var(--workspace-text); background: var(--workspace-page); overflow-wrap: anywhere; }
+.page :is(p, ul) { color: var(--workspace-muted); }
+.page img { background: var(--workspace-subtle); }
+.page a { color: var(--workspace-text); background: var(--workspace-surface); border-color: var(--workspace-control); }
+.page a:hover, .page a:active { color: var(--workspace-text); background: var(--workspace-subtle); }
+.page :is(a, summary):focus-visible { outline: calc(var(--spacing) / 2) solid var(--workspace-focus); outline-offset: var(--spacing); }

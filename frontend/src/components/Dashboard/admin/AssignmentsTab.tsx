@@ -24,6 +24,7 @@ interface SubmissionT {
   id: string;
   student_name: string;
   assignment_title: string;
+  assignment_id?: string;
   status: string;
   score: string | null;
   feedback?: string;
@@ -123,9 +124,8 @@ export function AssignmentsTab() {
   const gradeSubmission = async (sub: SubmissionT) => {
     setMsg(null);
     try {
-      const assignment = assignments.find((a) => a.title === sub.assignment_title);
-      if (!assignment) throw new Error('Matching assignment not found in this view.');
-      await api.request(`/assignments/${assignment.id}/grade/`, {
+      if (!sub.assignment_id || !/^\d+$/.test(String(sub.assignment_id))) throw new Error('This submission is missing its assignment ID. Install the matching backend patch and refresh before grading.');
+      await api.request(`/assignments/${sub.assignment_id}/grade/`, {
         method: 'POST',
         body: JSON.stringify({
           submission_id: sub.id,

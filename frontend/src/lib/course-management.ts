@@ -5,6 +5,8 @@ export interface ManagedCourse {
   id: number; slug: string; title: string; category: number; instructor: number;
   description: string; duration: string; image_url: string; thumbnail: string | null;
   level: CourseLevel; price: string; is_published: boolean;
+  tagline?: string; learning_outcomes?: string; requirements?: string;
+  benefits?: string; target_audience?: string; outline?: string;
 }
 export interface ManagedCategory { id: number; name: string; slug: string; }
 export interface ManagedTutor { id: number; full_name: string; email: string; is_active: boolean; }

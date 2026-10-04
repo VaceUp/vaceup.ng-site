@@ -5,6 +5,8 @@ export interface CatalogCourse {
   id: number; slug: string; title: string; description: string; category: string;
   category_name?: string; instructor_name: string; level: string; price: string;
   thumbnail?: string | null; image_url?: string; duration?: string; is_published: boolean;
+  tagline?: string; target_audience?: string; learning_outcomes?: string;
+  requirements?: string; benefits?: string; outline?: string;
   modules?: { id: number; title: string; lessons: { id: number; title: string }[] }[];
 }
 export const formatPrice = (price: string | number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 2 }).format(Number(price));

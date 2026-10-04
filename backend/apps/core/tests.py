@@ -84,13 +84,15 @@ class DatabaseConcurrencyTests(TransactionTestCase):
             return list(executor.map(run, range(count)))
 
     def test_shared_rate_limit_is_atomic(self):
-        def attempt():
-            request = APIRequestFactory().get("/", REMOTE_ADDR="203.0.113.7")
-            request.user = AnonymousUser()
-            throttle = DatabaseAnonRateThrottle()
-            throttle.num_requests = 3
-            return throttle.allow_request(request, None)
-        self.assertEqual(sum(self.concurrent(attempt)), 3)
+        # Exercise competing initialization, not only an already-existing row.
+        for batch in range(10):
+            def attempt():
+                request = APIRequestFactory().get("/", REMOTE_ADDR=f"203.0.113.{7 + batch}")
+                request.user = AnonymousUser()
+                throttle = DatabaseAnonRateThrottle()
+                throttle.num_requests = 3
+                return throttle.allow_request(request, None)
+            self.assertEqual(sum(self.concurrent(attempt)), 3)
 
     def test_overlapping_mail_workers_claim_once(self):
         from django.test import override_settings

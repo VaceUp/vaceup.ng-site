@@ -8,8 +8,9 @@ export function generateStaticParams() {
   return BLOG_POSTS.map((post) => ({ id: post.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  const post = getPost(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = getPost(id);
   if (!post) return { title: 'Article not found | VaceUp' };
   return {
     title: `${post.title} | VaceUp Blog`,
@@ -17,8 +18,9 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   };
 }
 
-export default function BlogArticlePage({ params }: { params: { id: string } }) {
-  const post = getPost(params.id);
+export default async function BlogArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = getPost(id);
   if (!post) notFound();
 
   const related = BLOG_POSTS.filter((p) => p.slug !== post.slug).slice(0, 3);

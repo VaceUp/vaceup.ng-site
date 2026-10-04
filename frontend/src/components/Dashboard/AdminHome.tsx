@@ -177,7 +177,7 @@ export function AdminHome() {
       await post('/admin/dashboard/staff/invite/', invite);
       setStaffMsg({
         ok: true,
-        text: `${invite.full_name} (${invite.role}) created — share the password with them to start.`,
+        text: 'Account created. A password setup email has been requested. If it does not arrive, ask them to use Forgot password.',
       });
       setInvite({ email: '', full_name: '', role: 'instructor' });
       loadUsers();
@@ -192,7 +192,9 @@ export function AdminHome() {
     setAppMsg(null);
     try {
       await post(`/applications/${id}/review/`, { action });
-      setAppMsg({ id, ok: true, text: `Application ${action}d — the student is enrolled.` });
+      setAppMsg({ id, ok: true, text: action === 'approve'
+        ? 'Application approved. Paid courses still require payment or an explicit off-platform access grant.'
+        : 'Application rejected. Course access has not been granted.' });
       loadApplications();
       loadAll();
     } catch (err: any) {

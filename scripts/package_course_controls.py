@@ -9,6 +9,7 @@ from package_admin_deployment_repair import BACKEND_FILES
 ROOT = Path(__file__).resolve().parents[1]
 EXTRA = (
     'apps/core/schema.py',
+    'apps/core/throttling.py',
     'apps/adminpanel/services.py',
     'apps/adminpanel/user_deletion.py', 'apps/courses/models.py',
     'apps/courses/catalog.py', 'apps/courses/original_catalog.json',
@@ -39,7 +40,7 @@ def main():
         'scope': 'Changed backend files and known missing baseline dependencies only',
         'sha256': {name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
     }, indent=2).encode()
-    target = ROOT / 'artifacts/stabilization/vaceup-course-controls-patch-2026-10-04.zip'
+    target = ROOT / 'artifacts/stabilization/vaceup-course-controls-patch-2026-10-04-v2.zip'
     with ZipFile(target, 'x', compression=ZIP_DEFLATED) as bundle:
         for name, data in files.items():
             bundle.writestr(name, data)

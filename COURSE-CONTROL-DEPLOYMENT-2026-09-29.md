@@ -2,7 +2,7 @@
 
 This is a changed-files overlay, not a replacement backend. It includes the known missing baseline migration/helper files as dependencies. It does not contain .env, passwords, databases, media, frontend code or a virtual environment. Keep your existing database and .env.
 
-Final release date: 4 October 2026. Archive: `vaceup-course-controls-patch-2026-10-04.zip`.
+Final release date: 4 October 2026. Archive: `vaceup-course-controls-patch-2026-10-04-v2.zip`. The initial local archive is superseded; use v2, which includes the MySQL rate-limit concurrency repair.
 
 ## Configuration changes
 
@@ -70,6 +70,8 @@ Running the worker can send pending real messages. Run it only when ready for de
 Enable, disable, promote and password-change actions now save the fields the User model actually has. Disabling an account and changing its password blacklist its old refresh tokens; re-enabling cannot revive those refresh tokens. Existing access tokens remain subject to the configured expiry and active-account checks. Password changes also invalidate outstanding reset links. These changes and their audit log entry commit together or roll back together. You cannot disable your own signed-in account.
 
 Staff invitations create the correct tutor profile and request a password-setup email through the existing mail-delivery flow. No password is invented or exposed to the administrator. Bulk price updates use real numeric course IDs, reject out-of-range prices and roll back as a unit. Assignment grading uses the submission's assignment ID, so duplicate assignment titles no longer select the wrong course assignment.
+
+The shared database rate limiter establishes a new counter before locking it, avoiding the missing-row insert deadlock reproduced in MySQL tests. Transient lock errors have bounded retries; database failures never bypass abuse limits. A prolonged database failure returns a safe, explicit 503 rather than exposing internals or disabling security checks.
 
 ## Remaining production gates
 

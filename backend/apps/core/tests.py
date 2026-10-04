@@ -6,13 +6,13 @@ from asgiref.sync import async_to_sync
 from asgiref.testing import ApplicationCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.db import close_old_connections
+from django.db import OperationalError, close_old_connections, transaction
 from django.test import SimpleTestCase, TransactionTestCase, skipUnlessDBFeature
 from rest_framework.test import APIRequestFactory
 
 from apps.accounts import services
 from apps.accounts.outbox import claim_job
-from apps.core.throttling import DatabaseAnonRateThrottle
+from apps.core.throttling import DatabaseAnonRateThrottle, RateLimitUnavailable
 
 
 class WebsocketDeploymentTests(SimpleTestCase):
@@ -26,6 +26,45 @@ class WebsocketDeploymentTests(SimpleTestCase):
             self.assertEqual(event, {"type": "websocket.close", "code": 4403})
             await communicator.wait(timeout=1)
         async_to_sync(exercise)()
+
+
+class RateLimitFailureTests(TransactionTestCase):
+    def attempt(self):
+        request = APIRequestFactory().get('/', REMOTE_ADDR='203.0.113.7')
+        request.user = AnonymousUser()
+        return DatabaseAnonRateThrottle().allow_request(request, None)
+
+    def test_transient_deadlock_retries_without_counting_twice(self):
+        from apps.core.models import RateLimitBucket
+        original = RateLimitBucket.objects.get_or_create
+        calls = []
+        def flaky(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise OperationalError(1213, 'synthetic deadlock')
+            return original(*args, **kwargs)
+        with patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=flaky):
+            self.assertTrue(self.attempt())
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(RateLimitBucket.objects.get().count, 1)
+
+    def test_failures_are_closed_and_retries_are_bounded(self):
+        from apps.core.models import RateLimitBucket
+        for code, calls in ((1213, 3), (2003, 1), (1146, 1)):
+            with patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=OperationalError(code, 'synthetic private database detail')) as operation:
+                with self.assertRaises(RateLimitUnavailable) as caught:
+                    self.attempt()
+                self.assertEqual(operation.call_count, calls)
+                self.assertEqual(caught.exception.status_code, 503)
+                self.assertNotIn('private', str(caught.exception))
+        self.assertFalse(RateLimitBucket.objects.exists())
+
+    def test_does_not_retry_a_caller_owned_transaction(self):
+        from apps.core.models import RateLimitBucket
+        with transaction.atomic(), patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=OperationalError(1213, 'deadlock')) as operation:
+            with self.assertRaises(RateLimitUnavailable):
+                self.attempt()
+            self.assertEqual(operation.call_count, 1)
 
 
 @skipUnlessDBFeature("has_select_for_update")

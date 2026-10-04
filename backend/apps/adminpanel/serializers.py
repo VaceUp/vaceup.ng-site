@@ -120,8 +120,8 @@ class AdminActionLogCreateSerializer(serializers.Serializer):
     """Serializer for logging admin actions."""
 
     action_type = serializers.ChoiceField(choices=AdminActionLog.ActionType.choices)
-    target_user_id = serializers.UUIDField(required=False, allow_null=True)
-    target_course_id = serializers.UUIDField(required=False, allow_null=True)
+    target_user_id = serializers.IntegerField(min_value=1, max_value=9223372036854775807, required=False, allow_null=True)
+    target_course_id = serializers.IntegerField(min_value=1, max_value=9223372036854775807, required=False, allow_null=True)
     description = serializers.CharField()
     metadata = serializers.JSONField(required=False, default=dict)
     ip_address = serializers.IPAddressField(required=False, allow_null=True)
@@ -132,7 +132,7 @@ class BulkPriceUpdateSerializer(serializers.Serializer):
     """Serializer for bulk course price updates."""
 
     course_ids = serializers.ListField(
-        child=serializers.UUIDField(),
+        child=serializers.IntegerField(min_value=1, max_value=9223372036854775807),
         min_length=1,
         max_length=100,
     )
@@ -146,6 +146,16 @@ class BulkPriceUpdateSerializer(serializers.Serializer):
     )
 
 
+class TutorInviteProfileSerializer(serializers.Serializer):
+    expertise = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    years_experience = serializers.IntegerField(min_value=0, max_value=100, required=False)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and set(data) - set(self.fields):
+            raise serializers.ValidationError("Supported tutor details are expertise and years_experience.")
+        return super().to_internal_value(data)
+
+
 class StaffInviteSerializer(serializers.Serializer):
     """Serializer for inviting staff/tutors."""
 
@@ -155,10 +165,10 @@ class StaffInviteSerializer(serializers.Serializer):
         ("instructor", "Instructor"),
         ("admin", "Admin"),
     ])
-    tutor_profile = serializers.JSONField(
-        required=False,
-        help_text="Required if role is instructor: bio, expertise, experience_years, etc."
-    )
+    tutor_profile = TutorInviteProfileSerializer(required=False)
+
+    def validate_email(self, value):
+        return User.objects.normalize_email(value).lower()
 
 class AdminUserListSerializer(serializers.ModelSerializer):
     """Read shape for the admin user directory."""
@@ -175,7 +185,8 @@ class AdminCourseListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
         fields = ("id", "title", "slug", "price", "level", "category", "instructor",
-                  "is_published", "description", "thumbnail", "duration", "image_url")
+                  "is_published", "description", "thumbnail", "duration", "image_url",
+                  "tagline", "learning_outcomes", "requirements", "benefits", "target_audience", "outline")
         read_only_fields = fields
 
 

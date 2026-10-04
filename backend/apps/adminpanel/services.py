@@ -1,5 +1,6 @@
 """Admin panel services: logging, stats, etc."""
 from __future__ import annotations
+from ipaddress import ip_address
 
 from django.conf import settings
 from django.db import transaction
@@ -32,8 +33,8 @@ def log_admin_action(*, admin, action_type, description, target_user=None,
 
 
 def get_client_ip(request):
-    """Extract client IP from request."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    """Audit the validated peer address; do not trust client-supplied headers."""
+    try:
+        return str(ip_address(request.META.get("REMOTE_ADDR", "")))
+    except ValueError:
+        return None

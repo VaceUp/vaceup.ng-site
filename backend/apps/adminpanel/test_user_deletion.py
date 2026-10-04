@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
+from django.db import OperationalError
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -131,3 +132,29 @@ class UserDeletionTests(APITestCase):
             with self.assertRaises(RuntimeError):
                 self.client.post(DELETE, data, format="json")
         self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
+
+    def test_missing_schema_fails_closed_with_actionable_message(self):
+        with patch('apps.adminpanel.user_deletion.Collector.collect', side_effect=OperationalError(1146, 'missing table')):
+            response = self.preview()
+        self.assertEqual(response.status_code, 503)
+        self.assertIn('migrations', str(response.data))
+        self.assertNotIn('confirmation_token', response.data)
+        self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
+
+    def test_database_failure_rolls_back_audit_and_deletion(self):
+        payload = self.payload()
+        with patch.object(User, 'delete', side_effect=OperationalError(1054, 'missing column')):
+            response = self.client.post(DELETE, payload, format='json')
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(AdminActionLog.objects.filter(action_type='user_delete').exists())
+        self.assertTrue(User.objects.filter(pk=self.student.pk).exists())
+
+    def test_protected_accounts_do_not_traverse_unrelated_tables(self):
+        tutor = User.objects.create_user('owner@example.com', 'password', role='instructor', is_active=True)
+        Course.objects.create(title='Owned course', instructor=tutor, category=Category.objects.create(name='Owned'))
+        with patch('apps.adminpanel.user_deletion.Collector.collect', side_effect=AssertionError('Should not traverse')):
+            for user in (self.admin, tutor):
+                result = self.preview(user)
+                self.assertEqual(result.status_code, 200)
+                self.assertFalse(result.data['can_delete'])
+                self.assertIsNone(result.data['confirmation_token'])

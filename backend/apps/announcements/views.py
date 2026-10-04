@@ -1,8 +1,8 @@
 """Announcement endpoints: CRUD, publishing, comments, read tracking."""
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, serializers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework.response import Response
@@ -75,6 +75,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         # Filter by course
         course_id = self.request.query_params.get("course")
         if course_id:
+            course_id = serializers.IntegerField(min_value=1).run_validation(course_id)
             queryset = queryset.filter(target_courses__id=course_id)
 
         # Filter published only
@@ -107,22 +108,20 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return response
 
     @action(detail=True, methods=["post"], url_path="publish")
+    @transaction.atomic
     def publish(self, request, pk=None):
         """POST /announcements/{id}/publish/ - publish announcement."""
         announcement = self.get_object()
+        announcement = Announcement.objects.select_for_update().get(pk=announcement.pk)
         if announcement.status == Announcement.Status.PUBLISHED:
-            return Response({"detail": "Already published."}, status=400)
+            return Response({"detail": "Already published. Email delivery will not be duplicated."})
 
         announcement.status = Announcement.Status.PUBLISHED
         if not announcement.publish_at:
             announcement.publish_at = timezone.now()
         announcement.save(update_fields=["status", "publish_at", "updated_at"])
 
-        # Trigger async email/push
-        from apps.announcements.tasks import send_announcement_notifications
-        send_announcement_notifications.delay(announcement.id)
-
-        return Response({"detail": "Announcement published."})
+        return Response({"detail": "Announcement published. Enabled email notifications will be picked up by process_mail_queue when due. Browser push delivery is not configured."})
 
     @action(detail=True, methods=["post"], url_path="unpublish")
     def unpublish(self, request, pk=None):
@@ -139,9 +138,9 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         if not announcement.send_email:
             return Response({"detail": "Email notifications disabled for this announcement."}, status=400)
 
-        from apps.announcements.tasks import send_announcement_email
-        send_announcement_email.delay(announcement.id)
-        return Response({"detail": "Email notification queued."})
+        if not announcement.is_published:
+            raise ValidationError({"detail": "Publish this announcement and wait until its publication time before sending."})
+        return Response({"detail": "Email delivery is enabled. The database mail worker will queue eligible recipients; previously queued recipients are not sent duplicates."})
 
     @action(detail=True, methods=["post"], url_path="send-push")
     def send_push(self, request, pk=None):
@@ -150,9 +149,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         if not announcement.send_push:
             return Response({"detail": "Push notifications disabled for this announcement."}, status=400)
 
-        from apps.announcements.tasks import send_announcement_push
-        send_announcement_push.delay(announcement.id)
-        return Response({"detail": "Push notification queued."})
+        return Response({"detail": "Browser push delivery is not configured. Use the published announcement and email delivery instead; no push notification was sent."}, status=409)
 
     @action(detail=True, methods=["post"], url_path="read")
     def mark_read(self, request, pk=None):
@@ -245,6 +242,8 @@ class AnnouncementCommentViewSet(viewsets.ModelViewSet):
         if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
             return AnnouncementComment.objects.none()
         announcement_id = self.kwargs.get("announcement_pk") or self.request.query_params.get("announcement")
+        if announcement_id is not None:
+            announcement_id = serializers.IntegerField(min_value=1).run_validation(announcement_id)
         return AnnouncementComment.objects.filter(
             announcement__in=visible_announcements(self.request.user),
             announcement_id=announcement_id,

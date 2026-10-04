@@ -50,6 +50,12 @@ class Course(TimeStampedModel):
         limit_choices_to={"role": "instructor"},
     )
     description = models.TextField(blank=True)
+    tagline = models.CharField(max_length=300, blank=True)
+    learning_outcomes = models.TextField(blank=True)
+    requirements = models.TextField(blank=True)
+    benefits = models.TextField(blank=True)
+    target_audience = models.CharField(max_length=200, blank=True)
+    outline = models.TextField(blank=True, help_text="Public syllabus, separate from enrolled lesson content.")
     duration = models.CharField(max_length=80, blank=True)
     image_url = models.URLField(blank=True)
     level = models.CharField(

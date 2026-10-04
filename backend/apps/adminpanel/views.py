@@ -3,9 +3,9 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db import transaction, models
+from django.db import IntegrityError, transaction, models
 from django.utils import timezone
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, serializers as drf_serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import BasePermission, IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -35,6 +35,13 @@ from apps.payments.serializers import PaymentSerializer
 from apps.payments.models import Payment
 
 User = get_user_model()
+
+
+def positive_id(data, field):
+    try:
+        return drf_serializers.IntegerField(min_value=1, max_value=9223372036854775807).run_validation(data.get(field))
+    except drf_serializers.ValidationError:
+        raise DomainError(f"{field} must be a positive integer.", code="invalid_identifier")
 
 
 class IsAdmin(BasePermission):
@@ -177,6 +184,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         })
 
     @action(detail=False, methods=["post"], url_path="staff/invite")
+    @transaction.atomic
     def invite_staff(self, request):
         """POST /admin/dashboard/staff/invite/ - invite tutor/staff."""
         serializer = StaffInviteSerializer(data=request.data)
@@ -189,47 +197,48 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         tutor_profile = data.get("tutor_profile", {})
 
         # Check if user already exists
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             raise AlreadyExists("A user with this email already exists.")
 
         # Create user
-        user = User.objects.create_user(
-            email=email,
-            full_name=full_name,
-            role=User.Role.INSTRUCTOR if role == "instructor" else User.Role.ADMIN,
-            is_active=True,
-        )
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    email=email, full_name=full_name, role=role,
+                    is_active=True, is_staff=role == User.Role.ADMIN,
+                )
+        except IntegrityError:
+            raise AlreadyExists("An account with this email already exists. Refresh the directory.") from None
 
         # Create tutor profile if instructor
         if role == "instructor":
             from apps.accounts.models import TutorProfile
             TutorProfile.objects.create(
                 user=user,
-                bio=tutor_profile.get("bio", ""),
-                expertise=tutor_profile.get("expertise", []),
-                experience_years=tutor_profile.get("experience_years", 0),
-                hourly_rate_usd=tutor_profile.get("hourly_rate_usd"),
-                timezone=tutor_profile.get("timezone", "UTC"),
-                languages=tutor_profile.get("languages", ["English"]),
+                expertise=tutor_profile.get("expertise", ""),
+                years_experience=tutor_profile.get("years_experience", 0),
             )
 
         # Log action
         services.log_admin_action(
             admin=request.user,
             action_type=AdminActionLog.ActionType.TUTOR_INVITE if role == "instructor" 
-                       else AdminActionLog.ActionType.STAFF_INVITE,
+                       else AdminActionLog.ActionType.USER_CREATE,
             target_user=user,
             description=f"Invited {full_name} as {role}",
             metadata={"tutor_profile": tutor_profile},
             request=request,
         )
 
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        from apps.accounts.services import request_password_reset
+        request_password_reset(email=user.email)
+        return Response(AdminUserListSerializer(user).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"], url_path="staff/deactivate")
+    @transaction.atomic
     def deactivate_staff(self, request):
         """POST /admin/dashboard/staff/deactivate/ {user_id} - deactivate staff."""
-        user_id = request.data.get("user_id")
+        user_id = positive_id(request.data, "user_id")
         if not user_id:
             raise DomainError("user_id is required.", code="user_id_required")
 
@@ -239,15 +248,17 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             # ValueError/ValidationError: user_id is not a valid UUID
             raise DomainError("User not found (check the user id).", code="user_not_found")
 
+        if user.pk == request.user.pk:
+            raise DomainError("You cannot disable the account you are signed in with.", code="cannot_deactivate_self")
         if user.is_admin and user != request.user:
             raise DomainError("Cannot deactivate another admin.", code="cannot_deactivate_admin")
 
         user.is_active = False
-        user.save(update_fields=["is_active", "updated_at"])
+        user.save(update_fields=["is_active"])
 
         # Revoke tokens (blacklist refresh tokens)
-        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
-        OutstandingToken.objects.filter(user=user).delete()
+        from apps.accounts.services import _revoke_all_refresh_tokens
+        _revoke_all_refresh_tokens(user)
 
         # Log action
         services.log_admin_action(
@@ -261,9 +272,10 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         return Response({"detail": "Staff deactivated successfully."})
 
     @action(detail=False, methods=["post"], url_path="staff/activate")
+    @transaction.atomic
     def activate_staff(self, request):
         """POST /admin/dashboard/staff/activate/ {user_id} - activate staff."""
-        user_id = request.data.get("user_id")
+        user_id = positive_id(request.data, "user_id")
         if not user_id:
             raise DomainError("user_id is required.", code="user_id_required")
 
@@ -274,7 +286,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             raise DomainError("User not found (check the user id).", code="user_not_found")
 
         user.is_active = True
-        user.save(update_fields=["is_active", "updated_at"])
+        user.save(update_fields=["is_active"])
 
         services.log_admin_action(
             admin=request.user,
@@ -287,9 +299,10 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         return Response({"detail": "Staff activated successfully."})
 
     @action(detail=False, methods=["post"], url_path="staff/promote")
+    @transaction.atomic
     def promote_staff(self, request):
         """POST /admin/dashboard/staff/promote/ {user_id} - promote to admin."""
-        user_id = request.data.get("user_id")
+        user_id = positive_id(request.data, "user_id")
         if not user_id:
             raise DomainError("user_id is required.", code="user_id_required")
 
@@ -301,7 +314,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
         user.role = User.Role.ADMIN
         user.is_staff = True
-        user.save(update_fields=["role", "is_staff", "updated_at"])
+        user.save(update_fields=["role", "is_staff"])
 
         services.log_admin_action(
             admin=request.user,
@@ -314,6 +327,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         return Response({"detail": "Staff promoted to admin."})
 
     @action(detail=False, methods=["post"], url_path="courses/bulk-price")
+    @transaction.atomic
     def bulk_price_update(self, request):
         """POST /admin/dashboard/courses/bulk-price/ - bulk price update."""
         serializer = BulkPriceUpdateSerializer(data=request.data)
@@ -324,7 +338,9 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         adjustment = data["price_adjustment"]
         is_percentage = data["is_percentage"]
 
-        courses = Course.objects.filter(id__in=course_ids)
+        courses = list(Course.objects.select_for_update().filter(id__in=course_ids).order_by("pk"))
+        if len(courses) != len(set(course_ids)):
+            raise DomainError("Some selected courses no longer exist. Refresh the course list.")
         updated = 0
 
         with transaction.atomic():
@@ -333,6 +349,9 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
                     course.price = course.price * (Decimal("1.00") + adjustment / Decimal("100.00"))
                 else:
                     course.price = course.price + adjustment
+                course.price = course.price.quantize(Decimal("0.01"))
+                if not Decimal("0") <= course.price <= Decimal("99999999.99"):
+                    raise DomainError("This adjustment makes a course price invalid. Use a smaller adjustment; no prices were changed.")
                 course.save(update_fields=["price", "updated_at"])
                 updated += 1
 
@@ -348,12 +367,11 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
     # ────────────────────────────────────────────── user directory (admin panel)
     @action(detail=False, methods=["post"], url_path="users/password")
+    @transaction.atomic
     def user_password(self, request):
         """POST /admin/dashboard/users/password/ {user_id, new_password} — admin sets a password."""
-        user_id = request.data.get("user_id")
-        new_password = request.data.get("new_password")
-        if not user_id or not new_password:
-            raise DomainError("user_id and new_password are required.", code="password_params")
+        user_id = positive_id(request.data, "user_id")
+        new_password = drf_serializers.CharField(trim_whitespace=False, max_length=256).run_validation(request.data.get("new_password"))
 
         from django.contrib.auth import password_validation
         try:
@@ -363,11 +381,19 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
 
         try:
             password_validation.validate_password(new_password, user)
-        except Exception as exc:
-            raise DomainError(" ".join(str(exc).split()), code="weak_password")
+        except ValidationError as exc:
+            raise drf_serializers.ValidationError({"new_password": exc.messages}) from None
 
         user.set_password(new_password)
-        user.save(update_fields=["password", "updated_at"])
+        user.save(update_fields=["password"])
+        from apps.accounts.services import _revoke_all_refresh_tokens
+        from apps.accounts.models import PasswordResetToken
+        _revoke_all_refresh_tokens(user)
+        PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
+        services.log_admin_action(
+            admin=request.user, action_type=AdminActionLog.ActionType.USER_UPDATE,
+            target_user=user, description="Changed account password and revoked refresh tokens.", request=request,
+        )
         return Response({"detail": f"Password updated for {user.full_name or user.email}."})
 
     @action(detail=False, methods=["post"], url_path="certificates/issue")
@@ -438,6 +464,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
                 "id": str(sub.id),
                 "student_name": sub.student.full_name,
                 "assignment_title": sub.assignment.title,
+                "assignment_id": str(sub.assignment_id),
                 "status": sub.status,
                 "score": str(sub.score) if sub.score is not None else None,
                 "feedback": sub.feedback,
@@ -504,7 +531,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["post"], url_path="courses/update")
     def course_update(self, request):
         """POST /admin/dashboard/courses/update/ {course_id, price?, is_published?, title?}."""
-        course_id = request.data.get("course_id")
+        course_id = positive_id(request.data, "course_id")
         if not course_id:
             raise DomainError("course_id is required.", code="course_id_required")
         try:

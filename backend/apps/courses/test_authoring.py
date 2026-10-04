@@ -74,8 +74,8 @@ class CourseAuthoringTests(APITestCase):
         for _ in range(2):
             response = self.client.post(endpoint, {"instructor": self.tutor.pk}, format='json')
             self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(Course.objects.count(), 6)
-        imported = Course.objects.get(title="Virtual Assistant")
+        self.assertEqual(Course.objects.count(), 11)
+        imported = Course.objects.get(slug="virtual-assistant")
         self.assertFalse(imported.is_published)
         imported.price = 90000; imported.save()
         self.client.post(endpoint, {"instructor": self.tutor.pk}, format='json')
@@ -85,6 +85,49 @@ class CourseAuthoringTests(APITestCase):
         from django.urls import resolve
         route = resolve('/api/v1/courses/import-homepage/')
         self.assertEqual(route.func.actions['post'], 'import_homepage')
+        self.assertEqual(route.func.actions['get'], 'import_homepage')
+
+    def test_public_details_roundtrip_without_exposing_paid_lessons(self):
+        module = Module.objects.create(course=self.course, title="Teaching")
+        Lesson.objects.create(module=module, title="Private lesson", content="PAID CONTENT", video_key="private/key")
+        details = {"tagline": "Learn remotely", "target_audience": "New learners", "learning_outcomes": "Plan work\nSupport clients",
+                   "requirements": "A laptop", "benefits": "Practical projects", "outline": "Week 1\n- Communication", "is_published": True}
+        response = self.client.patch(f'/api/v1/courses/{self.course.slug}/', details, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(self.client.get('/api/v1/admin/dashboard/courses/').data[0]['outline'], details['outline'])
+        self.client.force_authenticate(None)
+        result = self.client.get(f'/api/v1/courses/{self.course.slug}/')
+        for field, value in details.items():
+            self.assertEqual(result.data[field], value)
+        self.assertNotIn('PAID CONTENT', str(result.data))
+        self.assertNotIn('private/key', str(result.data))
+
+    def test_complete_catalog_and_opt_in_blank_details_only(self):
+        existing = Course.objects.create(title='Virtual Assistant', instructor=self.tutor, category=self.category,
+                                        price=999, description='Admin description', is_published=True, benefits='Admin benefits')
+        endpoint = '/api/v1/courses/import-homepage/'
+        preview = self.client.get(endpoint)
+        self.assertEqual(len(preview.data['courses']), 10)
+        self.assertEqual(Course.objects.count(), 2)
+        self.client.post(endpoint, {'instructor': self.tutor.pk}, format='json')
+        existing.refresh_from_db(); self.assertEqual(existing.outline, '')
+        response = self.client.post(endpoint, {'instructor': self.tutor.pk, 'fill_missing_details': True}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['created'], [])
+        existing.refresh_from_db()
+        self.assertIn('Virtual Assistance', existing.outline)
+        self.assertEqual((existing.price, existing.description, existing.benefits, existing.is_published), (999, 'Admin description', 'Admin benefits', True))
+        self.assertEqual(existing.category_id, self.category.pk)
+        self.assertEqual(Course.objects.filter(slug__startswith='kids-').count(), 4)
+        self.assertTrue(Course.objects.filter(slug='artificial-intelligence').exists())
+        self.assertFalse(Module.objects.exists())
+
+    def test_category_inline_creation_and_duplicate_validation(self):
+        created = self.client.post('/api/v1/categories/', {'name': 'New category'}, format='json')
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(self.client.post('/api/v1/categories/', {'name': '  new CATEGORY '}, format='json').status_code, 400)
+        response = self.client.patch(f'/api/v1/courses/{self.course.slug}/', {'category': created.data['id']}, format='json')
+        self.assertEqual(response.status_code, 200)
 
     def test_homepage_import_requires_admin_and_active_tutor(self):
         endpoint = '/api/v1/courses/import-homepage/'

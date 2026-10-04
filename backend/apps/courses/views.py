@@ -1,13 +1,11 @@
 """ViewSets for the course catalog with action-scoped permissions."""
 import uuid
-from io import StringIO
-from django.core.management import call_command
 from django.contrib.auth import get_user_model
 
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Q, Max
 from django.db.models.deletion import ProtectedError
-from rest_framework import viewsets
+from rest_framework import viewsets, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -22,6 +20,7 @@ from apps.core.permissions import (
 from apps.core.storage import presigned_download_url, presigned_upload_url
 from apps.core.exceptions import IllegalStateTransition
 from apps.courses.models import Category, Course, Lesson, Module
+from apps.courses.catalog import catalog_preview, restore_catalog
 from apps.courses.serializers import (
     CategorySerializer,
     CourseDetailSerializer,
@@ -89,17 +88,26 @@ class CourseViewSet(viewsets.ModelViewSet):
             return [IsInstructorOrAdmin()]
         return [IsAuthenticatedOrReadOnly()]
 
-    @action(detail=False, methods=["post"], url_path="import-homepage")
+    @action(detail=False, methods=["get", "post"], url_path="import-homepage")
     def import_homepage(self, request):
+        if request.method == "GET":
+            return Response({"courses": catalog_preview()})
+        class ImportOptions(serializers.Serializer):
+            instructor = serializers.IntegerField(min_value=1)
+            fill_missing_details = serializers.BooleanField(default=False)
+        options = ImportOptions(data=request.data)
+        options.is_valid(raise_exception=True)
         try:
             tutor = get_user_model().objects.get(
-                pk=request.data.get("instructor"), role="instructor", is_active=True
+                pk=options.validated_data["instructor"], role="instructor", is_active=True
             )
         except (get_user_model().DoesNotExist, ValueError, TypeError):
             raise ValidationError({"instructor": "Select an existing active tutor."})
-        output = StringIO()
-        call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=output)
-        return Response({"detail": output.getvalue()})
+        try:
+            result = restore_catalog(tutor, fill_missing_details=options.validated_data["fill_missing_details"])
+        except IntegrityError:
+            raise ValidationError({"detail": "Another catalogue edit conflicted with this import. No partial import was saved. Refresh and try again."})
+        return Response({"detail": f"Created {len(result['created'])} drafts; kept {len(result['kept'])} existing courses; filled blank details on {len(result['enriched'])}.", **result})
 
     def perform_create(self, serializer):
         if self.request.user.is_admin:

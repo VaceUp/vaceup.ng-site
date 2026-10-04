@@ -9,7 +9,7 @@ import uuid
 
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Q, Case, When, Value, IntegerField
 from django.utils import timezone
 
 from apps.accounts.mail_delivery import classify_delivery_failure
@@ -61,7 +61,7 @@ def claim_job():
     with transaction.atomic():
         query = MailJob.objects.select_for_update(
             skip_locked=connection.features.has_select_for_update_skip_locked,
-        ).filter(eligible).order_by("available_at", "pk")
+        ).filter(eligible).annotate(delivery_priority=Case(When(kind='announcement', then=Value(1)), default=Value(0), output_field=IntegerField())).order_by("delivery_priority", "available_at", "pk")
         job = query.first()
         if job is None:
             return None
@@ -80,6 +80,9 @@ def claim_job():
 
 
 def _deliver(job):
+    if job.kind == "announcement":
+        from apps.announcements.services import deliver_announcement
+        return deliver_announcement(job)
     if job.kind in {"verification", "password_reset"}:
         from apps.accounts.tasks import deliver_token_email
         return deliver_token_email(job.kind, token_id=job.object_id)
@@ -132,4 +135,7 @@ def process_one():
     MailJob.objects.filter(pk=job.pk, status=MailJob.Status.PROCESSING, claim_id=job.claim_id).update(
         **updates, updated_at=now, claim_id=None, claimed_at=None,
     )
+    if job.kind == "announcement":
+        from apps.announcements.services import update_delivery_status
+        update_delivery_status(job.object_id)
     return updates["status"]

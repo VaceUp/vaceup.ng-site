@@ -18,7 +18,7 @@ def main():
     names = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "backend"], cwd=ROOT, text=True).splitlines()
     for name in sorted(set(names)):
         rel = Path(name).relative_to("backend")
-        if rel.suffix not in {".py", ".txt", ".md", ".html"} or any(part in {"media", "staticfiles", "__pycache__", "uploads"} for part in rel.parts):
+        if rel.suffix not in {".py", ".txt", ".md", ".html", ".json"} or any(part in {"media", "staticfiles", "__pycache__", "uploads"} for part in rel.parts):
             continue
         if rel.suffix == ".txt" and rel.name != "requirements.txt":
             continue

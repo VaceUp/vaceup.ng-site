@@ -19,6 +19,15 @@ class Command(BaseCommand):
             "/api/v1/messages/contacts/": "GET",
             "/api/v1/messages/read/": "POST",
             "/api/v1/notifications/1/read/": "POST",
+            "/api/v1/admin/settings/definitions/": "GET",
+            "/api/v1/admin/settings/public/": "GET",
+            "/api/v1/courses/release-route-check/": "PATCH",
+        }
+        expected_actions = {
+            "/api/v1/admin/settings/definitions/": "definitions",
+            "/api/v1/admin/settings/public/": "public",
+            "/api/v1/courses/import-homepage/": "import_homepage",
+            "/api/v1/courses/release-route-check/": "partial_update",
         }
         missing = []
         for path, method in required.items():
@@ -27,11 +36,13 @@ class Command(BaseCommand):
                 actions = getattr(match.func, "actions", None)
                 view_class = getattr(match.func, "cls", None) or getattr(match.func, "view_class", None)
                 valid = method.lower() in actions if actions is not None else hasattr(view_class, method.lower())
+                if path in expected_actions:
+                    valid = valid and actions is not None and actions.get(method.lower()) == expected_actions[path]
             except Resolver404:
                 valid = False
             self.stdout.write(f"{'PASS' if valid else 'MISSING'} {method} {path}")
             if not valid:
                 missing.append(path)
         if missing:
-            raise CommandError("Installed backend is incomplete. Extract the full release into the Application Root and restart the Python app.")
+            raise CommandError("Installed backend routes are incomplete or misbound. Install the matching repair files in the Application Root and restart the Python app.")
         self.stdout.write("Routes exist in this process. Restart cPanel's web application, then test the public routes separately.")

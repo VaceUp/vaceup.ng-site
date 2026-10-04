@@ -138,7 +138,7 @@ class AnnouncementCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         target = attrs.get("target", self.instance.target if self.instance else None)
-        target_courses = attrs.get("target_courses", [])
+        target_courses = attrs.get("target_courses", self.instance.target_courses.all() if self.instance else [])
 
         if target in [
             Announcement.Target.COURSE_STUDENTS,
@@ -150,6 +150,16 @@ class AnnouncementCreateSerializer(serializers.ModelSerializer):
                     {"target_courses": "At least one course is required for this target."}
                 )
 
+        from django.utils import timezone
+        state = attrs.get('status', self.instance.status if self.instance else 'draft')
+        publish_at = attrs.get('publish_at', self.instance.publish_at if self.instance else None)
+        expires_at = attrs.get('expires_at', self.instance.expires_at if self.instance else None)
+        if state == 'scheduled' and publish_at is None:
+            raise serializers.ValidationError({'publish_at': 'A scheduled announcement needs a publication time.'})
+        if state == 'published' and publish_at is None:
+            publish_at = attrs['publish_at'] = timezone.now()
+        if expires_at and publish_at and expires_at <= publish_at:
+            raise serializers.ValidationError({'expires_at': 'Expiry must be after publication.'})
         return attrs
 
 

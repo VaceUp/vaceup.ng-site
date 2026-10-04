@@ -35,6 +35,15 @@ def is_entitled_to_content(user, course) -> bool:
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    def validate_name(self, value):
+        value = value.strip()
+        matches = Category.objects.filter(name__iexact=value)
+        if self.instance:
+            matches = matches.exclude(pk=self.instance.pk)
+        if matches.exists():
+            raise serializers.ValidationError("A category with this name already exists. Select it from the category list.")
+        return value
+
     class Meta:
         model = Category
         fields = ("id", "name", "slug")
@@ -231,6 +240,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "tagline", "learning_outcomes", "requirements", "benefits", "target_audience", "outline",
             "category",
             "category_name",
             "instructor",
@@ -246,7 +256,10 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         )
         # instructor is bound from request.user server-side; slug is derived.
         read_only_fields = ("slug",)
-        extra_kwargs = {"price": {"min_value": 0}}
+        extra_kwargs = {"price": {"min_value": 0}, **{
+            field: {"max_length": 20000} for field in
+            ("learning_outcomes", "requirements", "benefits", "outline")
+        }}
 
     def validate(self, attrs):
         user = _user(self)

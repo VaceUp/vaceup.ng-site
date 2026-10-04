@@ -1,18 +1,19 @@
 """Previewed, re-authenticated deletion of non-administrator accounts."""
 import hashlib
 import json
+import logging
 import uuid
 
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.db.models.deletion import Collector, ProtectedError, RestrictedError
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.debug import sensitive_post_parameters
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from apps.core.throttling import DatabaseUserRateThrottle
@@ -23,6 +24,26 @@ from apps.core.permissions import IsAdmin
 
 SALT = "admin-user-deletion-v1"
 MAX_AGE = 300
+logger = logging.getLogger(__name__)
+
+
+class DeletionUnavailable(APIException):
+    status_code = 503
+    default_code = "deletion_unavailable"
+
+
+def database_failure(exc):
+    # Do not expose SQL, connection details, or account data in responses/logs.
+    cause = exc.__cause__ or exc
+    code = cause.args[0] if cause.args and isinstance(cause.args[0], int) else None
+    schema_error = code in (1054, 1146) or any(text in str(cause).lower() for text in ("no such table", "no such column", "undefined table", "undefined column"))
+    reference = uuid.uuid4().hex[:12]
+    logger.error("User deletion database failure reference=%s type=%s code=%s", reference, type(exc).__name__, code)
+    detail = ("User deletion is unavailable because required database tables or columns are missing. "
+              "Complete the backend migrations and run diagnose_admin_deployment.py before retrying. "
+              "No account was deleted." if schema_error else
+              f"The database could not complete the deletion check. No account was deleted. Retry or contact support with reference {reference}.")
+    return DeletionUnavailable(detail, code="deletion_schema_incomplete" if schema_error else "deletion_unavailable")
 # Unknown cascades fail closed so adding a new app cannot silently expand deletion.
 OWNED_RECORDS = {
     "accounts.user", "accounts.user_groups", "accounts.user_user_permissions",
@@ -81,6 +102,10 @@ def deletion_plan(user, actor):
         blockers.append("You cannot delete the account you are signed in with.")
     if user.is_admin or user.is_superuser or user.is_staff:
         blockers.append("Administrator and staff accounts are protected. Disable access instead.")
+    if blockers:
+        return [], blockers, ""
+    if user.courses_taught.exists():
+        return [], ["This tutor owns courses. Assign those courses to another tutor in Content before deleting the account, or disable access instead."], ""
     collector = Collector(using=user._state.db or "default")
     try:
         collector.collect([user])
@@ -121,7 +146,10 @@ class UserDeletionPreviewView(GenericAPIView):
     @extend_schema(responses=DeletionPreviewSerializer)
     def get(self, request, user_id):
         user = get_object_or_404(get_user_model(), pk=user_id)
-        records, blockers, fingerprint = deletion_plan(user, request.user)
+        try:
+            records, blockers, fingerprint = deletion_plan(user, request.user)
+        except DatabaseError as exc:
+            raise database_failure(exc) from exc
         token = None if blockers else signing.dumps({
             "actor": request.user.pk, "target": user.pk,
             "fingerprint": fingerprint, "nonce": uuid.uuid4().hex,
@@ -181,4 +209,6 @@ class UserDeleteView(GenericAPIView):
                 user.delete()
         except (ProtectedError, RestrictedError):
             raise ValidationError({"detail": "Protected records prevent deletion. No changes were saved. Disable access instead."})
+        except DatabaseError as exc:
+            raise database_failure(exc) from exc
         return Response({"detail": "User deleted permanently.", "deleted_user_id": data["user_id"]})

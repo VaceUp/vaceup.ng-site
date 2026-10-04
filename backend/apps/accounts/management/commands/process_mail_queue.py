@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.accounts.mail_delivery import email_configuration_errors
 from apps.accounts.outbox import enqueue_reminders, process_one
 from apps.core.models import RateLimitBucket
+from apps.announcements.services import enqueue_due_announcements
 
 
 class Command(BaseCommand):
@@ -28,6 +29,7 @@ class Command(BaseCommand):
             raise CommandError(" ".join(errors))
         started = time.monotonic()
         queued = enqueue_reminders()
+        announcements = enqueue_due_announcements(limit=options["limit"])
         results = Counter()
         for _ in range(options["limit"]):
             if time.monotonic() - started >= options["max_seconds"]:
@@ -39,6 +41,6 @@ class Command(BaseCommand):
         # Bound maintenance: delete only expired counters, not account data.
         keys = list(RateLimitBucket.objects.filter(expires_at__lt=timezone.now()).values_list("pk", flat=True)[:1000])
         RateLimitBucket.objects.filter(pk__in=keys, expires_at__lt=timezone.now()).delete()
-        self.stdout.write(f"Reminders queued: {queued}; outcomes: {dict(results)}")
+        self.stdout.write(f"Reminders queued: {queued}; announcement emails queued: {announcements}; outcomes: {dict(results)}")
         if results["failed"]:
             raise CommandError("Some jobs failed. Run mail_queue_status for safe diagnostic codes.")

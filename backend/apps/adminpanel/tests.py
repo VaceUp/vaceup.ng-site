@@ -60,12 +60,12 @@ class AdminReadTests(APITestCase):
             call_command("import_homepage_catalog", apply=True, stdout=out)
         tutor = get_user_model().objects.create_user("tutor@example.com", "test-password", role="instructor", is_active=True)
         call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=out)
-        self.assertEqual(Course.objects.count(), 5)
-        self.assertEqual(Category.objects.count(), 4)
+        self.assertEqual(Course.objects.count(), 10)
+        self.assertEqual(Category.objects.count(), 6)
         Course.objects.filter(slug="virtual-assistant").update(price="999", is_published=True)
         call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=out)
-        self.assertEqual(Course.objects.count(), 5)
-        self.assertEqual(Course.objects.filter(is_published=False).count(), 4)
+        self.assertEqual(Course.objects.count(), 10)
+        self.assertEqual(Course.objects.filter(is_published=False).count(), 9)
         self.assertEqual(str(Course.objects.get(slug="virtual-assistant").price), "999.00")
 
     def test_payments_list_has_model_import(self):

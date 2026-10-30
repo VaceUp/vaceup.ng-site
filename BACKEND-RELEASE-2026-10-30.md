@@ -1,9 +1,10 @@
 # VaceUp backend release 2026-10-30 (manual cPanel overlay)
 
 Django stays on TrueHost, the Next.js site stays on Cloudflare Pages. This package is a
-source overlay only: no `.env`, no database, no uploaded media, no virtualenv, no
-collected static files. Extract it over the existing application root and keep the
-server's `.env` and `media/` untouched.
+delta overlay: it contains only files this release changed or added. Nothing else on the
+server is touched, so your existing application files, `.env`, database, uploaded media
+and virtualenv stay exactly where they are. There is no full-backend replacement here and
+no wholesale `apps/` folder.
 
 ## What ships in this release
 
@@ -69,16 +70,17 @@ secrets into admin settings.
 1. Back up the current application files, `.env`, the database and `media/` with
    cPanel. Store the backups outside the public web directory. Do not delete anything.
 2. Upload `vaceup-backend-2026-10-30.zip` and extract it directly into
-   `/home/coqrpund/vaceup_api/` so that `/home/coqrpund/vaceup_api/manage.py` exists.
-   Overwrite source files only. If the extraction produced a nested `backend/` folder,
-   move its contents up one level instead of continuing.
+   `/home/coqrpund/vaceup_api/`. After extraction the new app must sit at
+   `/home/coqrpund/vaceup_api/apps/website/views.py`, not inside a nested `backend/`
+   folder. Only the listed files are written; `manage.py`, `passenger_wsgi.py` and
+   `requirements.txt` are deliberately not included because this release does not
+   change them, so nothing that already works on your server is replaced.
 3. In cPanel Terminal:
 
 ```bash
 source /home/coqrpund/virtualenv/vaceup_api/3.12/bin/activate
 cd /home/coqrpund/vaceup_api
 python -V
-python -m pip install -r requirements.txt
 python manage.py migrate --plan
 python manage.py migrate --noinput
 python manage.py check
@@ -145,6 +147,17 @@ Restore the backed-up source files and `.env`, then restart the app. The new tab
 columns are additive; existing content, enrollments and payments are not rewritten. Do
 not restore a database dump without confirming no learner data was created after the
 backup.
+
+## Rebuilding this package
+
+The overlay is the diff against `fc8d421`, the deployment this release replaces:
+
+```bash
+python3 scripts/package_backend_release.py --base fc8d421
+```
+
+Pass `--with-unchanged` only if you deliberately want to re-ship `manage.py`,
+`passenger_wsgi.py` and `requirements.txt`.
 
 ## Verification record for this build
 

@@ -15,24 +15,38 @@ SKIP_NAMES = {".env", "db.sqlite3", ".DS_Store"}
 SKIP_SUFFIXES = {".pyc", ".pdf", ".log"}
 
 
-def changed_files():
-    result = subprocess.run(
+def changed_files(base):
+    paths = set()
+    if base:
+        committed = subprocess.run(
+            ["git", "diff", "--name-only", "--diff-filter=ACMR", f"{base}..HEAD", "--", "backend"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        )
+        paths.update(line for line in committed.stdout.splitlines() if line)
+    uncommitted = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all", "backend"],
         cwd=ROOT, capture_output=True, text=True, check=True,
     )
-    paths = []
-    for line in result.stdout.splitlines():
+    for line in uncommitted.stdout.splitlines():
         status, raw = line[:2], line[3:].strip().strip('"')
         if "D" in status or "->" in raw:
             continue
-        paths.append(raw)
-    return sorted(set(paths))
+        paths.add(raw)
+    return sorted(paths)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--notes", default=f"BACKEND-RELEASE-{date.today().isoformat()}.md")
     parser.add_argument("--out", default="")
+    parser.add_argument(
+        "--base", default="HEAD~1",
+        help="Git revision the release diffs against. Empty means only uncommitted files.",
+    )
+    parser.add_argument(
+        "--with-unchanged", action="store_true",
+        help="Also include manage.py, passenger_wsgi.py and requirements.txt.",
+    )
     args = parser.parse_args()
 
     notes = ROOT / args.notes
@@ -43,7 +57,8 @@ def main():
         parser.error("Release archive already exists; do not overwrite a delivered package.")
 
     files = {}
-    for source in [f"backend/{name}" for name in ALWAYS] + changed_files():
+    sources = ([f"backend/{name}" for name in ALWAYS] if args.with_unchanged else []) + changed_files(args.base)
+    for source in sources:
         path = ROOT / source
         rel = path.relative_to(BACKEND)
         if not path.is_file():
@@ -56,8 +71,8 @@ def main():
     files[notes.name] = notes.read_bytes()
     files["RELEASE-MANIFEST.json"] = json.dumps({
         "release": archive.stem,
-        "deployment": "manual cPanel source overlay over the existing application root; "
-                      "no environment, database, media or virtualenv included",
+        "deployment": "delta overlay: only files changed or added by this release are "
+                      "included; extract over the existing application root",
         "python": "3.12",
         "sha256": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())},
     }, indent=2).encode()

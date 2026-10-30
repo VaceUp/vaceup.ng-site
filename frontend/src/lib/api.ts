@@ -179,14 +179,14 @@ class ApiClient {
 
   // User Profile
   async updateProfile(data: Partial<UserProfile>): Promise<User> {
-    return this.request<User>('/users/me/', {
+    return this.request<User>('/auth/me/', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async changePassword(data: ChangePasswordRequest): Promise<void> {
-    return this.request<void>('/users/me/change-password/', {
+    return this.request<void>('/auth/change-password/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -571,9 +571,8 @@ export interface UserProfile {
 }
 
 export interface ChangePasswordRequest {
-  old_password: string;
+  current_password: string;
   new_password: string;
-  confirm_password: string;
 }
 
 export interface Course {
@@ -686,7 +685,21 @@ export interface Application { id: string; course_title: string; course_thumbnai
 
 export interface ApplicationListParams { page?: number; page_size?: number; status?: string; }
 
-export interface SubmitApplicationRequest { course_id: string; motivation: string; }
+export interface SubmitApplicationRequest {
+  course: string;
+  motivation: string;
+  goals?: string;
+  full_name?: string;
+  phone?: string;
+  country?: string;
+  city?: string;
+  education?: string;
+  current_role?: string;
+  experience?: string;
+  linkedin_url?: string;
+  github_url?: string;
+  heard_from?: string;
+}
 
 export interface Announcement {
   id: string;

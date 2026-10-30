@@ -1,155 +1,179 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
-import { useRouter } from 'next/navigation';
+import { Modal } from '@/components/ui/Modal';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { cn } from '@/lib/utils';
+import { SITE } from '@/lib/site-config';
+import { useAuth } from '@/lib/auth-context';
+import {
+  formatEventWindow,
+  getPublishedEvents,
+  registerForEvent,
+  type WebsiteEvent,
+} from '@/lib/website-api';
 
-const events = [
-  {
-    id: '1',
-    title: 'VaceUp Open Day: Explore Our Campus & Courses',
-    description: 'Join us for a day of interactive workshops, campus tours, and live demos. Meet our instructors, chat with current students, and discover which course is right for you.',
-    type: 'Open Day',
-    date: '2024-02-10',
-    time: '10:00 AM - 4:00 PM WAT',
-    location: 'VaceUp Campus, Lagos',
-    image: '/events/open-day.jpg',
-    featured: true,
-    registered: 245,
-    capacity: 300,
-  },
-  {
-    id: '2',
-    title: 'Tech Career Fair 2024: Connect with Top Employers',
-    description: 'Meet hiring managers from leading tech companies including Flutterwave, Paystack, Andela, and more. Bring your CV and portfolio for on-the-spot interviews.',
-    type: 'Career Fair',
-    date: '2024-02-24',
-    time: '9:00 AM - 6:00 PM WAT',
-    location: 'Landmark Event Centre, Lagos',
-    image: '/events/career-fair.jpg',
-    featured: false,
-    registered: 890,
-    capacity: 1000,
-  },
-  {
-    id: '3',
-    title: 'AI & Machine Learning Workshop: Build Your First Model',
-    description: 'Hands-on workshop for beginners. Learn the fundamentals of ML, build a classification model, and deploy it. No prior ML experience required.',
-    type: 'Workshop',
-    date: '2024-03-02',
-    time: '2:00 PM - 6:00 PM WAT',
-    location: 'Virtual (Zoom)',
-    image: '/events/ai-workshop.jpg',
-    featured: false,
-    registered: 156,
-    capacity: 200,
-  },
-  {
-    id: '4',
-    title: 'Alumni Networking Mixer: Lagos Edition',
-    description: 'Connect with fellow VaceUp alumni, share experiences, and build professional relationships. Featuring guest speakers from top tech companies.',
-    type: 'Networking',
-    date: '2024-03-15',
-    time: '6:00 PM - 9:00 PM WAT',
-    location: 'The Wheatbaker, Lagos',
-    image: '/events/alumni-mixer.jpg',
-    featured: false,
-    registered: 89,
-    capacity: 150,
-  },
-  {
-    id: '5',
-    title: 'Web Development Bootcamp Info Session',
-    description: 'Learn about our 12-week Web Development program. Curriculum overview, career outcomes, payment options, and Q&A with instructors.',
-    type: 'Info Session',
-    date: '2024-03-20',
-    time: '7:00 PM - 8:30 PM WAT',
-    location: 'Virtual (Google Meet)',
-    image: '/events/webdev-info.jpg',
-    featured: false,
-    registered: 234,
-    capacity: 500,
-  },
-  {
-    id: '6',
-    title: 'Data Analysis Hackathon: Solve Real Business Problems',
-    description: '48-hour hackathon using real datasets from partner companies. Prizes include internships, mentorship, and cash awards.',
-    type: 'Hackathon',
-    date: '2024-04-05',
-    time: 'Starts 10:00 AM Saturday',
-    location: 'VaceUp Campus, Lagos',
-    image: '/events/data-hackathon.jpg',
-    featured: false,
-    registered: 67,
-    capacity: 100,
-  },
-];
+type RsvpForm = { name: string; email: string; phone: string; note: string };
 
-const eventTypes = ['All', 'Open Day', 'Career Fair', 'Workshop', 'Networking', 'Info Session', 'Hackathon'];
+const icsStamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
 export default function EventsPage() {
-  const router = useRouter();
+  const { user } = useAuth();
+  const [upcoming, setUpcoming] = useState<WebsiteEvent[]>([]);
+  const [past, setPast] = useState<WebsiteEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedType, setSelectedType] = useState('All');
+  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [rsvpFor, setRsvpFor] = useState<WebsiteEvent | null>(null);
+  const [form, setForm] = useState<RsvpForm>({ name: '', email: '', phone: '', note: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [done, setDone] = useState('');
 
-  // Register sends visitors into the standard enrollment funnel
-  const handleRegister = () => router.push('/apply');
+  const load = () => {
+    setLoading(true);
+    setError('');
+    Promise.all([getPublishedEvents('upcoming'), getPublishedEvents('past')])
+      .then(([next, previous]) => {
+        setUpcoming(next.results);
+        setPast(previous.results);
+      })
+      .catch((requestError: unknown) =>
+        setError(requestError instanceof Error ? requestError.message : 'Events are unavailable right now.'),
+      )
+      .finally(() => setLoading(false));
+  };
 
-  // Add to Calendar generates a real calendar invite (.ics)
-  const handleAddToCalendar = (event: (typeof events)[number]) => {
-    const start = event.date.replace(/-/g, '') + 'T' + (event.time.match(/(\d{2}):(\d{2})/)?.[0] ?? '10:00').replace(':', '') + '00';
+  useEffect(load, []);
+
+  const types = useMemo(() => {
+    const seen = new Map<string, string>();
+    [...upcoming, ...past].forEach((event) => seen.set(event.event_type, event.event_type_label));
+    return ['All', ...seen.values()];
+  }, [upcoming, past]);
+
+  const matches = (event: WebsiteEvent) => selectedType === 'All' || event.event_type_label === selectedType;
+  const filteredUpcoming = upcoming.filter(matches);
+  const filteredPast = past.filter(matches);
+  const featured = filteredUpcoming.find((event) => event.is_featured) || filteredUpcoming[0];
+  const rest = featured ? filteredUpcoming.filter((event) => event.id !== featured.id) : [];
+
+  const openRsvp = (event: WebsiteEvent) => {
+    setRsvpFor(event);
+    setFormError('');
+    setDone('');
+    setForm({ name: user?.full_name || '', email: user?.email || '', phone: user?.phone_number || '', note: '' });
+  };
+
+  const submitRsvp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!rsvpFor || submitting) return;
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const result = await registerForEvent(rsvpFor.slug, {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        note: form.note.trim(),
+      });
+      setDone(result.detail);
+      setUpcoming((rows) =>
+        rows.map((row) =>
+          row.id === rsvpFor.id ? { ...row, seats_taken: result.seats_taken, is_full: result.is_full } : row,
+        ),
+      );
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : 'Your registration could not be saved.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addToCalendar = (event: WebsiteEvent) => {
+    const start = new Date(event.starts_at);
+    if (!Number.isFinite(start.getTime())) return;
+    const end = event.ends_at && Number.isFinite(new Date(event.ends_at).getTime())
+      ? new Date(event.ends_at)
+      : new Date(start.getTime() + 2 * 60 * 60 * 1000);
     const ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//VaceUp Digital Academy//EN',
       'BEGIN:VEVENT',
-      `UID:${event.id}@vaceup.ng`,
-      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
-      `DTSTART;TZID=Africa/Lagos:${start}00`,
+      `UID:${event.slug}@vaceup.ng`,
+      `DTSTAMP:${icsStamp(new Date().toISOString())}`,
+      `DTSTART:${icsStamp(event.starts_at)}`,
+      `DTEND:${icsStamp(end.toISOString())}`,
       `SUMMARY:${event.title}`,
-      `DESCRIPTION:${event.description.replace(/\n/g, ' ')}`,
-      `LOCATION:${event.location}`,
+      `DESCRIPTION:${(event.summary || event.description).replace(/\r?\n/g, ' ')}`,
+      `LOCATION:${(event.is_online ? 'Online' : event.location).replace(/,/g, '\\,')}`,
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n');
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${event.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`;
-    a.click();
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${event.slug}.ics`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
-  const [selectedType, setSelectedType] = useState('All');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
-
-  const filteredEvents = events.filter(event => {
-    return selectedType === 'All' || event.type === selectedType;
-  });
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  const registerAction = (event: WebsiteEvent, block = 'w-full') => {
+    if (event.registration_url) {
+      return (
+        <a
+          href={event.registration_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            'inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gold-brand px-5 font-bold text-navy-950 hover:bg-gold-hover transition-colors',
+            block,
+          )}
+        >
+          Register
+        </a>
+      );
+    }
+    if (event.is_past) {
+      return (
+        <Button variant="outline" disabled className={block}>
+          Already held
+        </Button>
+      );
+    }
+    if (event.is_full) {
+      return (
+        <Button variant="outline" disabled className={block}>
+          Fully booked
+        </Button>
+      );
+    }
+    return (
+      <Button
+        onClick={() => openRsvp(event)}
+        className={cn('bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold', block)}
+      >
+        Register
+      </Button>
+    );
   };
+
+  const seatLine = (event: WebsiteEvent) =>
+    event.capacity ? `${event.seats_taken}/${event.capacity} seats filled` : `${event.seats_taken} registered`;
 
   return (
     <div className="min-h-screen bg-white">
-      
       <main>
-        {/* Hero Section */}
         <section className="py-20 bg-navy-950">
           <div className="mx-auto max-w-7xl px-6 text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-              Events & Workshops
+              Events &amp; Workshops
             </h1>
             <p className="text-lg text-navy-200 max-w-3xl mx-auto">
               Join our community events, workshops, and networking sessions. Learn, connect, and grow with fellow tech enthusiasts.
@@ -157,245 +181,322 @@ export default function EventsPage() {
           </div>
         </section>
 
-        {/* Featured Event */}
-        <section className="py-12 bg-white">
-          <div className="mx-auto max-w-7xl px-6">
-            <article className="relative rounded-3xl overflow-hidden">
-              <div className="relative aspect-[16/9] lg:aspect-[21/9]">
-                <img
-                  src={events[0].image}
-                  alt={events[0].title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-navy-950/90 via-navy-900/50 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-12">
-                  <div className="max-w-3xl">
-                    <div className="flex flex-wrap gap-3 mb-4">
-                      <Badge variant="secondary" className="text-sm">{events[0].type}</Badge>
-                      <Badge className="bg-gold-brand text-navy-950 text-sm">{events[0].registered}/{events[0].capacity} Registered</Badge>
-                    </div>
-                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4">{events[0].title}</h2>
-                    <p className="text-navy-100 text-lg mb-8 max-w-2xl">{events[0].description}</p>
-                    <div className="flex flex-wrap gap-6 text-navy-200 mb-8">
-                      <div className="flex items-center gap-2">
-                        <LordIconComponent src={LordIcons.calendar} size={20} />
-                        <div>
-                          <p className="text-sm">Date</p>
-                          <p className="font-medium">{formatDate(events[0].date)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <LordIconComponent src={LordIcons.clock} size={20} />
-                        <div>
-                          <p className="text-sm">Time</p>
-                          <p className="font-medium">{events[0].time}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <LordIconComponent src={LordIcons.location} size={20} />
-                        <div>
-                          <p className="text-sm">Location</p>
-                          <p className="font-medium">{events[0].location}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      <Button size="lg" onClick={handleRegister} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
-                        Register Now
-                        <LordIconComponent src={LordIcons.arrowRight} size={20} className="ml-2" />
-                      </Button>
-                      <Button variant="outline" size="lg" onClick={() => handleAddToCalendar(events[0])} className="border-white/30 text-white hover:bg-white/10">
-                        Add to Calendar
-                        <LordIconComponent src={LordIcons.calendar} size={20} className="ml-2" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        {/* Filter & View Controls */}
-        <section className="py-8 bg-gray-50 border-y border-gray-100">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
-                {eventTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedType(type)}
-                    className={cn(
-                      'px-4 py-2 rounded-xl text-sm font-medium transition-colors',
-                      selectedType === type
-                        ? 'bg-navy-950 text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-100'
-                    )}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">View:</span>
-                <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
-                  <button
-                    onClick={() => setView('grid')}
-                    className={cn(
-                      'p-2 rounded-lg transition-colors',
-                      view === 'grid' ? 'bg-navy-950 text-white' : 'text-gray-500 hover:text-gray-700'
-                    )}
-                  >
-                    <LordIconComponent src={LordIcons.grid} size={20} />
-                  </button>
-                  <button
-                    onClick={() => setView('list')}
-                    className={cn(
-                      'p-2 rounded-lg transition-colors',
-                      view === 'list' ? 'bg-navy-950 text-white' : 'text-gray-500 hover:text-gray-700'
-                    )}
-                  >
-                    <LordIconComponent src={LordIcons.list} size={20} />
-                  </button>
-                </div>
+        {error && (
+          <section className="bg-white py-8">
+            <div className="mx-auto max-w-7xl px-6">
+              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+                <p className="font-semibold text-red-800">{error}</p>
+                <Button onClick={load} className="mt-4 bg-navy-950 text-white hover:bg-navy-900">
+                  Try again
+                </Button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* Events Grid/List */}
-        <section className="py-12 bg-white">
-          <div className="mx-auto max-w-7xl px-6">
-            {view === 'grid' ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEvents.slice(1).map((event) => (
-                  <div key={event.id}>
-                    <Card className="h-full hover:shadow-xl transition-all duration-300 border-gray-100">
-                      <div className="relative aspect-video overflow-hidden rounded-t-xl">
-                        <img
-                          src={event.image}
-                          alt={event.title}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                        />
-                        <div className="absolute top-3 right-3">
-                          <Badge variant="secondary" className="text-xs">{event.type}</Badge>
+        {!error && loading && (
+          <section className="py-12 bg-white">
+            <div className="mx-auto max-w-7xl px-6">
+              <div className="aspect-[16/9] max-h-[520px] w-full animate-pulse rounded-3xl bg-gray-100" />
+            </div>
+          </section>
+        )}
+
+        {!error && !loading && !featured && (
+          <section className="py-20 bg-white">
+            <div className="mx-auto max-w-3xl px-6 text-center">
+              <LordIconComponent src={LordIcons.calendar} size={40} className="mx-auto text-navy-200" />
+              <h2 className="mt-6 text-2xl font-bold text-navy-950">No dates announced yet</h2>
+              <p className="mt-2 text-gray-600">
+                Open days, workshops and info sessions appear here as soon as the academy publishes them.
+              </p>
+              <a
+                href={`mailto:${SITE.email}`}
+                className="mt-6 inline-block rounded-xl bg-gold-brand px-6 py-3 font-bold text-navy-950 hover:bg-gold-hover transition-colors"
+              >
+                Ask when the next one is
+              </a>
+            </div>
+          </section>
+        )}
+
+        {!error && !loading && featured && (
+          <>
+            <section className="py-12 bg-white">
+              <div className="mx-auto max-w-7xl px-6">
+                <article className="relative rounded-3xl overflow-hidden">
+                  <div className="relative aspect-[16/9] lg:aspect-[21/9]">
+                    {featured.image ? (
+                      <img src={featured.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-navy-900" aria-hidden="true" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-navy-950/90 via-navy-900/50 to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-12">
+                      <div className="max-w-3xl">
+                        <div className="flex flex-wrap gap-3 mb-4">
+                          <Badge variant="secondary" className="text-sm">{featured.event_type_label}</Badge>
+                          <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine(featured)}</Badge>
                         </div>
-                        <div className="absolute bottom-3 left-3 right-3 flex justify-between">
-                          <Badge className="bg-gold-brand text-navy-950">{event.registered}/{event.capacity}</Badge>
-                        </div>
-                      </div>
-                      <CardContent className="p-6">
-                        <Badge variant="outline" className="text-xs mb-3 text-navy-700 border-navy-200 bg-navy-50">{event.type}</Badge>
-                        <h3 className="font-bold text-navy-950 mb-2 group-hover:text-gold-brand transition-colors line-clamp-2">{event.title}</h3>
-                        <p className="text-gray-600 mb-4 line-clamp-2">{event.description}</p>
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <div className="flex items-center gap-2 text-navy-700">
-                            <LordIconComponent src={LordIcons.calendar} size={16} />
-                            <span>{formatDate(event.date)}</span>
+                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4">{featured.title}</h2>
+                        <p className="text-navy-100 text-lg mb-8 max-w-2xl">{featured.summary || featured.description}</p>
+                        <div className="flex flex-wrap gap-6 text-navy-200 mb-8">
+                          <div className="flex items-center gap-2">
+                            <LordIconComponent src={LordIcons.calendar} size={20} />
+                            <div>
+                              <p className="text-sm">When</p>
+                              <p className="font-medium">{formatEventWindow(featured)}</p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-navy-700">
-                            <LordIconComponent src={LordIcons.clock} size={16} />
-                            <span>{event.time}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-navy-700">
-                            <LordIconComponent src={LordIcons.location} size={16} />
-                            <span>{event.location}</span>
+                          <div className="flex items-center gap-2">
+                            <LordIconComponent src={LordIcons.location} size={20} />
+                            <div>
+                              <p className="text-sm">Where</p>
+                              <p className="font-medium">{featured.is_online ? 'Online' : featured.location || 'Venue to be confirmed'}</p>
+                            </div>
                           </div>
                         </div>
-                        <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
-                          <span className="font-medium text-navy-900">{event.registered}/{event.capacity} seats filled</span>
-                          <Button size="sm" onClick={handleRegister} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
-                            Register
+                        <div className="flex flex-wrap gap-4">
+                          {registerAction(featured, '')}
+                          <Button
+                            variant="outline"
+                            onClick={() => addToCalendar(featured)}
+                            className="border-white/30 text-white hover:bg-white/10"
+                          >
+                            Add to Calendar
+                            <LordIconComponent src={LordIcons.calendar} size={20} className="ml-2" />
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                </article>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredEvents.slice(1).map((event) => (
-                  <div key={event.id}>
-                    <Card className="hover:shadow-lg transition-all duration-300 border-gray-100">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row md:items-center gap-6">
-                          <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0 rounded-xl overflow-hidden">
-                            <img src={event.image} alt={event.title} className="w-full h-full object-cover" />
-                            <Badge variant="secondary" className="absolute top-2 right-2 text-xs">{event.type}</Badge>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap gap-2 mb-2">
-                              <Badge variant="outline" className="text-xs text-navy-700 border-navy-200 bg-navy-50">{event.type}</Badge>
-                              <Badge className="bg-gold-brand text-navy-950 text-xs">{event.registered}/{event.capacity}</Badge>
-                            </div>
-                            <h3 className="font-bold text-navy-950 mb-2">{event.title}</h3>
-                            <p className="text-gray-600 mb-4 line-clamp-2">{event.description}</p>
-                            <div className="flex flex-wrap gap-6 text-sm text-gray-600">
-                              <div className="flex items-center gap-2 text-navy-700">
-                                <LordIconComponent src={LordIcons.calendar} size={16} />
-                                <span>{formatDate(event.date)}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-navy-700">
-                                <LordIconComponent src={LordIcons.clock} size={16} />
-                                <span>{event.time}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-navy-700">
-                                <LordIconComponent src={LordIcons.location} size={16} />
-                                <span>{event.location}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 md:w-48">
-                            <Button onClick={handleRegister} className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
-                              Register
-                            </Button>
+            </section>
+
+            <section className="py-8 bg-gray-50 border-y border-gray-100">
+              <div className="mx-auto max-w-7xl px-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    {types.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedType(type)}
+                        aria-pressed={selectedType === type}
+                        className={cn(
+                          'min-h-[44px] px-4 py-2 rounded-xl text-sm font-medium transition-colors',
+                          selectedType === type
+                            ? 'bg-navy-950 text-white shadow-md'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-100',
+                        )}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                  {filteredUpcoming.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">View:</span>
+                      <div className="flex gap-1 bg-white rounded-xl p-1 border border-gray-100">
+                        <button
+                          onClick={() => setView('grid')}
+                          aria-pressed={view === 'grid'}
+                          aria-label="Grid view"
+                          className={cn(
+                            'p-2 rounded-lg transition-colors',
+                            view === 'grid' ? 'bg-navy-950 text-white' : 'text-gray-500 hover:text-gray-700',
+                          )}
+                        >
+                          <LordIconComponent src={LordIcons.grid} size={20} />
+                        </button>
+                        <button
+                          onClick={() => setView('list')}
+                          aria-pressed={view === 'list'}
+                          aria-label="List view"
+                          className={cn(
+                            'p-2 rounded-lg transition-colors',
+                            view === 'list' ? 'bg-navy-950 text-white' : 'text-gray-500 hover:text-gray-700',
+                          )}
+                        >
+                          <LordIconComponent src={LordIcons.list} size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="py-12 bg-white" aria-label="More upcoming events">
+              <div className="mx-auto max-w-7xl px-6">
+                {rest.length === 0 ? (
+                  <p className="text-center text-gray-600">This is the only {selectedType === 'All' ? 'event' : selectedType.toLowerCase()} on the calendar right now.</p>
+                ) : view === 'grid' ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {rest.map((event) => (
+                      <Card key={event.id} className="h-full hover:shadow-xl transition-all duration-300 border-gray-100">
+                        <div className="relative aspect-video overflow-hidden rounded-t-xl bg-navy-900">
+                          {event.image && <img src={event.image} alt="" className="w-full h-full object-cover" />}
+                          <div className="absolute top-3 right-3">
+                            <Badge variant="secondary" className="text-xs">{event.event_type_label}</Badge>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                        <CardContent className="p-6">
+                          <h3 className="font-bold text-navy-950 mb-2 line-clamp-2">{event.title}</h3>
+                          <p className="text-gray-600 mb-4 line-clamp-2">{event.summary || event.description}</p>
+                          <div className="space-y-2 text-sm text-navy-700">
+                            <div className="flex items-center gap-2">
+                              <LordIconComponent src={LordIcons.calendar} size={16} />
+                              <span>{formatEventWindow(event)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <LordIconComponent src={LordIcons.location} size={16} />
+                              <span>{event.is_online ? 'Online' : event.location || 'Venue to be confirmed'}</span>
+                            </div>
+                          </div>
+                          <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3">
+                            <span className="font-medium text-navy-900 text-sm">{seatLine(event)}</span>
+                            {registerAction(event, '')}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    {rest.map((event) => (
+                      <Card key={event.id} className="hover:shadow-lg transition-all duration-300 border-gray-100">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col md:flex-row md:items-center gap-6">
+                            <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0 rounded-xl overflow-hidden bg-navy-900">
+                              {event.image && <img src={event.image} alt="" className="w-full h-full object-cover" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                <Badge variant="outline" className="text-xs text-navy-700 border-navy-200 bg-navy-50">
+                                  {event.event_type_label}
+                                </Badge>
+                                <Badge className="bg-gold-brand text-navy-950 text-xs">{seatLine(event)}</Badge>
+                              </div>
+                              <h3 className="font-bold text-navy-950 mb-2">{event.title}</h3>
+                              <p className="text-gray-600 mb-4 line-clamp-2">{event.summary || event.description}</p>
+                              <div className="flex flex-wrap gap-6 text-sm text-navy-700">
+                                <div className="flex items-center gap-2">
+                                  <LordIconComponent src={LordIcons.calendar} size={16} />
+                                  <span>{formatEventWindow(event)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <LordIconComponent src={LordIcons.location} size={16} />
+                                  <span>{event.is_online ? 'Online' : event.location || 'Venue to be confirmed'}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 md:w-48">{registerAction(event)}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {!error && !loading && filteredPast.length > 0 && (
+          <section className="py-16 bg-navy-950" aria-labelledby="past-events-heading">
+            <div className="mx-auto max-w-7xl px-6">
+              <div className="text-center mb-12">
+                <h2 id="past-events-heading" className="text-3xl sm:text-4xl font-black text-white mb-4">
+                  Recently held
+                </h2>
+                <p className="text-navy-200 max-w-3xl mx-auto">
+                  A record of what the community has already taken part in.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredPast.map((event) => (
+                  <Card key={event.id} className="bg-navy-900/50 border-navy-800 h-full">
+                    <CardContent className="p-8">
+                      <Badge variant="secondary" className="text-xs mb-4">{event.event_type_label}</Badge>
+                      <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{event.title}</h3>
+                      <p className="text-navy-200 text-sm mb-4 line-clamp-2">{event.summary || event.description}</p>
+                      <div className="flex items-center gap-2 text-navy-300 text-sm">
+                        <LordIconComponent src={LordIcons.calendar} size={16} />
+                        <span>{formatEventWindow(event)}</span>
+                      </div>
+                      <p className="mt-4 text-sm text-navy-300">{seatLine(event)}</p>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            )}
-          </div>
-        </section>
-
-        {/* Upcoming Cohorts */}
-        <section className="py-16 bg-navy-950">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Upcoming Cohort Starts</h2>
-              <p className="text-navy-200 max-w-3xl mx-auto">Next intake dates for our flagship programs</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { course: 'Virtual Assistant', start: '21 Sep 2026', spots: 12 },
-                { course: 'Data Analysis', start: '28 Sep 2026', spots: 8 },
-                { course: 'UI/UX Design', start: '05 Oct 2026', spots: 15 },
-              ].map((cohort, i) => (
-                <Card key={i} className="bg-navy-900/50 border-navy-800 h-full">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 rounded-2xl bg-gold-brand/15 border border-gold-brand/30 flex items-center justify-center mx-auto mb-6">
-                      <i className="bi bi-mortarboard-fill text-3xl text-gold-brand" aria-hidden="true" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">{cohort.course}</h3>
-                    <div className="flex items-center justify-center gap-2 text-navy-300 mb-4">
-                      <LordIconComponent src={LordIcons.calendar} size={20} />
-                      <span className="font-medium text-white">{cohort.start}</span>
-                    </div>
-                    <p className="text-navy-300 mb-6">{cohort.spots} spots remaining</p>
-                    <Button className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold w-full">
-                      Reserve Your Spot
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
+      <Modal isOpen={!!rsvpFor} onClose={() => setRsvpFor(null)} title="Reserve your seat" size="sm">
+        {rsvpFor && (
+          done ? (
+            <div className="space-y-6">
+              <p role="status" className="rounded-xl bg-green-50 p-4 text-sm font-semibold text-green-800">{done}</p>
+              <p className="text-sm text-gray-600">{rsvpFor.title} — {formatEventWindow(rsvpFor)}</p>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={() => addToCalendar(rsvpFor)} variant="outline">Add to calendar</Button>
+                <Button onClick={() => setRsvpFor(null)} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={submitRsvp} className="space-y-4">
+              <p className="text-sm text-gray-600">{formatEventWindow(rsvpFor)}</p>
+              <Input
+                label="Full name"
+                required
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                autoComplete="name"
+              />
+              <Input
+                label="Email"
+                type="email"
+                required
+                value={form.email}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+                autoComplete="email"
+              />
+              <Input
+                label="Phone (optional)"
+                type="tel"
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                autoComplete="tel"
+              />
+              <div>
+                <label htmlFor="event-note" className="block text-sm font-semibold text-navy-900 mb-2">
+                  Anything we should know? (optional)
+                </label>
+                <textarea
+                  id="event-note"
+                  rows={3}
+                  value={form.note}
+                  onChange={(event) => setForm({ ...form, note: event.target.value })}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition-colors resize-y"
+                />
+              </div>
+              {formError && <p role="alert" className="text-sm font-semibold text-red-700">{formError}</p>}
+              <Button
+                type="submit"
+                loading={submitting}
+                className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold"
+              >
+                Confirm registration
+              </Button>
+            </form>
+          )
+        )}
+      </Modal>
     </div>
   );
 }

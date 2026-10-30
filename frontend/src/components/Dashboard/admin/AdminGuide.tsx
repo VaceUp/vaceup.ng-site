@@ -11,6 +11,7 @@ const QUICK_START: { title: string; description: string; destinations: AdminTab[
   { title: 'Bring the right people in', description: 'Set up your tutors, review applications and confirm learner access.', destinations: ['users', 'applications', 'enrollments'] },
   { title: 'Prepare a course for learners', description: 'Create the course as a draft, build its modules and lessons, then publish when it is ready.', destinations: ['courses', 'content'] },
   { title: 'Run teaching and assessment', description: 'Schedule sessions, review learner work and confirm achievements before issuing certificates.', destinations: ['liveclasses', 'assignments', 'certificates'] },
+  { title: 'Keep the public website current', description: 'The About, Events and Blog pages read from here — you can change them without waiting for a developer.', destinations: ['website', 'events', 'blog'] },
   { title: 'Keep the academy running', description: 'Review payments, share clear updates and check settings with your technical team.', destinations: ['payments', 'announcements', 'marketing', 'flags'] },
 ];
 

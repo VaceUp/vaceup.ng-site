@@ -1,4 +1,5 @@
 """Live class endpoints: schedule (instructor), list/join (student), attendance."""
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -37,6 +38,9 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             course__enrollments__status__in=(
                 Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED,
             ),
+        ).annotate(
+            member_attended=Exists(Attendance.objects.filter(
+                live_class=OuterRef("pk"), student=user)),
         ).distinct()
 
     def get_permissions(self):
@@ -69,8 +73,8 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             "show_payment_prompt": not is_paid,
             "show_calendar_reminder": is_paid and is_future,
             "show_recorded_prompt": is_paid and is_past and live_class.recording_status != "ready",
-            "live_class": LiveClassSerializer(live_class).data,
-            "enrollment": enrollment,
+            "live_class": LiveClassSerializer(live_class, context={"request": self.request}).data,
+            "enrollment": enrollment.pk if enrollment else None,
         }
 
     @action(detail=True, methods=["post"])
@@ -130,6 +134,33 @@ class LiveClassViewSet(viewsets.ModelViewSet):
         
         # Redirect to the signed URL
         return HttpResponseRedirect(playback_url)
+
+    @action(detail=True, methods=["get"], url_path="recording-url")
+    def recording_url(self, request, pk=None):
+        """GET /live-classes/{id}/recording-url/ → JSON signed playback URL."""
+        live_class = self.get_object()
+        if live_class.recording_status != "ready" or not live_class.recording_key:
+            return Response({"detail": "Recording not available yet."}, status=404)
+        if not live_class._user_has_recording_access(request.user):
+            return Response(
+                {"detail": "Recordings are available to learners who attended this class."},
+                status=403,
+            )
+        playback_url = live_class.get_recording_playback_url(request.user, expires_in=3600)
+        return Response({"url": playback_url, "expires_in": 3600})
+
+    @action(detail=True, methods=["get"], url_path="my-attendance")
+    def my_attendance(self, request, pk=None):
+        """GET /live-classes/{id}/my-attendance/ → the caller's recorded join."""
+        live_class = self.get_object()
+        attendance = Attendance.objects.filter(
+            live_class=live_class, student=request.user).first()
+        return Response({
+            "attended": attendance is not None,
+            "joined_at": attendance.joined_at if attendance else None,
+            "scheduled_start": live_class.scheduled_start,
+            "scheduled_end": live_class.scheduled_end,
+        })
 
     # --- Breakout Room Actions ---
     

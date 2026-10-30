@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import TimeStampedModel
 from apps.courses.models import Course
+from .storage import AssignmentStorage
 
 
 class Assignment(TimeStampedModel):
@@ -42,6 +43,10 @@ class Assignment(TimeStampedModel):
         db_index=True,
     )
     allow_late_submission = models.BooleanField(default=True)
+    # Staff can stage assignments; students only see published ones.
+    # Defaults to published so existing assignments keep working; the admin
+    # studio explicitly creates drafts.
+    is_published = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         ordering = ("due_at",)
@@ -77,6 +82,7 @@ class Submission(TimeStampedModel):
     )
     file = models.FileField(
         upload_to="assignment_submissions/",
+        storage=AssignmentStorage(),
         blank=True,
         null=True,
     )
@@ -310,3 +316,16 @@ class QuizAttempt(TimeStampedModel):
 
     def __str__(self):
         return f"{self.student} -> {self.quiz} ({self.status})"
+
+
+class AssessmentGradeLog(TimeStampedModel):
+    """Append-only grading evidence, written in the grading transaction."""
+
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    submission = models.ForeignKey(Submission, null=True, on_delete=models.SET_NULL, related_name="grade_history")
+    attempt = models.ForeignKey(QuizAttempt, null=True, on_delete=models.SET_NULL, related_name="grade_history")
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")

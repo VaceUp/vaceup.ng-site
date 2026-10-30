@@ -1,5 +1,6 @@
 """Certificate endpoints: issuance, verification, templates."""
 import json
+from django.contrib.auth import get_user_model
 from django.http import HttpResponse, FileResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -19,6 +20,7 @@ from apps.certificates.serializers import (
     CertificateTemplateCreateSerializer,
 )
 from apps.core.exceptions import DomainError
+from apps.courses.models import Course
 from apps.enrollment.models import Enrollment
 
 
@@ -67,6 +69,40 @@ class CertificateTemplateViewSet(viewsets.ModelViewSet):
         course = serializer.validated_data.get("course", getattr(serializer.instance, "course", None))
         if not self.request.user.is_admin and (course is None or course.instructor_id != self.request.user.pk):
             raise PermissionDenied("Only administrators manage global templates; tutors may manage their own courses only.")
+
+    @action(detail=False, methods=["get"], url_path="preview")
+    def preview(self, request):
+        """GET /certificates/templates/preview/?course=&student= -> the rendered design."""
+        course_id = request.query_params.get("course", "")
+        student_id = request.query_params.get("student", "")
+        if not (course_id.isdigit() and student_id.isdigit()):
+            raise ValidationError("Choose both a course and a student to preview a certificate.")
+        course = Course.objects.filter(pk=int(course_id)).select_related("instructor").first()
+        if course is None:
+            raise ValidationError("That course does not exist. Select a course from the list.")
+        if not request.user.is_admin and course.instructor_id != request.user.pk:
+            raise PermissionDenied("Tutors may only preview certificates for their own courses.")
+        student = get_user_model().objects.filter(pk=int(student_id), is_active=True).first()
+        if student is None:
+            raise ValidationError("That student account is not available. Select another student.")
+        template_id = request.query_params.get("template", "")
+        template = (
+            CertificateTemplate.objects.filter(pk=int(template_id)).first()
+            if template_id.isdigit() else None
+        ) or services.get_template_for_course(course)
+        if template is None:
+            raise ValidationError("No active certificate template applies to this course.")
+        if not request.user.is_admin and (template.course_id is None or template.course.instructor_id != request.user.pk):
+            raise PermissionDenied("Tutors may only preview their own course templates.")
+        try:
+            html = services.preview_certificate_html(template=template, student=student, course=course)
+        except ValidationError:
+            raise
+        except Exception as exc:
+            raise ValidationError(
+                "This template could not be rendered. Check its Django template syntax."
+            ) from exc
+        return Response({"html": html, "template": template.name})
 
 
 class CertificateViewSet(viewsets.ReadOnlyModelViewSet):

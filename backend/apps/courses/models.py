@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import TimeStampedModel
 from apps.core.utils import unique_slug
+from config.storages import public_media_storage
 
 
 class Category(TimeStampedModel):
@@ -63,7 +64,8 @@ class Course(TimeStampedModel):
     )
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     thumbnail = models.ImageField(
-        upload_to="course/thumbnails/", blank=True, null=True
+        upload_to="course/thumbnails/", blank=True, null=True,
+        storage=public_media_storage,
     )
     is_published = models.BooleanField(default=False)
 
@@ -99,6 +101,14 @@ class Module(TimeStampedModel):
     )
     title = models.CharField(max_length=200)
     order = models.PositiveIntegerField(default=0)
+    week = models.PositiveIntegerField(default=1, help_text="Course week this module is taught in.")
+    duration_minutes = models.PositiveIntegerField(
+        default=0, help_text="Planned contact time for this module in minutes."
+    )
+    meeting_url = models.URLField(
+        blank=True,
+        help_text="Optional Google Meet link for live sessions of this module.",
+    )
 
     class Meta:
         ordering = ("order",)

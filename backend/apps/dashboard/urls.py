@@ -6,6 +6,7 @@ from apps.dashboard.member_views import (
     WorkspaceOverviewView, WorkspaceCourseListView, WorkspaceCourseDetailView,
     WorkspacePaymentListView,
 )
+from apps.dashboard.teaching_views import CourseGradebookView
 
 urlpatterns = [
     path("dashboard/overview/", WorkspaceOverviewView.as_view(), name="workspace-overview"),
@@ -16,4 +17,6 @@ urlpatterns = [
          name="instructor-dashboard"),
     path("instructor/students/", InstructorStudentsView.as_view(),
          name="instructor-students"),
+    path("instructor/courses/<int:pk>/gradebook/", CourseGradebookView.as_view(),
+         name="instructor-course-gradebook"),
 ]

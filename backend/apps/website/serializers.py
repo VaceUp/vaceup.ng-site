@@ -1,0 +1,154 @@
+"""Serializers for public website content (profile, team, events, blog)."""
+
+from django.utils import timezone
+from rest_framework import serializers
+
+from apps.website.models import (
+    AcademyProfile,
+    BlogPost,
+    BloggerSource,
+    Event,
+    EventRegistration,
+    TeamMember,
+)
+from apps.website.sanitize import sanitize_html
+
+
+def _image_url(obj, field):
+    if obj.image_url:
+        return obj.image_url
+    image = getattr(obj, field, None)
+    if not image:
+        return ""
+    try:
+        return image.url
+    except ValueError:
+        return ""
+
+
+class AcademyProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AcademyProfile
+        fields = (
+            "id", "name", "tagline", "mission", "story", "location",
+            "founded_year", "email", "phone", "linkedin_url",
+            "instagram_url", "facebook_url", "website_url",
+        )
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamMember
+        fields = (
+            "id", "name", "role_title", "bio", "quote", "image", "photo",
+            "linkedin_url", "instagram_url", "website_url",
+            "is_founder", "order", "is_published",
+        )
+        extra_kwargs = {"photo": {"write_only": True, "required": False}}
+
+    def get_image(self, obj):
+        return _image_url(obj, "photo")
+
+    def validate_photo(self, image):
+        if image and image.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Choose a photo smaller than 5 MB.")
+        return image
+
+
+class EventPublicSerializer(serializers.ModelSerializer):
+    event_type_label = serializers.CharField(source="get_event_type_display", read_only=True)
+    image = serializers.SerializerMethodField()
+    seats_taken = serializers.IntegerField(read_only=True)
+    is_full = serializers.BooleanField(read_only=True)
+    is_past = serializers.BooleanField(read_only=True)
+    rsvp_enabled = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = (
+            "id", "title", "slug", "summary", "description", "event_type",
+            "event_type_label", "starts_at", "ends_at", "location", "is_online",
+            "registration_url", "capacity", "seats_taken", "is_full",
+            "is_past", "image", "is_featured", "rsvp_enabled",
+        )
+
+    def get_image(self, obj):
+        return _image_url(obj, "cover_image")
+
+    def get_rsvp_enabled(self, obj):
+        return not obj.is_past and not obj.is_full and not obj.registration_url
+
+
+class EventAdminSerializer(EventPublicSerializer):
+    registrations_count = serializers.IntegerField(source="seats_taken", read_only=True)
+
+    class Meta(EventPublicSerializer.Meta):
+        fields = EventPublicSerializer.Meta.fields + (
+            "meeting_url", "cover_image", "is_published", "registrations_count",
+            "created_at", "updated_at",
+        )
+        extra_kwargs = {"cover_image": {"write_only": True, "required": False}}
+
+
+class EventRegistrationCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventRegistration
+        fields = ("name", "email", "phone", "note")
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate_name(self, value):
+        value = value.strip()
+        if len(value) < 2:
+            raise serializers.ValidationError("Enter your full name.")
+        return value
+
+
+class EventRegistrationAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventRegistration
+        fields = ("id", "name", "email", "phone", "note", "created_at")
+
+
+class BlogPostListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BlogPost
+        fields = (
+            "id", "blogger_id", "title", "url", "summary", "author_name",
+            "labels", "thumbnail_url", "published_at", "is_visible",
+        )
+
+
+class BlogPostDetailSerializer(BlogPostListSerializer):
+    class Meta(BlogPostListSerializer.Meta):
+        fields = BlogPostListSerializer.Meta.fields + ("content_html",)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Re-sanitize on read as defence in depth for older cached rows.
+        data["content_html"] = sanitize_html(instance.content_html)
+        return data
+
+
+class BloggerSourceSerializer(serializers.ModelSerializer):
+    has_api_key = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BloggerSource
+        fields = (
+            "id", "blog_id", "api_key", "has_api_key", "label_filter",
+            "is_enabled", "last_synced_at", "last_error",
+        )
+        extra_kwargs = {"api_key": {"write_only": True, "required": False}}
+
+    def get_has_api_key(self, obj):
+        return bool(obj.api_key)
+
+    def update(self, instance, validated_data):
+        # Blank api_key means "keep the stored key" rather than erase it.
+        if "api_key" in validated_data and not validated_data["api_key"]:
+            validated_data.pop("api_key")
+        return super().update(instance, validated_data)

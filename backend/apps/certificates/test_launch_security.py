@@ -22,7 +22,11 @@ class CertificateLaunchTests(APITestCase):
         category = Category.objects.create(name="Skills")
         self.course = Course.objects.create(title="Course", category=category, instructor=self.tutor, is_published=True)
         self.other_course = Course.objects.create(title="Other", category=category, instructor=self.other)
-        self.template = CertificateTemplate.objects.create(name="Global", is_default=True, html_template="{{ student_name }}: {{ course_title }}")
+        # Migration 0003 already seeds the academy-wide default; reuse it so this
+        # suite exercises the design real deployments render.
+        self.template = CertificateTemplate.objects.filter(course__isnull=True, is_default=True).order_by("pk").first()
+        if self.template is None:
+            self.template = CertificateTemplate.objects.create(name="Global", is_default=True, html_template="{{ student_name }}: {{ course_title }}")
         self.enrollment = Enrollment.objects.create(student=self.student, course=self.course, status="completed", completed_at=timezone.now())
         field = Certificate._meta.get_field("pdf_file")
         self.storage_patch = patch.object(field, "storage", InMemoryStorage())
@@ -70,6 +74,44 @@ class CertificateLaunchTests(APITestCase):
         self.client.force_authenticate(self.tutor)
         response = self.client.patch(f"/api/v1/certificates/templates/{template.pk}/", {"course": self.other_course.pk}, format="json")
         self.assertEqual(response.status_code, 403)
+
+    def test_admin_previews_the_shipped_design_without_issuing(self):
+        admin = User.objects.create_user(email="preview@example.org", password="x", full_name="Previewer", role="admin", is_active=True)
+        self.client.force_authenticate(admin)
+        response = self.client.get(
+            f"/api/v1/certificates/templates/preview/?course={self.course.pk}&student={self.student.pk}"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("Learner", response.data["html"])
+        self.assertIn("Certificate of Completion", response.data["html"])
+        self.assertNotIn(self.student.email, response.data["html"])
+        self.assertEqual(Certificate.objects.count(), 0)
+
+    def test_preview_rejects_incomplete_or_foreign_requests(self):
+        self.client.force_authenticate(self.student)
+        self.assertEqual(
+            self.client.get(f"/api/v1/certificates/templates/preview/?course={self.course.pk}").status_code, 403
+        )
+        self.client.force_authenticate(self.other)
+        self.assertEqual(
+            self.client.get(
+                f"/api/v1/certificates/templates/preview/?course={self.course.pk}&student={self.student.pk}"
+            ).status_code, 403
+        )
+
+    def test_renderer_without_weasyprint_still_draws_the_brand_certificate(self):
+        """Shared hosts lack WeasyPrint; the drawn layout must still be a real PDF."""
+        from apps.certificates.services import (
+            certificate_context, generate_certificate_pdf, render_certificate_html,
+        )
+        certificate = self.issue()
+        html = render_certificate_html(certificate)
+        pdf = generate_certificate_pdf(
+            html, page_size="A4", orientation="landscape",
+            context=certificate_context(certificate),
+        )
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf), 1500)
 
     def test_template_context_does_not_expose_account_objects(self):
         certificate = self.issue()

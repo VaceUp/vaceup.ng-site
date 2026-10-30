@@ -64,17 +64,26 @@ export function LiveClassesTab() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
+    const start = new Date(form.scheduled_start);
+    if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) {
+      setMsg({ ok: false, text: 'Choose a start time in the future.' });
+      return;
+    }
+    if (form.provider === 'external' && !/^https:\/\/\S+$/i.test(form.join_url.trim())) {
+      setMsg({ ok: false, text: 'Paste the full meeting link, starting with https://.' });
+      return;
+    }
     try {
       await api.request('/live-classes/', {
         method: 'POST',
         body: JSON.stringify({
-          course: form.course,
+          course: Number(form.course),
           title: form.title,
           description: form.description,
-          scheduled_start: new Date(form.scheduled_start).toISOString(),
+          scheduled_start: start.toISOString(),
           duration_minutes: parseInt(form.duration_minutes) || 90,
           provider: form.provider,
-          join_url: form.join_url,
+          join_url: form.provider === 'external' ? form.join_url.trim() : '',
         }),
       });
       setMsg({ ok: true, text: `“${form.title}” scheduled. Students see it on their dashboard.` });
@@ -222,29 +231,26 @@ export function LiveClassesTab() {
               <div className="min-w-0">
                 <p className="text-sm font-bold text-navy-950">{c.title}</p>
                 <p className="text-xs text-gray-500">
-                  {c.course_title} ·{' '}
+                  {c.course_title ? `${c.course_title} · ` : ''}
                   {new Date(c.scheduled_start).toLocaleString('en-NG')} ·{' '}
                   {c.duration_minutes} min ·{' '}
                   <span className="capitalize">{c.provider}</span>
+                  {c.status ? ` · ${c.status}` : ''}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {c.join_url && (
+                {c.provider === 'external' && c.join_url ? (
                   <a
                     href={c.join_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
                   >
-                    Open link
+                    Open meeting
                   </a>
+                ) : (
+                  <span className="text-xs text-gray-500">VaceUp Live Room</span>
                 )}
-                <a
-                  href={`/liveclasses/${c.id}`}
-                  className="rounded-lg bg-gold-brand px-3 py-1.5 text-xs font-bold text-navy-950"
-                >
-                  Classroom
-                </a>
               </div>
             </li>
           ))}

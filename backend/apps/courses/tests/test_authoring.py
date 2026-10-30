@@ -3,7 +3,10 @@
 Focus on the bugs fixed in Phase 0 #3: lesson-create now works, module/category
 endpoints exist, ownership is enforced, previews are reachable, slugs are unique.
 """
+import base64
+
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
@@ -77,6 +80,35 @@ class AuthoringTests(APITestCase):
             instructor=self.instr1, price=0)
         self.assertNotEqual(c1.slug, c2.slug)
 
+    # --- cover upload -------------------------------------------------------
+    @override_settings(MEDIA_URL="/media/")
+    def test_admin_uploads_cover_image_as_multipart(self):
+        from django.core.files.storage import InMemoryStorage
+        field = Course._meta.get_field("thumbnail")
+        original_storage = field.storage
+        field.storage = InMemoryStorage()
+        self.addCleanup(setattr, field, "storage", original_storage)
+
+        course = self._course(self.instr1)
+        image = SimpleUploadedFile(
+            "cover.png",
+            base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4"
+                "2mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+            ),
+            content_type="image/png",
+        )
+        self.client.force_authenticate(self.admin)
+        r = self.client.patch(
+            f"{COURSES}{course.slug}/",
+            {"title": course.title, "thumbnail": image},
+            format="multipart",
+        )
+        self.assertEqual(r.status_code, 200, r.data)
+        course.refresh_from_db()
+        self.assertIn("course/thumbnails/", course.thumbnail.name)
+        self.assertTrue(r.data["thumbnail"])
+
     # --- modules ------------------------------------------------------------
     def test_instructor_adds_module_to_own_course(self):
         course = self._course(self.instr1)
@@ -91,6 +123,38 @@ class AuthoringTests(APITestCase):
         r = self.client.post(MODULES, {
             "course": course.id, "title": "Sneak", "order": 1}, format="json")
         self.assertEqual(r.status_code, 403)
+
+    def test_module_stores_week_duration_and_meeting_link(self):
+        course = self._course(self.instr1, published=True)
+        link = "https://meet.google.com/abc-defg-hij"
+        self.client.force_authenticate(self.instr1)
+        r = self.client.post(MODULES, {
+            "course": course.id, "title": "Live week", "week": 3,
+            "duration_minutes": 90, "meeting_url": link}, format="json")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["week"], 3)
+        self.assertEqual(r.data["duration_minutes"], 90)
+        self.assertEqual(r.data["meeting_url"], link)
+
+        # Learners without access never receive the live-room link.
+        self.client.force_authenticate(self.student)
+        detail = self.client.get(f"{COURSES}{course.slug}/")
+        self.assertEqual(detail.data["modules"][0]["meeting_url"], "")
+
+        Enrollment.objects.create(
+            student=self.student, course=course,
+            status=Enrollment.Status.ACTIVE)
+        detail = self.client.get(f"{COURSES}{course.slug}/")
+        self.assertEqual(detail.data["modules"][0]["meeting_url"], link)
+
+    def test_module_rejects_meeting_link_without_scheme(self):
+        course = self._course(self.instr1)
+        self.client.force_authenticate(self.instr1)
+        r = self.client.post(MODULES, {
+            "course": course.id, "title": "Live",
+            "meeting_url": "meet.google.com/abc"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("meeting_url", r.data)
 
     # --- lessons (the previously-broken endpoint) ---------------------------
     def test_instructor_creates_lesson_under_own_module(self):

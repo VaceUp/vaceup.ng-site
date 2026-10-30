@@ -33,6 +33,7 @@ interface AuthContextType {
     full_name: string;
     phone_number?: string;
   }) => Promise<RegisterResponse>;
+  updateProfile: (data: { full_name: string }) => Promise<User>;
   setAdminGuideDismissed: (dismissed: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -116,6 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const updateProfile = useCallback(async (data: { full_name: string }) => {
+    const updated = await api.updateProfile(data);
+    setUser(updated);
+    return updated;
+  }, []);
+
   const setAdminGuideDismissed = useCallback(async (dismissed: boolean) => {
     const updated = await api.setAdminGuideDismissed(dismissed);
     setUser(updated);
@@ -144,10 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       retrySession,
       login,
       register,
+      updateProfile,
       setAdminGuideDismissed,
       logout,
     }),
-    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, logout, setAdminGuideDismissed, sessionError, retrySession]
+    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, updateProfile, logout, setAdminGuideDismissed, sessionError, retrySession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

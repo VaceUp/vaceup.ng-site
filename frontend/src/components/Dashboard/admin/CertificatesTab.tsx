@@ -47,8 +47,29 @@ export function CertificatesTab() {
       .catch(() => undefined);
   }, []);
 
-  const selStudent = students.find((s) => s.id === issueSel.student_id);
-  const selCourse = courses.find((c) => c.id === issueSel.course_id);
+  const [preview, setPreview] = useState<{ html: string; template: string } | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+
+  useEffect(() => {
+    if (!issueSel.student_id || !issueSel.course_id) {
+      setPreview(null); setPreviewError(''); setPreviewBusy(false);
+      return;
+    }
+    let active = true;
+    setPreviewBusy(true); setPreviewError('');
+    api.request<{ html: string; template: string }>(
+      `/certificates/templates/preview/?course=${encodeURIComponent(issueSel.course_id)}&student=${encodeURIComponent(issueSel.student_id)}`,
+    )
+      .then((result) => { if (active) { setPreview(result); setPreviewError(''); } })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setPreview(null);
+        setPreviewError(err instanceof Error ? err.message : 'The certificate design could not be previewed.');
+      })
+      .finally(() => { if (active) setPreviewBusy(false); });
+    return () => { active = false; };
+  }, [issueSel.student_id, issueSel.course_id]);
 
   const handleIssue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,27 +203,31 @@ export function CertificatesTab() {
           </div>
         </form>
 
-        {/* Live preview */}
+        {/* Live preview — rendered by the same code that issues the PDF */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-gray-400">Live preview</p>
-          <div className={cn('rounded-lg border-8 border-navy-950 bg-white p-1', selStudent && selCourse ? '' : 'opacity-60')}>
-            <div className="border-4 border-gold-brand p-6 text-center">
-              <img src="/logo.webp" alt="VaceUp" className="mx-auto mb-3 h-14 w-14 object-contain" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-navy-900">Certificate of Completion</p>
-              <p className="mt-4 text-[10px] uppercase tracking-widest text-gray-400">This is to certify that</p>
-              <p className="mt-1 text-2xl font-black text-navy-950">{selStudent?.full_name || 'Student Name'}</p>
-              <p className="mt-2 text-xs text-gray-500">has successfully completed</p>
-              <p className="mt-1 text-lg font-bold text-teal-700">{selCourse?.title || 'Course Title'}</p>
-              <div className="mt-5 flex items-end justify-between border-t border-gray-200 pt-3 text-[9px] text-gray-400">
-                <span>Issued {new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                <span className="text-right">
-                  <span className="block border-t border-gray-300 pt-1 font-bold text-navy-900">Director Mercy</span>
-                  Director, VaceUp Digital Academy
-                </span>
-              </div>
-            </div>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Certificate preview</p>
+            {preview && <p className="text-xs text-gray-500">Design: {preview.template}</p>}
           </div>
-          <p className="mt-3 text-center text-xs text-gray-400">Verify URL: vaceup.ng/verify?code=...</p>
+          {!issueSel.student_id || !issueSel.course_id ? (
+            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+              Choose a student and a course to see the exact certificate they would receive.
+            </div>
+          ) : previewBusy && !preview ? (
+            <div className="min-h-40 animate-pulse rounded-xl bg-gray-100" aria-busy="true" />
+          ) : previewError ? (
+            <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{previewError}</p>
+          ) : preview ? (
+            <iframe
+              title="Certificate preview"
+              srcDoc={preview.html}
+              sandbox=""
+              className="aspect-[297/210] w-full rounded-xl border border-gray-200 bg-white"
+            />
+          ) : null}
+          <p className="mt-3 text-center text-xs text-gray-400">
+            Names, dates and the verification code come from the real course records.
+          </p>
         </div>
       </div>
 

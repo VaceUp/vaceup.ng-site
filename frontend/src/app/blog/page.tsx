@@ -1,17 +1,29 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/Input';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { cn } from '@/lib/utils';
 import { BLOG_POSTS, formatDate } from '@/data/posts';
+import { getBlogPosts, type BlogPost as FeedPost } from '@/lib/website-api';
 
 const categories = ['All', ...Array.from(new Set(BLOG_POSTS.map((p) => p.category)))];
 
 export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [feed, setFeed] = useState<FeedPost[]>([]);
+
+  // The academy publishes on Blogger; the backend caches those posts so new
+  // entries appear here without redeploying the site.
+  useEffect(() => {
+    let active = true;
+    getBlogPosts()
+      .then((rows) => { if (active) setFeed(rows); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -52,6 +64,62 @@ export default function BlogPage() {
             </p>
           </div>
         </section>
+
+        {/* Latest posts from the academy blog (synced from Blogger) */}
+        {feed.length > 0 && (
+          <section className="border-b border-gray-100 bg-white py-12" aria-labelledby="latest-reading-heading">
+            <div className="mx-auto max-w-7xl px-6">
+              <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+                <h2 id="latest-reading-heading" className="text-2xl font-black text-navy-950">
+                  Latest from the academy blog
+                </h2>
+                <span className="text-sm text-gray-500">
+                  Updated automatically when we publish
+                </span>
+              </div>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {feed.slice(0, 6).map((post) => (
+                  <a
+                    key={post.id}
+                    href={post.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    <div className="relative aspect-video overflow-hidden bg-navy-950">
+                      {post.thumbnail_url && (
+                        <img
+                          src={post.thumbnail_url}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      )}
+                      {post.labels[0] && (
+                        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-navy-950 backdrop-blur-sm">
+                          {post.labels[0]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <time dateTime={post.published_at} className="mb-2 text-xs text-gray-500">
+                        {formatDate(post.published_at)}
+                      </time>
+                      <h3 className="mb-2 line-clamp-2 font-bold text-navy-950 transition-colors group-hover:text-gold-brand">
+                        {post.title}
+                      </h3>
+                      <p className="mb-4 line-clamp-2 flex-1 text-sm text-gray-600">{post.summary}</p>
+                      <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-bold text-navy-900 group-hover:text-gold-brand">
+                        Read article
+                        <i className="bi bi-arrow-up-right" aria-hidden="true" />
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Search & Filter */}
         <section className="border-b border-gray-100 bg-gray-50 py-8">

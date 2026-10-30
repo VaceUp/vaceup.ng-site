@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { adminHref, type AdminTab as Tab } from '@/lib/admin-sections';
 import { useAdminTab } from '@/lib/use-admin-tab';
@@ -10,13 +10,18 @@ import MarketingManager from './admin/MarketingManager';
 import PlatformSettings from './admin/PlatformSettings';
 import DeleteUserDialog from './admin/DeleteUserDialog';
 import { Button } from '@/components/ui/Button';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
+import { Action, Feedback, styles as authoringStyles } from './admin/AuthoringUI';
 import { cn } from '@/lib/utils';
 import LiveClassesTab from '@/components/Dashboard/admin/LiveClassesTab';
 import ContentTab from '@/components/Dashboard/admin/ContentTab';
-import AssignmentsTab from '@/components/Dashboard/admin/AssignmentsTab';
+import AssessmentWorkspace from './AssessmentWorkspace';
 import CertificatesTab from '@/components/Dashboard/admin/CertificatesTab';
 import EnrollmentsTab from '@/components/Dashboard/admin/EnrollmentsTab';
+import AnnouncementsManager from '@/components/Dashboard/admin/AnnouncementsManager';
+import WebsiteManager from '@/components/Dashboard/admin/WebsiteManager';
+import EventsManager from '@/components/Dashboard/admin/EventsManager';
+import BlogManager from '@/components/Dashboard/admin/BlogManager';
 
 interface AdminStats {
   users: { total: number; students: number; instructors: number; admins: number; new_last_30_days: number };
@@ -58,18 +63,36 @@ function naira(v: number | string) {
   }).format(parseFloat(String(v)) || 0);
 }
 
+function adminReadError(error: unknown, section: string) {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'Your session has expired. Sign in again, then retry.';
+    if (error.status === 403) return 'This account cannot access this section. Ask an authorised administrator to check your access.';
+    if (error.status >= 500) return `The server could not load ${section}. Retry shortly. If it continues, contact support with the time of the failure.`;
+    return error.message;
+  }
+  return `We could not reach the API to load ${section}. Check your connection and retry. This does not mean records were removed.`;
+}
+
 
 export function AdminHome() {
   const tab = useAdminTab();
   const router = useRouter();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsError, setStatsError] = useState('');
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // ── Users ──
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [userRole, setUserRole] = useState('');
   const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersCount, setUsersCount] = useState(0);
+  const [usersNext, setUsersNext] = useState(false);
+  const usersQuery = useRef({ search: '', role: '', page: 1 });
+  const usersRequest = useRef(0);
+  const usersAbort = useRef<AbortController | null>(null);
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'instructor' });
   const [staffMsg, setStaffMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
@@ -83,12 +106,8 @@ export function AdminHome() {
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(true);
 
-  // ── Announcements ──
-  const [ann, setAnn] = useState({ title: '', body: '' });
-  const [annMsg, setAnnMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-
-  const loadAll = useCallback(() => {
+  const loadStats = useCallback(() => {
+    setStatsLoading(true);
     api
       .request('/admin/dashboard/')
       .then((res) => {
@@ -96,31 +115,41 @@ export function AdminHome() {
         setStatsError('');
       })
       .catch((err) => {
-        setStats(null);
-        setStatsError(err?.message || 'Request failed');
-      });
-    loadUsers();
-    loadApplications();
-    loadPayments();
-    api
-      .request('/admin/announcements/')
-      .then((res: any) => setAnnouncements(res.results ?? res ?? []))
-      .catch(() => undefined);
+        setStatsError(adminReadError(err, 'platform statistics'));
+      }).finally(() => setStatsLoading(false));
   }, []);
 
   const loadUsers = useCallback(
-    (search = userSearch, role = userRole) => {
+    async (search = usersQuery.current.search, role = usersQuery.current.role, page = usersQuery.current.page) => {
+      const version = ++usersRequest.current;
+      usersAbort.current?.abort();
+      const controller = new AbortController();
+      usersAbort.current = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 20000);
+      usersQuery.current = { search, role, page };
       setUsersLoading(true);
+      setUsersError('');
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
       if (role) params.set('role', role);
-      api
-        .request(`/admin/dashboard/users/?${params.toString()}`)
-        .then((res: any) => setUsers(res.results ?? res ?? []))
-        .catch(() => setUsers([]))
-        .finally(() => setUsersLoading(false));
+      params.set('page', String(page));
+      try {
+        const result = await api.request<AdminUser[] | { results: AdminUser[]; count: number; next: string | null }>(`/admin/dashboard/users/?${params.toString()}`, { signal: controller.signal, cache: 'no-store' });
+        const rows = Array.isArray(result) ? result : result.results;
+        if (!Array.isArray(rows)) throw new Error('Invalid directory response');
+        if (version !== usersRequest.current) return;
+        setUsers(rows);
+        setUsersPage(page);
+        setUsersCount(Array.isArray(result) ? rows.length : result.count);
+        setUsersNext(!Array.isArray(result) && !!result.next);
+      } catch (error) {
+        if (version === usersRequest.current) setUsersError(adminReadError(error, 'the user directory'));
+      } finally {
+        window.clearTimeout(timeout);
+        if (version === usersRequest.current) setUsersLoading(false);
+      }
     },
-    [userSearch, userRole]
+    []
   );
 
   const loadApplications = useCallback(() => {
@@ -141,9 +170,15 @@ export function AdminHome() {
       .finally(() => setPaymentsLoading(false));
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  // Request only the section being viewed; one failing service must not clear other lists.
+  const loadAll = useCallback(() => {
+    if (tab === 'overview') loadStats();
+    if (tab === 'users') void loadUsers();
+    if (tab === 'applications') loadApplications();
+    if (tab === 'payments') loadPayments();
+  }, [tab, loadStats, loadUsers, loadApplications, loadPayments]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => () => { usersRequest.current++; usersAbort.current?.abort(); }, []);
 
   const setTabAndHash = (t: Tab) => {
     router.push(adminHref(t));
@@ -202,60 +237,22 @@ export function AdminHome() {
     }
   };
 
-  // ── Announcement actions ──
-  const handleAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAnnMsg(null);
-    try {
-      await post('/admin/announcements/', { title: ann.title, body: ann.body });
-      setAnnMsg({ ok: true, text: 'Announcement created — publish it below.' });
-      setAnn({ title: '', body: '' });
-      loadAll();
-    } catch (err: any) {
-      setAnnMsg({ ok: false, text: err.message });
-    }
-  };
-
-  const publishAnnouncement = async (id: string) => {
-    try {
-      await post(`/admin/announcements/${id}/publish/`, {});
-      setAnnMsg({ ok: true, text: 'Published.' });
-      loadAll();
-    } catch (err: any) {
-      setAnnMsg({ ok: false, text: err.message });
-    }
-  };
-
   return (
     <div className="space-y-6">
       <AdminGuide currentTab={tab} onNavigate={setTabAndHash} />
       {/* ═══ Overview ═══ */}
       {tab === 'overview' && (
         <div className="space-y-6">
-          {!stats && statsError ? (
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
-              <i className="bi bi-exclamation-triangle mb-3 block text-3xl text-red-400" aria-hidden="true" />
-              <p className="font-bold text-red-700">Could not load platform stats</p>
-              <p className="mx-auto mt-1 max-w-md break-words font-mono text-xs text-red-500">{statsError}</p>
-              <p className="mx-auto mt-3 max-w-md text-xs text-gray-500">
-                If this says 403: your account&apos;s <b>role</b> is not set to <code>admin</code> —
-                set it in Django admin → Users → your account → Role.
-              </p>
-              <button
-                type="button"
-                onClick={loadAll}
-                className="mt-4 rounded-xl bg-navy-950 px-6 py-2.5 text-sm font-bold text-white"
-              >
-                Retry
-              </button>
-            </div>
-          ) : !stats ? (
+          {statsError && <div className={`${authoringStyles.root} ${authoringStyles.stack}`}><Feedback error={statsError} />
+            {stats && <p>Showing the last statistics we could load.</p>}
+            <div><Action loading={statsLoading} onClick={loadStats}>Retry statistics</Action></div></div>}
+          {!stats && !statsError ? (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="h-28 animate-pulse rounded-2xl bg-gray-200" />
               ))}
             </div>
-          ) : (
+          ) : stats ? (
             <>
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <Card icon="bi-people" label="Total Users" value={stats.users?.total ?? 0} />
@@ -268,11 +265,12 @@ export function AdminHome() {
                 <Card icon="bi-person-plus" label="New (30 days)" value={stats.users?.new_last_30_days ?? 0} />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   { tab: 'users' as Tab, icon: 'bi-person-plus', title: 'Invite a tutor or admin', text: 'Add team members with roles' },
                   { tab: 'courses' as Tab, icon: 'bi-book', title: 'Create a course', text: 'Build and publish a new program' },
                   { tab: 'applications' as Tab, icon: 'bi-file-earmark-text', title: 'Review applications', text: 'Approve or reject student applications' },
+                  { tab: 'website' as Tab, icon: 'bi-globe2', title: 'Update the public website', text: 'About page, events and blog' },
                 ].map((a) => (
                   <button
                     key={a.title}
@@ -287,7 +285,7 @@ export function AdminHome() {
                 ))}
               </div>
             </>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -298,7 +296,7 @@ export function AdminHome() {
           <form onSubmit={handleInvite} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h3 className="mb-1 font-black text-navy-950">Create Tutor / Admin Account</h3>
             <p className="mb-5 text-xs text-gray-500">
-              The account is created immediately — share the password with them to start.
+              A password-setup email is requested after the account is created. Delivery depends on the mail queue.
             </p>
             <div className="grid gap-4 sm:grid-cols-3">
               <input
@@ -353,15 +351,17 @@ export function AdminHome() {
                 placeholder="Search by email or name…"
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadUsers()}
+                aria-label="Search users by email or name"
+                onKeyDown={(e) => e.key === 'Enter' && void loadUsers(userSearch, userRole, 1)}
                 className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-navy-900 focus:bg-white focus:outline-none"
               />
               <select
                 value={userRole}
                 onChange={(e) => {
                   setUserRole(e.target.value);
-                  loadUsers(userSearch, e.target.value);
+                  void loadUsers(userSearch, e.target.value, 1);
                 }}
+                aria-label="Filter users by role"
                 className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm sm:w-44"
               >
                 <option value="">All roles</option>
@@ -371,20 +371,23 @@ export function AdminHome() {
               </select>
               <button
                 type="button"
-                onClick={() => loadUsers()}
+                onClick={() => void loadUsers(userSearch, userRole, 1)}
                 className="rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-bold text-white"
               >
                 Search
               </button>
             </div>
 
+            {usersError && <div className={`${authoringStyles.root} ${authoringStyles.stack}`}><Feedback error={usersError} />
+              {users.length > 0 && <p>Showing the last directory results we could load. Your requested search or page may not be shown yet.</p>}
+              <div><Action loading={usersLoading} onClick={() => void loadUsers()}>Retry user directory</Action></div></div>}
             {usersLoading ? (
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="h-12 animate-pulse rounded-xl bg-gray-100" />
                 ))}
               </div>
-            ) : users.length === 0 ? (
+            ) : users.length === 0 && !usersError ? (
               <p className="text-sm text-gray-500">No users match.</p>
             ) : (
               <ul className="divide-y divide-gray-100">
@@ -458,6 +461,11 @@ export function AdminHome() {
                 ))}
               </ul>
             )}
+            {!usersLoading && usersCount > 0 && <nav aria-label="User directory pages" className={`${authoringStyles.root} ${authoringStyles.row}`}>
+              <Action disabled={usersPage <= 1} onClick={() => void loadUsers(usersQuery.current.search, usersQuery.current.role, usersPage - 1)}>Previous users</Action>
+              <span>Page {usersPage} / {usersCount} users</span>
+              <Action disabled={!usersNext} onClick={() => void loadUsers(usersQuery.current.search, usersQuery.current.role, usersPage + 1)}>Next users</Action>
+            </nav>}
             {staffMsg && (
               <p
                 className={cn(
@@ -475,6 +483,7 @@ export function AdminHome() {
       {/* ═══ Courses ═══ */}
       {deleteTarget && <DeleteUserDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={(id) => {
         setUsers((current) => current.filter((item) => String(item.id) !== String(id)));
+        void loadUsers(usersQuery.current.search, usersQuery.current.role, 1);
         setStaffMsg({ ok: true, text: 'User and the listed database records were permanently deleted. Backups, external files and audit records were retained.' });
       }} />}
       {tab === 'courses' && <CourseManager />}
@@ -486,7 +495,7 @@ export function AdminHome() {
       {tab === 'liveclasses' && <LiveClassesTab />}
 
       {/* ═══ Assignments & Quizzes ═══ */}
-      {tab === 'assignments' && <AssignmentsTab />}
+      {tab === 'assignments' && <AssessmentWorkspace />}
 
       {/* ═══ Certificates ═══ */}
       {tab === 'certificates' && <CertificatesTab />}
@@ -640,66 +649,12 @@ export function AdminHome() {
       )}
 
       {/* ═══ Announcements ═══ */}
-      {tab === 'announcements' && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <form onSubmit={handleAnnouncement} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h3 className="mb-5 font-black text-navy-950">New Announcement</h3>
-            <div className="space-y-4">
-              <input
-                type="text"
-                required
-                placeholder="Title"
-                value={ann.title}
-                onChange={(e) => setAnn({ ...ann, title: e.target.value })}
-                className={inputCls}
-              />
-              <textarea
-                required
-                rows={5}
-                placeholder="Write the announcement…"
-                value={ann.body}
-                onChange={(e) => setAnn({ ...ann, body: e.target.value })}
-                className={inputCls}
-              />
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-gold-brand py-3.5 font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover"
-              >
-                Create Announcement
-              </button>
-            </div>
-          </form>
+      {tab === 'announcements' && <AnnouncementsManager />}
 
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 font-black text-navy-950">Published & Drafts</h3>
-            {announcements.length === 0 ? (
-              <p className="text-sm text-gray-500">No announcements yet.</p>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {announcements.map((a: any) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-navy-950">{a.title}</p>
-                      <p className="text-xs text-gray-500">
-                        {a.status ?? 'draft'} · {a.target ?? 'all users'}
-                      </p>
-                    </div>
-                    {a.status !== 'published' && (
-                      <button
-                        type="button"
-                        onClick={() => publishAnnouncement(a.id)}
-                        className="rounded-lg bg-navy-950 px-3 py-1.5 text-xs font-bold text-white"
-                      >
-                        Publish
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ═══ Public website ═══ */}
+      {tab === 'website' && <WebsiteManager />}
+      {tab === 'events' && <EventsManager />}
+      {tab === 'blog' && <BlogManager />}
 
       {tab === 'flags' && <PlatformSettings />}
       {tab === 'marketing' && <MarketingManager />}

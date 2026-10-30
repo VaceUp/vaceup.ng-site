@@ -1,5 +1,7 @@
 """Account-scoped student/tutor workspace reads. No demo data or write side effects."""
-from django.db.models import Count, F, OuterRef, Q, Subquery, Sum
+from datetime import timedelta
+
+from django.db.models import Count, Exists, F, Min, OuterRef, Q, Subquery, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.cache import patch_cache_control
@@ -8,11 +10,12 @@ from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.assignments.models import Assignment, Quiz, QuizAttempt, Submission
 from apps.certificates.models import Certificate
 from apps.courses.models import Course, Lesson
 from apps.courses.serializers import CourseDetailSerializer
 from apps.enrollment.models import Enrollment, LessonProgress
-from apps.liveclasses.models import LiveClass
+from apps.liveclasses.models import JOIN_GRACE, LiveClass
 from apps.payments.models import Payment
 
 ACCESS_STATUSES = (Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED)
@@ -98,11 +101,190 @@ class WorkspaceLiveClassSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "course_title", "scheduled_start", "duration_minutes", "status", "joinable")
 
 
+class WorkspaceAgendaItemSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    course_id = serializers.IntegerField()
+    course_title = serializers.CharField()
+    when = serializers.DateTimeField(allow_null=True)
+    state = serializers.CharField()
+    detail = serializers.CharField()
+    href = serializers.CharField()
+
+
+class WorkspaceTaskSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    label = serializers.CharField()
+    count = serializers.IntegerField()
+    href = serializers.CharField()
+
+
+def _agenda_item(kind, pk, title, course, when, state, detail, href):
+    return {
+        "kind": kind, "id": pk, "title": title, "course_id": course.pk,
+        "course_title": course.title, "when": when, "state": state,
+        "detail": detail, "href": href,
+    }
+
+
+def _class_agenda(courses, limit=3):
+    now = timezone.now()
+    classes = (LiveClass.objects.filter(course__in=courses)
+               .filter(Q(status=LiveClass.Status.LIVE) |
+                       Q(status=LiveClass.Status.SCHEDULED,
+                         scheduled_start__gte=now - timedelta(hours=6)))
+               .exclude(status__in=(LiveClass.Status.CANCELLED, LiveClass.Status.ENDED))
+               .select_related("course").order_by("scheduled_start"))
+    rows = []
+    for session in classes:
+        # A scheduled session whose window closed is no longer "next up".
+        if (session.status == LiveClass.Status.SCHEDULED
+                and session.scheduled_end + JOIN_GRACE < now):
+            continue
+        if session.status == LiveClass.Status.LIVE:
+            state = "live"
+        elif session.is_joinable(now):
+            state = "join now"
+        else:
+            state = "scheduled"
+        rows.append(_agenda_item(
+            "class", session.pk, session.title, session.course,
+            session.scheduled_start, state,
+            f"{session.duration_minutes} minutes", "/dashboard/live-classes",
+        ))
+        if len(rows) == limit:
+            break
+    return rows
+
+
+def _student_agenda(user, courses):
+    now = timezone.now()
+    rows = []
+    mine = Submission.objects.filter(assignment=OuterRef("pk"), student=user)
+    assignments = (Assignment.objects.filter(
+        course__in=courses, is_published=True, due_at__gte=now - timedelta(days=14))
+        .annotate(submission_status=Subquery(mine.values("status")[:1]))
+        .filter(Q(submission_status__isnull=True) |
+                ~Q(submission_status=Submission.Status.GRADED))
+        .select_related("course").order_by("due_at")[:4])
+    for assignment in assignments:
+        status = assignment.submission_status
+        if status in (Submission.Status.SUBMITTED, Submission.Status.LATE,
+                      Submission.Status.REVIEW):
+            state, detail = "awaiting grading", "Submitted. Your tutor has not recorded a grade yet."
+        else:
+            state = "overdue" if assignment.due_at < now else "due"
+            detail = f"{assignment.max_score} marks. Due {assignment.due_at:%d %b %Y, %H:%M}."
+        rows.append(_agenda_item(
+            "assignment", assignment.pk, assignment.title, assignment.course,
+            assignment.due_at, state, detail,
+            f"/dashboard/assessments?view=list&assignment={assignment.pk}",
+        ))
+
+    attempts = QuizAttempt.objects.filter(quiz=OuterRef("pk"), student=user)
+    quizzes = (Quiz.objects.filter(course__in=courses, status=Quiz.Status.PUBLISHED)
+               .annotate(attempt_status=Subquery(attempts.values("status")[:1]))
+               .filter(Q(attempt_status__isnull=True) |
+                       Q(attempt_status=QuizAttempt.Status.IN_PROGRESS))
+               .select_related("course").order_by("-created_at")[:3])
+    for quiz in quizzes:
+        state = "in progress" if quiz.attempt_status == QuizAttempt.Status.IN_PROGRESS else "available"
+        rows.append(_agenda_item(
+            "quiz", quiz.pk, quiz.title, quiz.course, None, state,
+            f"{quiz.pass_mark}% to pass. {quiz.time_limit_minutes}-minute limit.",
+            f"/dashboard/assessments?view=list&quiz={quiz.pk}",
+        ))
+
+    rows.extend(_class_agenda(courses))
+    rows.sort(key=lambda row: row["when"] or now)
+    return rows[:8]
+
+
+def _tutor_agenda(user, courses):
+    now = timezone.now()
+    awaiting = Count("submissions", filter=Q(
+        submissions__score__isnull=True,
+        submissions__status__in=(Submission.Status.SUBMITTED, Submission.Status.LATE,
+                                 Submission.Status.REVIEW),
+    ))
+    assignments = (Assignment.objects.filter(course__in=courses)
+                   .annotate(awaiting=awaiting).filter(awaiting__gt=0)
+                   .select_related("course").order_by("due_at")[:4])
+    rows = []
+    for assignment in assignments:
+        state = "overdue" if assignment.due_at < now else "due"
+        rows.append(_agenda_item(
+            "assignment", assignment.pk, assignment.title, assignment.course,
+            assignment.due_at, state,
+            f"{assignment.awaiting} submission{'s' if assignment.awaiting != 1 else ''} awaiting grading.",
+            f"/dashboard/assessments?view=list&assignment={assignment.pk}",
+        ))
+    rows.extend(_class_agenda(courses))
+    rows.sort(key=lambda row: row["when"] or now)
+    return rows[:8]
+
+
+def _student_tasks(user, courses):
+    now = timezone.now()
+    mine = Submission.objects.filter(assignment=OuterRef("pk"), student=user)
+    assignments = (Assignment.objects.filter(
+        course__in=courses, is_published=True, due_at__gte=now - timedelta(days=30))
+        .annotate(has_submission=Exists(mine)).filter(has_submission=False).count())
+    attempts = QuizAttempt.objects.filter(quiz=OuterRef("pk"), student=user)
+    quizzes = (Quiz.objects.filter(course__in=courses, status=Quiz.Status.PUBLISHED)
+               .annotate(attempt_status=Subquery(attempts.values("status")[:1]))
+               .filter(Q(attempt_status__isnull=True) |
+                       Q(attempt_status=QuizAttempt.Status.IN_PROGRESS)).count())
+    classes = (LiveClass.objects.filter(
+        course__in=courses, status=LiveClass.Status.SCHEDULED,
+        scheduled_start__gte=now, scheduled_start__lte=now + timedelta(days=7)).count())
+    total_lessons = Lesson.objects.filter(module__course__in=courses).count()
+    completed = LessonProgress.objects.filter(
+        enrollment__student=user, enrollment__course__in=courses,
+        enrollment__status__in=ACCESS_STATUSES, completed=True).count()
+    return [
+        {"kind": "assignments", "label": "Assignments to submit", "count": assignments,
+         "href": "/dashboard/assessments?view=list"},
+        {"kind": "quizzes", "label": "Quizzes to take", "count": quizzes,
+         "href": "/dashboard/assessments?view=list"},
+        {"kind": "classes", "label": "Classes this week", "count": classes,
+         "href": "/dashboard/live-classes"},
+        {"kind": "lessons", "label": "Lessons remaining", "count": max(total_lessons - completed, 0),
+         "href": "/dashboard/courses"},
+    ]
+
+
+def _tutor_tasks(user, courses):
+    now = timezone.now()
+    ungraded = Submission.objects.filter(
+        assignment__course__in=courses, score__isnull=True,
+        status__in=(Submission.Status.SUBMITTED, Submission.Status.LATE,
+                    Submission.Status.REVIEW)).count()
+    drafts = courses.filter(is_published=False).count()
+    quiz_drafts = Quiz.objects.filter(course__in=courses, status=Quiz.Status.DRAFT).count()
+    classes = LiveClass.objects.filter(
+        course__in=courses, status=LiveClass.Status.SCHEDULED,
+        scheduled_start__gte=now, scheduled_start__lte=now + timedelta(days=7)).count()
+    return [
+        {"kind": "grading", "label": "Submissions to grade", "count": ungraded,
+         "href": "/dashboard/assessments?view=list"},
+        {"kind": "drafts", "label": "Unpublished courses", "count": drafts,
+         "href": "/dashboard/content"},
+        {"kind": "quizzes", "label": "Quiz drafts", "count": quiz_drafts,
+         "href": "/dashboard/assessments?view=list"},
+        {"kind": "classes", "label": "Classes this week", "count": classes,
+         "href": "/dashboard/live-classes"},
+    ]
+
+
 class WorkspaceOverviewSerializer(serializers.Serializer):
     role = serializers.CharField()
     counts = serializers.DictField(child=serializers.IntegerField())
     recent_courses = WorkspaceCourseSerializer(many=True)
     upcoming_classes = WorkspaceLiveClassSerializer(many=True)
+    agenda = WorkspaceAgendaItemSerializer(many=True)
+    tasks = WorkspaceTaskSerializer(many=True)
     updated_at = serializers.DateTimeField()
 
 
@@ -140,10 +322,15 @@ class WorkspaceOverviewView(PrivateWorkspaceResponse, GenericAPIView):
                     .filter(Q(status=LiveClass.Status.LIVE) |
                             Q(status=LiveClass.Status.SCHEDULED, scheduled_start__gte=timezone.now()))
                     .select_related("course").order_by("scheduled_start", "pk")[:4])
+        agenda = (_tutor_agenda(user, courses) if user.is_instructor
+                  else _student_agenda(user, courses))
+        tasks = (_tutor_tasks(user, courses) if user.is_instructor
+                 else _student_tasks(user, courses))
         return Response(self.get_serializer({
             "role": user.role, "counts": counts,
             "recent_courses": workspace_courses(user)[:3],
-            "upcoming_classes": upcoming, "updated_at": timezone.now(),
+            "upcoming_classes": upcoming, "agenda": agenda, "tasks": tasks,
+            "updated_at": timezone.now(),
         }).data)
 
 

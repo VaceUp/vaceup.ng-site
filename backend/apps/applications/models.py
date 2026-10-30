@@ -36,6 +36,17 @@ class Application(TimeStampedModel):
         db_index=True,
     )
     motivation = models.TextField(blank=True)
+    full_name = models.CharField(max_length=150, blank=True)
+    phone = models.CharField(max_length=40, blank=True)
+    country = models.CharField(max_length=80, blank=True)
+    city = models.CharField(max_length=80, blank=True)
+    education = models.CharField(max_length=200, blank=True)
+    current_role = models.CharField(max_length=200, blank=True)
+    experience = models.CharField(max_length=80, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    github_url = models.URLField(blank=True)
+    goals = models.TextField(blank=True)
+    heard_from = models.CharField(max_length=200, blank=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

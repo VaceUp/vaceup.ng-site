@@ -3,26 +3,35 @@ from django.core.management.base import BaseCommand, CommandError
 from django.urls import Resolver404, resolve
 
 
+REQUIRED_ROUTES = {
+    "/api/v1/admin/dashboard/users/1/deletion/": "GET",
+    "/api/v1/admin/dashboard/users/delete/": "POST",
+    "/api/v1/auth/password-reset/": "POST",
+    "/api/v1/auth/password-reset/confirm/": "POST",
+    "/api/v1/courses/import-homepage/": "POST",
+    "/api/v1/admin/dashboard/enrollments/grant/": "POST",
+    "/api/v1/payments/checkout/": "POST",
+    "/api/v1/payments/verify/": "POST",
+    "/api/v1/messages/contacts/": "GET",
+    "/api/v1/messages/read/": "POST",
+    "/api/v1/notifications/1/read/": "POST",
+    "/api/v1/admin/settings/definitions/": "GET",
+    "/api/v1/admin/settings/public/": "GET",
+    "/api/v1/courses/release-route-check/": "PATCH",
+    "/api/v1/website/profile/": "GET",
+    "/api/v1/website/events/": "GET",
+    "/api/v1/website/posts/": "GET",
+    "/api/v1/website/blog/source/": "PATCH",
+    "/api/v1/website/events/1/register/": "POST",
+    "/api/v1/certificates/templates/preview/": "GET",
+}
+
+
 class Command(BaseCommand):
     help = "Verify critical installed routes without sending mail, making payments or deleting users."
 
     def handle(self, *args, **options):
-        required = {
-            "/api/v1/admin/dashboard/users/1/deletion/": "GET",
-            "/api/v1/admin/dashboard/users/delete/": "POST",
-            "/api/v1/auth/password-reset/": "POST",
-            "/api/v1/auth/password-reset/confirm/": "POST",
-            "/api/v1/courses/import-homepage/": "POST",
-            "/api/v1/admin/dashboard/enrollments/grant/": "POST",
-            "/api/v1/payments/checkout/": "POST",
-            "/api/v1/payments/verify/": "POST",
-            "/api/v1/messages/contacts/": "GET",
-            "/api/v1/messages/read/": "POST",
-            "/api/v1/notifications/1/read/": "POST",
-            "/api/v1/admin/settings/definitions/": "GET",
-            "/api/v1/admin/settings/public/": "GET",
-            "/api/v1/courses/release-route-check/": "PATCH",
-        }
+        required = REQUIRED_ROUTES
         expected_actions = {
             "/api/v1/admin/settings/definitions/": "definitions",
             "/api/v1/admin/settings/public/": "public",

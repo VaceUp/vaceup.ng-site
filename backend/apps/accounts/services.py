@@ -191,6 +191,15 @@ def reset_password(*, token, new_password):
     return user
 
 
+@transaction.atomic
+def change_password(*, user, new_password):
+    """Set a new password for a signed-in user and revoke every session."""
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+    _revoke_all_refresh_tokens(user)
+    return user
+
+
 def _revoke_all_refresh_tokens(user) -> None:
     """Blacklist every outstanding refresh token for the user."""
     # Local import: the blacklist app owns these tables.

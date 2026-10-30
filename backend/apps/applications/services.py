@@ -7,16 +7,41 @@ from apps.applications.models import Application
 from apps.enrollment.models import Enrollment
 
 
-def application_submit(*, student, course, motivation=""):
-    """Student submits an application (idempotent — returns existing if any)."""
+PERSONAL_FIELDS = (
+    "full_name", "phone", "country", "city", "education", "current_role",
+    "experience", "linkedin_url", "github_url", "goals", "heard_from",
+)
+
+
+def application_submit(*, student, course, motivation="", details=None):
+    """Student submits an application (idempotent — updates while still open)."""
+    details = {
+        key: value for key, value in (details or {}).items()
+        if key in PERSONAL_FIELDS and value not in (None, "")
+    }
     application, created = Application.objects.get_or_create(
         student=student,
         course=course,
         defaults={
             "motivation": motivation,
+            **details,
             "status": Application.Status.SUBMITTED,
         },
     )
+    if not created and application.status in (
+        Application.Status.SUBMITTED,
+        Application.Status.UNDER_REVIEW,
+    ):
+        changed = []
+        if motivation and application.motivation != motivation:
+            application.motivation = motivation
+            changed.append("motivation")
+        for key, value in details.items():
+            if getattr(application, key) != value:
+                setattr(application, key, value)
+                changed.append(key)
+        if changed:
+            application.save(update_fields=changed + ["updated_at"])
     return application
 
 

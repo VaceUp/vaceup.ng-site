@@ -6,10 +6,11 @@ import { Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
-import { webUrl, type WorkspaceCourseDetail, type WorkspaceLesson } from '@/lib/workspace-api';
+import { webUrl, type WorkspaceCourseDetail, type WorkspaceLesson, type WorkspaceModule } from '@/lib/workspace-api';
 import { WorkspaceHeading, WorkspacePanel, WorkspaceEmpty, WorkspaceFeedback, WorkspaceRefresh, WorkspaceLink, WorkspaceButton, styles } from './WorkspaceUI';
 
-function Lesson({ lesson, completed, student, onComplete }: { lesson: WorkspaceLesson; completed: boolean; student: boolean; onComplete: () => void }) {
+function Lesson({ lesson, module, completed, student, onComplete }: { lesson: WorkspaceLesson; module: WorkspaceModule; completed: boolean; student: boolean; onComplete: () => void }) {
+  const meetUrl = webUrl(module.meeting_url);
   const [busy, setBusy] = useState(false);
   const [videoBusy, setVideoBusy] = useState(false);
   const [source, setSource] = useState<string | null>(null);
@@ -34,6 +35,10 @@ function Lesson({ lesson, completed, student, onComplete }: { lesson: WorkspaceL
     finally { if (mounted.current) setBusy(false); }
   };
   return <WorkspacePanel><div className={styles.stack}><div className={styles.row}><h2>{lesson.title}</h2>{completed && <span className={styles.badge}><Check aria-hidden="true" />Completed</span>}</div>
+    <p className={styles.muted}>Week {module.week} - {module.title}{module.duration_minutes ? ` - ${module.duration_minutes} minutes planned` : ''}</p>
+    {module.meeting_url && (meetUrl
+      ? <a className={styles.action} href={meetUrl} target="_blank" rel="noopener noreferrer">Join the live Google Meet session</a>
+      : <p className={styles.muted}>The live session link for this module is invalid. Contact your tutor.</p>)}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {lesson.has_video && <div className={styles.stack}><WorkspaceButton loading={videoBusy} onClick={() => void play()}>{source ? 'Refresh video access' : 'Load lesson video'}</WorkspaceButton>
       {source && <>{!videoError && <video className={styles.video} src={source} controls playsInline preload="metadata" onError={() => setVideoError(true)} aria-label={lesson.title} />}
@@ -54,12 +59,14 @@ function LearnContent() {
   const data = resource.data;
   const lessons = data?.course.modules.flatMap(module => module.lessons) || [];
   const lesson = lessons.find(item => item.id === selected) || lessons.find(item => !data?.completed_lesson_ids.includes(item.id)) || lessons[0];
+  const activeModule = data?.course.modules.find(module => module.lessons.some(item => item.id === lesson?.id));
   if (!valid) return <WorkspaceEmpty title="Choose a course first" action={<WorkspaceLink href="/dashboard/courses">My courses</WorkspaceLink>}>Open a course from your enrollments to access its lessons.</WorkspaceEmpty>;
   return <><WorkspaceHeading title={data?.course.title || 'Your course'} description={user?.role === 'instructor' ? 'Review the published lesson content your learners can access.' : 'Choose a lesson and mark it complete when you finish studying.'} action={<WorkspaceRefresh loading={resource.loading} onRefresh={resource.refresh} />} />
     <WorkspaceLink href="/dashboard/courses">Back to my courses</WorkspaceLink>
+    <WorkspaceLink href="/dashboard/assessments">Open assignments and quizzes</WorkspaceLink>
     <WorkspaceFeedback {...resource} hasData={!!data} onRetry={resource.refresh} />
-    {data && (lessons.length ? <div className={`${styles.split} ${styles.lessonSplit}`}><nav className={styles.lessonNav} aria-label="Course lessons">{data.course.modules.map(module => <details key={module.id} open><summary>{module.title}</summary>{module.lessons.map(item => <WorkspaceButton key={item.id} className={styles.lessonButton} aria-current={lesson?.id === item.id ? 'step' : undefined} onClick={() => setSelected(item.id)}>{data.completed_lesson_ids.includes(item.id) && <Check aria-hidden="true" />}{item.title}</WorkspaceButton>)}</details>)}</nav>
-      {lesson && <Lesson key={`${id}:${lesson.id}`} lesson={lesson} student={user?.role === 'student'} completed={data.completed_lesson_ids.includes(lesson.id)} onComplete={() => { setSelected(lesson.id); resource.refresh(); }} />}
+    {data && (lessons.length ? <div className={`${styles.split} ${styles.lessonSplit}`}><nav className={styles.lessonNav} aria-label="Course lessons">{data.course.modules.map(module => <details key={module.id} open><summary>Week {module.week}: {module.title}</summary>{module.lessons.map(item => <WorkspaceButton key={item.id} className={styles.lessonButton} aria-current={lesson?.id === item.id ? 'step' : undefined} onClick={() => setSelected(item.id)}>{data.completed_lesson_ids.includes(item.id) && <Check aria-hidden="true" />}{item.title}</WorkspaceButton>)}</details>)}</nav>
+      {lesson && activeModule && <Lesson key={`${id}:${lesson.id}`} lesson={lesson} module={activeModule} student={user?.role === 'student'} completed={data.completed_lesson_ids.includes(lesson.id)} onComplete={() => { setSelected(lesson.id); resource.refresh(); }} />}
     </div> : <WorkspaceEmpty title="Lessons are on their way">Your tutor has not added lessons to this course yet.</WorkspaceEmpty>)}
   </>;
 }

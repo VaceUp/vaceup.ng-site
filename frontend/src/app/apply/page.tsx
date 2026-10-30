@@ -24,6 +24,9 @@ export default function ApplyPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courses, setCourses] = useState<{ id: string; title: string; price: number; duration: string }[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState('');
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [serverError, setServerError] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -62,6 +65,8 @@ export default function ApplyPage() {
   // Accept only courses that exist in the published backend catalogue.
   useEffect(() => {
     let cancelled = false;
+    setCoursesLoading(true);
+    setCoursesError('');
     getPublicCourses()
       .then((res) => {
         if (cancelled) return;
@@ -75,8 +80,35 @@ export default function ApplyPage() {
         );
       })
       .catch(() => {
-        if (!cancelled) setServerError('Courses could not be loaded. Please refresh and try again before applying.');
+        if (!cancelled) {
+          setCoursesError('Courses could not be loaded. Check your connection and try again before applying.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCoursesLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [catalogAttempt]);
+
+  // Prefill contact details from the signed-in account so applicants only
+  // complete what we do not already know.
+  useEffect(() => {
+    if (!api.getToken()) return;
+    let cancelled = false;
+    api
+      .getMe()
+      .then((me) => {
+        if (cancelled) return;
+        setFormData((prev) => ({
+          ...prev,
+          fullName: prev.fullName || me.full_name || '',
+          email: prev.email || me.email || '',
+          phone: prev.phone || me.phone_number || '',
+        }));
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -95,10 +127,20 @@ export default function ApplyPage() {
       if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
       if (!formData.country.trim()) newErrors.country = 'Country is required';
       if (!formData.city.trim()) newErrors.city = 'City is required';
+      if (formData.linkedin.trim() && !formData.linkedin.toLowerCase().includes('linkedin.com')) {
+        newErrors.linkedin = 'Enter a linkedin.com profile URL';
+      }
+      if (formData.github.trim() && !formData.github.toLowerCase().includes('github.com')) {
+        newErrors.github = 'Enter a github.com profile URL';
+      }
     }
     if (step === 3) {
-      if (!formData.motivation.trim()) newErrors.motivation = 'Please tell us why you want to join';
-      if (!formData.goals.trim()) newErrors.goals = 'Please share your career goals';
+      if (formData.motivation.trim().length < 100) {
+        newErrors.motivation = 'Please write at least 100 characters so we can review your application properly';
+      }
+      if (formData.goals.trim().length < 100) {
+        newErrors.goals = 'Please describe your career goals in at least 100 characters';
+      }
     }
     
     setErrors(newErrors);
@@ -117,7 +159,14 @@ export default function ApplyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep(4)) return;
+
+    // Re-check earlier steps so a backward edit cannot bypass validation.
+    for (const step of [1, 2, 3]) {
+      if (!validateStep(step)) {
+        setCurrentStep(step);
+        return;
+      }
+    }
 
     // BUSINESS RULE: register before paying — captures leads for admin
     // marketing campaigns and keeps payments tied to real accounts.
@@ -138,13 +187,19 @@ export default function ApplyPage() {
         })
         .catch(() => undefined);
       await api.submitApplication({
-        course_id: selectedCourse,
-        motivation: [
-          formData.motivation.trim(),
-          formData.goals.trim() ? `Career goals: ${formData.goals.trim()}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n\n'),
+        course: selectedCourse,
+        motivation: formData.motivation.trim(),
+        goals: formData.goals.trim(),
+        full_name: formData.fullName.trim(),
+        phone: formData.phone.trim(),
+        country: formData.country.trim(),
+        city: formData.city.trim(),
+        education: formData.education.trim(),
+        current_role: formData.currentRole.trim(),
+        experience: formData.experience.trim(),
+        linkedin_url: formData.linkedin.trim(),
+        github_url: formData.github.trim(),
+        heard_from: formData.heardFrom,
       });
       setSubmitStatus('success');
     } catch (err: any) {
@@ -251,42 +306,68 @@ export default function ApplyPage() {
                   <h2 className="text-2xl font-black text-navy-950 mb-2">Select Your Course</h2>
                   <p className="text-gray-600">Choose the program that aligns with your career goals</p>
                 </div>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {courses.map((course) => (
-                    <button
-                      key={course.id}
-                      onClick={() => setSelectedCourse(course.id)}
-                      className={cn(
-                        'relative p-6 rounded-2xl border-2 transition-all text-left group',
-                        selectedCourse === course.id
-                          ? 'border-gold-brand bg-gold-brand/5 shadow-lg'
-                          : 'border-gray-100 hover:border-navy-200 hover:shadow-md'
-                      )}
+                {coursesLoading ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Loading courses">
+                    {[0, 1, 2].map((index) => (
+                      <div key={index} className="h-44 rounded-2xl border-2 border-gray-100 bg-gray-50 animate-pulse" />
+                    ))}
+                  </div>
+                ) : coursesError ? (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+                    <p className="text-sm text-red-700">{coursesError}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => setCatalogAttempt((attempt) => attempt + 1)}
                     >
-                      {selectedCourse === course.id && (
-                        <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gold-brand flex items-center justify-center">
-                          <LordIconComponent src={LordIcons.check} size={20} colors="primary:#00088A" />
+                      Try again
+                    </Button>
+                  </div>
+                ) : courses.length === 0 ? (
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-8 text-center">
+                    <p className="font-semibold text-navy-950">No courses are open for applications right now.</p>
+                    <p className="mt-2 text-sm text-gray-600">
+                      New cohorts are announced regularly. Contact admissions and we will let you know when enrollment opens.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {courses.map((course) => (
+                      <button
+                        key={course.id}
+                        type="button"
+                        onClick={() => setSelectedCourse(course.id)}
+                        aria-pressed={selectedCourse === course.id}
+                        className={cn(
+                          'relative p-6 rounded-2xl border-2 transition-all text-left group',
+                          selectedCourse === course.id
+                            ? 'border-gold-brand bg-gold-brand/5 shadow-lg'
+                            : 'border-gray-100 hover:border-navy-200 hover:shadow-md'
+                        )}
+                      >
+                        {selectedCourse === course.id && (
+                          <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-gold-brand flex items-center justify-center">
+                            <LordIconComponent src={LordIcons.check} size={20} colors="primary:#00088A" />
+                          </div>
+                        )}
+                        <h3 className="font-bold text-navy-950 mb-2">{course.title}</h3>
+                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                          <span className="flex items-center gap-1">
+                            <LordIconComponent src={LordIcons.clock} size={14} />
+                            {course.duration}
+                          </span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-1 text-gold-brand mb-2">
-                        <LordIconComponent src={LordIcons.star} size={16} colors="primary:#FFC72C" />
-                        <span className="font-bold">4.9</span>
-                        <span className="text-gray-400 text-sm">(1,200+ reviews)</span>
-                      </div>
-                      <h3 className="font-bold text-navy-950 mb-1">{course.title}</h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                        <span className="flex items-center gap-1">
-                          <LordIconComponent src={LordIcons.clock} size={14} />
-                          {course.duration}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <span className="font-bold text-lg text-navy-950">{formatCurrency(course.price)}</span>
-                        <Badge variant="secondary" className="text-xs">Enroll</Badge>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                          <span className="font-bold text-lg text-navy-950">{formatCurrency(course.price)}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {selectedCourse === course.id ? 'Selected' : 'Select'}
+                          </Badge>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {errors.course && (
                   <p className="mt-4 text-center text-red-500 text-sm">{errors.course}</p>
                 )}
@@ -406,6 +487,7 @@ export default function ApplyPage() {
                         placeholder="https://linkedin.com/in/yourname"
                         value={formData.linkedin}
                         onChange={(e) => setFormData(prev => ({ ...prev, linkedin: e.target.value }))}
+                        error={errors.linkedin}
                       />
                     </div>
                     <div>
@@ -416,6 +498,7 @@ export default function ApplyPage() {
                         placeholder="https://github.com/yourname"
                         value={formData.github}
                         onChange={(e) => setFormData(prev => ({ ...prev, github: e.target.value }))}
+                        error={errors.github}
                       />
                     </div>
                   </div>
@@ -441,6 +524,7 @@ export default function ApplyPage() {
                       id="motivation"
                       name="motivation"
                       rows={6}
+                      maxLength={500}
                       placeholder="I want to learn..."
                       value={formData.motivation}
                       onChange={(e) => setFormData(prev => ({ ...prev, motivation: e.target.value }))}
@@ -457,6 +541,7 @@ export default function ApplyPage() {
                       id="goals"
                       name="goals"
                       rows={6}
+                      maxLength={500}
                       placeholder="After completing this program, I want to..."
                       value={formData.goals}
                       onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
@@ -609,25 +694,39 @@ export default function ApplyPage() {
           )}
 
           {/* Navigation Buttons for Steps 1-3 */}
-          {currentStep < 4 && currentStep > 1 && (
-            <div className="flex justify-between mt-8">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleBack}
-                className="w-full sm:w-auto"
-              >
-                <LordIconComponent src={LordIcons.chevronLeft} size={20} className="mr-2" />
-                Back
-              </Button>
-              <Button
-                size="lg"
-                onClick={handleNext}
-                className="w-full sm:w-auto bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold"
-              >
-                Next
-                <LordIconComponent src={LordIcons.chevronRight} size={20} className="ml-2" />
-              </Button>
+          {currentStep < 4 && (
+            <div className="mt-8">
+              {currentStep === 1 && !coursesLoading && !coursesError && courses.length > 0 && (
+                <p className="mb-4 text-center text-sm text-gray-500">
+                  {selectedCourseData
+                    ? `${selectedCourseData.title} selected - continue to personal information.`
+                    : 'Select a course above to continue.'}
+                </p>
+              )}
+              <div className="flex justify-between">
+                {currentStep > 1 ? (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={handleBack}
+                    className="w-full sm:w-auto"
+                  >
+                    <LordIconComponent src={LordIcons.chevronLeft} size={20} className="mr-2" />
+                    Back
+                  </Button>
+                ) : (
+                  <span className="hidden sm:block" />
+                )}
+                <Button
+                  size="lg"
+                  onClick={handleNext}
+                  disabled={currentStep === 1 && (coursesLoading || !!coursesError || courses.length === 0)}
+                  className="w-full sm:w-auto bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  Next
+                  <LordIconComponent src={LordIcons.chevronRight} size={20} className="ml-2" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

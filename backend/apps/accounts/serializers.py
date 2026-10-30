@@ -65,6 +65,47 @@ class AdminGuidePreferenceSerializer(serializers.Serializer):
         return attrs
 
 
+class ProfileUpdateSerializer(serializers.Serializer):
+    """Self-service profile fields. Identity and role stay staff-controlled."""
+
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True)
+
+    def validate(self, attrs):
+        if set(self.initial_data) - {"full_name"}:
+            raise serializers.ValidationError("Only your full name can be changed here.")
+        if not attrs["full_name"]:
+            raise serializers.ValidationError({"full_name": "Enter your full name."})
+        return attrs
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True, trim_whitespace=False, max_length=256, style={"input_type": "password"}
+    )
+    new_password = serializers.CharField(
+        write_only=True, trim_whitespace=False, max_length=256, style={"input_type": "password"}
+    )
+
+    def validate_current_password(self, value):
+        if not self.context["user"].check_password(value):
+            raise serializers.ValidationError("Your current password is not correct.")
+        return value
+
+    def validate_new_password(self, value):
+        try:
+            validate_password(value, user=self.context["user"])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+    def validate(self, attrs):
+        if attrs["current_password"] == attrs["new_password"]:
+            raise serializers.ValidationError(
+                {"new_password": "Choose a different password from your current one."}
+            )
+        return attrs
+
+
 class ResendVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()
 

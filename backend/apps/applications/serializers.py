@@ -35,6 +35,17 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "course_title",
             "status",
             "motivation",
+            "full_name",
+            "phone",
+            "country",
+            "city",
+            "education",
+            "current_role",
+            "experience",
+            "linkedin_url",
+            "github_url",
+            "goals",
+            "heard_from",
             "reviewed_by",
             "reviewer_name",
             "reviewed_at",
@@ -45,11 +56,49 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):
-    """Write shape: student submits an application."""
+    """Write shape: student submits an application.
+
+    Accepts ``course`` or the legacy ``course_id`` alias so older clients keep
+    working while the website uses the canonical field name.
+    """
+
+    def to_internal_value(self, data):
+        if "course" not in data and "course_id" in data:
+            data = data.copy()
+            data["course"] = data["course_id"]
+        return super().to_internal_value(data)
 
     class Meta:
         model = Application
-        fields = ("course", "motivation")
+        fields = (
+            "course",
+            "motivation",
+            "full_name",
+            "phone",
+            "country",
+            "city",
+            "education",
+            "current_role",
+            "experience",
+            "linkedin_url",
+            "github_url",
+            "goals",
+            "heard_from",
+        )
+        extra_kwargs = {
+            "motivation": {"required": False, "allow_blank": True},
+            "full_name": {"required": False, "allow_blank": True},
+            "phone": {"required": False, "allow_blank": True},
+            "country": {"required": False, "allow_blank": True},
+            "city": {"required": False, "allow_blank": True},
+            "education": {"required": False, "allow_blank": True},
+            "current_role": {"required": False, "allow_blank": True},
+            "experience": {"required": False, "allow_blank": True},
+            "linkedin_url": {"required": False, "allow_blank": True},
+            "github_url": {"required": False, "allow_blank": True},
+            "goals": {"required": False, "allow_blank": True},
+            "heard_from": {"required": False, "allow_blank": True},
+        }
 
     def validate_course(self, course):
         user = self.context["request"].user
@@ -58,6 +107,23 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
         if Enrollment.objects.filter(student=user, course=course).exists():
             raise serializers.ValidationError("Already enrolled in this course.")
         return course
+
+    def validate_linkedin_url(self, value):
+        return self._validate_optional_url(value, "linkedin.com")
+
+    def validate_github_url(self, value):
+        return self._validate_optional_url(value, "github.com")
+
+    @staticmethod
+    def _validate_optional_url(value, expected_host):
+        value = (value or "").strip()
+        if not value:
+            return ""
+        if not value.startswith(("https://", "http://")):
+            value = "https://" + value
+        if expected_host not in value.lower():
+            raise serializers.ValidationError(f"Enter your {expected_host} profile URL.")
+        return value
 
     def create(self, validated_data):
         validated_data["student"] = self.context["request"].user

@@ -164,7 +164,7 @@ class LiveClass(TimeStampedModel):
         
         # Generate signed URL for the recording
         from apps.core.storage import presigned_download_url
-        return presigned_download_url(self.recording_key, expires_in=expires_in)
+        return presigned_download_url(self.recording_key, expires=expires_in)
     
     def _user_has_recording_access(self, user) -> bool:
         """Check if user has access to the recording."""

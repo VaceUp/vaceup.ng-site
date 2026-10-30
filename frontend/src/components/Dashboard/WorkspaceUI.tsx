@@ -51,6 +51,7 @@ export function WorkspaceCourseCard({ course, instructor, featured = false }: { 
     <p className={styles.muted}>{course.lesson_count ?? 0} lessons{course.duration ? ` / ${course.duration}` : ''}</p>
     {!instructor && <WorkspaceProgress value={course.progress_percent} label={`Progress in ${course.title}`} />}
     {suspended ? <p className={styles.muted}>Access is suspended. Contact support to discuss your enrollment.</p> : <WorkspaceLink href={courseWorkspaceHref(course.id)} primary={featured}>{instructor ? 'View course content' : course.enrollment_status === 'completed' ? 'Review course' : 'Continue learning'}<ArrowRight className="size-4" aria-hidden="true" /></WorkspaceLink>}
+    {instructor && <WorkspaceLink href={`/dashboard/content?course=${course.id}`}>Edit teaching content</WorkspaceLink>}
   </div></WorkspacePanel>;
 }
 export function WorkspacePagination({ page, count, hasNext, loading, onPage }: { page: number; count: number; hasNext: boolean; loading: boolean; onPage: (page: number) => void }) {

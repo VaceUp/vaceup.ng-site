@@ -17,9 +17,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from apps.accounts import services
 from apps.accounts.serializers import (
     AdminGuidePreferenceSerializer,
+    ChangePasswordSerializer,
     EmailVerificationSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     ResendVerificationSerializer,
     UserSerializer,
@@ -129,7 +131,7 @@ class PasswordResetConfirmView(APIView):
 
 
 class MeView(APIView):
-    """GET: the authenticated user's profile."""
+    """GET/PATCH: the authenticated user's profile."""
 
     permission_classes = [IsAuthenticated]
 
@@ -137,13 +139,39 @@ class MeView(APIView):
         return Response(UserSerializer(request.user).data)
 
     def patch(self, request):
-        if not request.user.is_admin:
-            raise PermissionDenied("Only administrators have an admin guide preference.")
-        serializer = AdminGuidePreferenceSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        request.user.admin_guide_dismissed = serializer.validated_data["admin_guide_dismissed"]
-        request.user.save(update_fields=["admin_guide_dismissed"])
+        if "admin_guide_dismissed" in request.data:
+            if not request.user.is_admin:
+                raise PermissionDenied("Only administrators have an admin guide preference.")
+            serializer = AdminGuidePreferenceSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            request.user.admin_guide_dismissed = serializer.validated_data["admin_guide_dismissed"]
+            request.user.save(update_fields=["admin_guide_dismissed"])
+        else:
+            serializer = ProfileUpdateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            request.user.full_name = serializer.validated_data["full_name"]
+            request.user.save(update_fields=["full_name"])
         return Response(UserSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    """POST {current_password, new_password}: change a known password."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_password_reset"
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"user": request.user})
+        serializer.is_valid(raise_exception=True)
+        services.change_password(
+            user=request.user,
+            new_password=serializer.validated_data["new_password"],
+        )
+        return Response(
+            {"detail": "Password updated. Every session, including this one, will need to sign in again once its access token expires."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class _LoginSerializer(TokenObtainPairSerializer):

@@ -13,6 +13,7 @@ from apps.assignments.models import (
     MCQChoice,
     Answer,
     QuizAttempt,
+    AssessmentGradeLog,
 )
 from apps.courses.models import Course
 from apps.enrollment.models import Enrollment
@@ -50,6 +51,8 @@ def submission_create(*, student, assignment, file=None, text_answer=None):
     # Enrollment check
     require_enrollment(student, assignment.course)
     assignment = Assignment.objects.select_for_update().get(pk=assignment.pk)
+    if not assignment.is_published:
+        raise ValidationError("This assignment has not been published yet.")
     late = timezone.now() > assignment.due_at
     if late and not assignment.allow_late_submission:
         raise ValidationError("This assignment no longer accepts submissions.")
@@ -97,6 +100,7 @@ def submission_grade(*, submission, grader, score, feedback="", marked_late=Fals
         raise PermissionDenied("You may only grade submissions for your own courses.")
     if score < 0 or score > submission.assignment.max_score:
         raise ValidationError("Score must be between zero and the assignment maximum.")
+    before = {"score": str(submission.score) if submission.score is not None else None, "feedback": submission.feedback, "status": submission.status}
     submission.score = score
     submission.feedback = feedback
     if marked_late:
@@ -106,6 +110,9 @@ def submission_grade(*, submission, grader, score, feedback="", marked_late=Fals
     submission.save(
         update_fields=["score", "feedback", "status", "updated_at"]
     )
+    after = {"score": str(submission.score), "feedback": submission.feedback, "status": submission.status}
+    if before != after:
+        AssessmentGradeLog.objects.create(actor=grader, submission=submission, before=before, after=after)
     return submission
 
 
@@ -189,8 +196,10 @@ def answer_submit(*, student, question, choice_id=None, short_text=None):
     return answer
 
 
+@transaction.atomic
 def attempt_create(*, student, quiz):
     """Start a new quiz attempt (idempotent — re‑uses existing if not completed)."""
+    quiz = Quiz.objects.select_for_update().select_related("course").get(pk=quiz.pk)
     require_enrollment(student, quiz.course)
     if quiz.status != Quiz.Status.PUBLISHED:
         raise PermissionDenied("This quiz is not published.")
@@ -226,35 +235,5 @@ def attempt_submit(*, attempt, time_spent_seconds=None):
 
 def attempt_grade(*, attempt, auto_grade=False):
     """Grade a quiz attempt. If auto_grade, compute score from answers."""
-    from decimal import Decimal
-    if attempt.quiz.questions.filter(question_type=Question.Type.SHORT_ANSWER).exists():
-        # Manual marking is not implemented yet: never invent a final grade.
-        return attempt
-    attempt.status = QuizAttempt.Status.GRADED
-    attempt.save(update_fields=["status", "updated_at"])
-
-    # Re-compute score from answers
-    total_possible = Decimal(attempt.quiz.questions.count())
-    total_earned = Decimal("0.00")
-
-    for answer in Answer.objects.filter(
-        student=attempt.student,
-        question__quiz=attempt.quiz
-    ).select_related("question", "choice"):
-        if answer.question.question_type == Question.Type.MCQ:
-            if answer.is_correct:
-                total_earned += Decimal("1.00")
-            else:
-                pass
-        elif answer.question.question_type == Question.Type.TRUE_FALSE:
-            if answer.is_correct:
-                total_earned += Decimal("1.00")
-        elif answer.question.question_type == Question.Type.SHORT_ANSWER:
-            pass
-
-    attempt.total_score = (total_earned / total_possible * Decimal("100")) if total_possible > 0 else Decimal("0.00")
-    attempt.passed = attempt.total_score >= Decimal(str(attempt.quiz.pass_mark))
-    attempt.save(
-        update_fields=["total_score", "passed", "updated_at"]
-    )
-    return attempt
+    from .workflows import calculate_grade
+    return calculate_grade(attempt)

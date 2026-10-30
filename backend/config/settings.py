@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "apps.certificates",
     "apps.marketing",
     "apps.announcements",
+    "apps.website",
     "drf_spectacular",
 ]
 
@@ -162,6 +163,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "cart", "description": "Shopping Cart & Checkout"},
         {"name": "applications", "description": "Applications & Admissions"},
         {"name": "certificates", "description": "Certificates & Verification"},
+        {"name": "website", "description": "Public Website: Events, Team & Blog"},
     ],
 }
 
@@ -226,22 +228,39 @@ LIVE_CLASS_JOIN_EARLY_MINUTES = env.int("LIVE_CLASS_JOIN_EARLY_MINUTES", default
 LIVE_CLASS_JOIN_GRACE_MINUTES = env.int("LIVE_CLASS_JOIN_GRACE_MINUTES", default=15)
 
 # --- Media storage: private S3 via django-storages (see config/storages.py) ---
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+# Optional separate bucket for public assets (course covers, team photos).
+# Defaults to the main bucket; that bucket must allow public reads for them.
+AWS_PUBLIC_STORAGE_BUCKET_NAME = env("AWS_PUBLIC_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-1")
+AWS_S3_SIGNATURE_VERSION = "s3v4"  # required for pre-signed URLs
+# Set for S3-compatible providers (Cloudflare R2, Backblaze B2, Wasabi). Leave
+# blank for AWS S3. R2 reuses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="") or None
+
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
+
+# Without a configured bucket, keep media on local disk so image uploads
+# still work. Only media/public is served over HTTP (see config/urls.py).
 STORAGES = {
-    "default": {"BACKEND": "config.storages.PrivateMediaStorage"},
+    "default": {
+        "BACKEND": "config.storages.PrivateMediaStorage" if AWS_STORAGE_BUCKET_NAME
+        else "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": (
             "whitenoise.storage.CompressedManifestStaticFilesStorage"
         )
     },
 }
-AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
-AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
-AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
-AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-1")
-AWS_S3_SIGNATURE_VERSION = "s3v4"  # required for pre-signed URLs
-# Set for S3-compatible providers (Cloudflare R2, Backblaze B2, Wasabi). Leave
-# blank for AWS S3. R2 reuses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
-AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="") or None
+if not AWS_STORAGE_BUCKET_NAME:
+    STORAGES["default"]["OPTIONS"] = {
+        "location": BASE_DIR / "media" / "private",
+        "base_url": "/media/private/",
+    }
 
 # --- CORS: lock to the known frontend origin(s) ---
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
@@ -315,6 +334,10 @@ CELERY_BEAT_SCHEDULE = {
     "live-class-reminders": {
         "task": "liveclasses.send_live_class_reminders",
         "schedule": float(env.int("LIVE_CLASS_REMINDER_SCAN_SECONDS", default=300)),
+    },
+    "blogger-sync": {
+        "task": "website.sync_blogger_posts",
+        "schedule": float(env.int("BLOGGER_SYNC_SECONDS", default=900)),
     },
 }
 

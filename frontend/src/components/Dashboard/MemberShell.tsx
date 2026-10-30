@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell } from 'lucide-react';
+import { BookOpen, ClipboardList, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell, Megaphone, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { NativeDialog } from '@/components/ui/Modal';
 import { WorkspaceButton, styles } from './WorkspaceUI';
@@ -43,7 +43,11 @@ export default function MemberShell({ children }: { children: ReactNode }) {
     { title: 'Notifications', href: '/notification', icon: Bell },
   ] : [
     { title: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { title: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
     { title: 'My courses', href: '/dashboard/courses', icon: BookOpen },
+    ...(instructor ? [{ title: 'Course content', href: '/dashboard/content', icon: BookOpen }] : []),
+    { title: instructor ? 'Teach and assess' : 'Assignments and quizzes', href: '/dashboard/assessments', icon: ClipboardList },
+    ...(instructor ? [{ title: 'Gradebook', href: '/dashboard/gradebook', icon: BarChart3 }] : []),
     { title: 'Live classes', href: '/dashboard/live-classes', icon: Video },
     ...(instructor ? [{ title: 'My students', href: '/dashboard/students', icon: Users }] : [
       { title: 'Certificates', href: '/dashboard/certificates', icon: Award },

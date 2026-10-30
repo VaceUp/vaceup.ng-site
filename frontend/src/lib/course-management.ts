@@ -14,7 +14,11 @@ export interface ManagedLesson {
   id: number; module: number; title: string; content: string; order: number;
   video_url: string; video_key: string; duration_seconds: number; is_preview: boolean;
 }
-export interface ManagedModule { id: number; course: number; title: string; order: number; lessons: ManagedLesson[]; }
+export interface ManagedModule {
+  id: number; course: number; title: string; order: number;
+  week: number; duration_minutes: number; meeting_url: string;
+  lessons: ManagedLesson[];
+}
 interface Page<T> { results: T[]; next: string | null; }
 
 /** Keep pagination on our API origin; never forward credentials to a next URL. */

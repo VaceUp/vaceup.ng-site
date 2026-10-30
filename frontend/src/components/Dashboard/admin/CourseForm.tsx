@@ -1,5 +1,5 @@
 'use client';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '@/lib/api';
 import { courseEndpoint, failureMessage, type ManagedCourse, type ManagedCategory, type ManagedTutor, type CourseLevel } from '@/lib/course-management';
 import { Action, Field, Feedback, styles } from './AuthoringUI';
@@ -20,6 +20,14 @@ export default function CourseForm({ course, categories, tutors, onSaved, onCanc
   const availableCategories = [...categories, ...newCategories.filter((item) => !categories.some((existing) => existing.id === item.id))];
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [cover, setCover] = useState<File | null>(null), [removeCover, setRemoveCover] = useState(false);
+  const [coverPreview, setCoverPreview] = useState('');
+  useEffect(() => {
+    if (!cover) { setCoverPreview(''); return; }
+    const url = URL.createObjectURL(cover);
+    setCoverPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [cover]);
+  const shownCover = removeCover ? '' : coverPreview || course?.thumbnail || course?.image_url || '';
   async function save(event: FormEvent) {
     event.preventDefault(); if (busy) return; setBusy(true); setError('');
     try {
@@ -58,6 +66,7 @@ export default function CourseForm({ course, categories, tutors, onSaved, onCanc
       <p className={styles.muted}>These details appear on the public course page when published. Use headings and one topic per line for the outline. Do not paste paid lesson content here; add that under Modules and lessons below.</p>
       <Field label="Cover image URL"><input type="url" maxLength={200} value={form.image_url} onChange={(event) => setForm({ ...form, image_url: event.target.value })} /></Field>
       <Field label="Upload cover image (JPEG, PNG or WebP; up to 5 MB)"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setCover(event.target.files?.[0] ?? null)} /></Field>
+      {shownCover && <div><p className={styles.muted}>Cover preview{cover ? ' (saved when you submit)' : ''}</p><img className={styles.preview} src={shownCover} alt="Course cover preview" /></div>}
       {course?.thumbnail && <label className={styles.check}><input type="checkbox" checked={removeCover} onChange={(event) => setRemoveCover(event.target.checked)} />Remove current uploaded cover</label>}
       <p className={styles.muted}>Use an image you have permission to publish. An uploaded cover takes priority over the URL; remove it to use the URL instead. Existing storage files are retained.</p>
       <label className={styles.check}><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} />Published on the public website</label>

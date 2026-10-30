@@ -18,8 +18,8 @@ export const API_ENDPOINTS = {
     resendVerification: 'POST /api/v1/auth/resend-verification/',
     passwordReset: 'POST /api/v1/auth/password-reset/',
     passwordResetConfirm: 'POST /api/v1/auth/password-reset/confirm/',
-    updateProfile: 'PATCH /api/v1/users/me/',
-    changePassword: 'POST /api/v1/users/me/change-password/',
+    updateProfile: 'PATCH /api/v1/auth/me/',
+    changePassword: 'POST /api/v1/auth/change-password/',
   },
 
   // ============================================

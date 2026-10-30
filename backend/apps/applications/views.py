@@ -47,10 +47,14 @@ class ApplicationViewSet(viewsets.GenericViewSet):
         """POST /applications/ {course, motivation} -> submit application."""
         serializer = ApplicationCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        data = dict(serializer.validated_data)
+        course = data.pop("course")
+        motivation = data.pop("motivation", "")
         application = services.application_submit(
             student=request.user,
-            course=serializer.validated_data["course"],
-            motivation=serializer.validated_data.get("motivation", ""),
+            course=course,
+            motivation=motivation,
+            details=data,
         )
         return Response(ApplicationSerializer(application).data, status=status.HTTP_201_CREATED)
 

@@ -137,10 +137,17 @@ class NestedModuleSerializer(serializers.ModelSerializer):
     """Read-only module + its lessons, embedded inside a course tree."""
 
     lessons = NestedLessonSerializer(many=True, read_only=True)
+    meeting_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Module
-        fields = ("id", "title", "order", "lessons")
+        fields = ("id", "title", "order", "week", "duration_minutes", "meeting_url", "lessons")
+
+    def get_meeting_url(self, module):
+        # Live-room links are for enrolled learners and staff only.
+        if not self.context.get("entitled", False):
+            return ""
+        return module.meeting_url
 
 
 class ModuleSerializer(serializers.ModelSerializer):
@@ -155,7 +162,15 @@ class ModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Module
-        fields = ("id", "course", "title", "order", "lessons")
+        fields = (
+            "id", "course", "title", "order", "week",
+            "duration_minutes", "meeting_url", "lessons",
+        )
+
+    def validate_meeting_url(self, value):
+        if value and not value.startswith(("https://", "http://")):
+            raise serializers.ValidationError("Enter a full meeting link starting with https://.")
+        return value
 
     def validate_course(self, course):
         user = _user(self)

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowRight, CalendarDays } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
+import { ArrowRight, CalendarDays, ClipboardList, ListChecks, Video } from 'lucide-react';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
-import { formatWorkspaceDate, type WorkspaceCourse, type WorkspaceOverview, type WorkspacePage, type WorkspacePayment, type WorkspaceStudent, type WorkspaceCertificate } from '@/lib/workspace-api';
+import { formatWorkspaceDate, type WorkspaceAgendaItem, type WorkspaceCourse, type WorkspaceOverview, type WorkspacePage, type WorkspacePayment, type WorkspaceStudent, type WorkspaceCertificate } from '@/lib/workspace-api';
 import { downloadApiFile } from '@/lib/api-pages';
 import { useWorkspaceTheme } from './MemberShell';
 import { WorkspaceHeading, WorkspacePanel, WorkspaceEmpty, WorkspaceFeedback, WorkspaceRefresh, WorkspaceLink, WorkspaceButton, WorkspaceCourseCard, WorkspacePagination, WorkspaceProgress, styles } from './WorkspaceUI';
@@ -21,13 +23,22 @@ export function MemberOverview() {
       action={<WorkspaceRefresh loading={resource.loading} onRefresh={resource.refresh} />} />
     <WorkspaceFeedback {...resource} hasData={!!data} onRetry={resource.refresh} />
     {data && <><dl className={styles.stats}>{metrics.map(([key, label]) => <div className={styles.stat} key={key}><dt>{label}</dt><dd>{data.counts[key] ?? 0}</dd></div>)}</dl>
+      {data.tasks.some(task => task.count > 0) && <ul className={styles.taskRow} aria-label="Work waiting for you">{data.tasks.filter(task => task.count > 0).map(task =>
+        <li key={task.kind}><Link href={task.href} className={styles.task}><strong>{task.count}</strong><span>{task.label}</span><ArrowRight aria-hidden="true" /></Link></li>)}</ul>}
       <div className={styles.split}><section className={styles.stack} aria-label="Your courses"><div className={styles.row}><h2>{instructor ? 'Your teaching' : 'Continue learning'}</h2><WorkspaceLink href="/dashboard/courses">All courses<ArrowRight aria-hidden="true" /></WorkspaceLink></div>
         {data.recent_courses.length ? data.recent_courses.map((course, index) => <WorkspaceCourseCard course={course} instructor={instructor} featured={index === 0} key={course.id} />) : <WorkspaceEmpty title={instructor ? 'Your next course starts here' : 'Your learning starts here'} action={!instructor && <WorkspaceLink href="/courses" primary>Explore courses</WorkspaceLink>}>{instructor ? 'Courses assigned to you by the academy will appear here, including drafts.' : 'Once you enroll in a course, your lessons and progress will appear here.'}</WorkspaceEmpty>}
-      </section><WorkspacePanel><CalendarDays aria-hidden="true" /><h2>Next live classes</h2><p className={styles.muted}>Times are shown in your device timezone.</p>
-        {data.upcoming_classes.length ? <ul className={styles.list}>{data.upcoming_classes.map(item => <li key={item.id}><p>{item.title}</p><p className={styles.muted}>{item.course_title}</p><p className={styles.muted}>{formatWorkspaceDate(item.scheduled_start, true)}</p></li>)}</ul> : <p className={styles.footer}>No upcoming classes scheduled for your courses.</p>}
-        <WorkspaceLink href="/dashboard/live-classes">View live classes</WorkspaceLink>
+      </section><WorkspacePanel><CalendarDays aria-hidden="true" /><h2>Next up</h2><p className={styles.muted}>Deadlines, assessments and sessions across your courses. Times use this device’s timezone.</p>
+        {data.agenda.length ? <ol className={styles.agendaList}>{data.agenda.map(item => <AgendaRow item={item} key={`${item.kind}:${item.id}`} />)}</ol> : <p className={styles.footer}>Nothing is due or scheduled right now. New work appears here automatically.</p>}
+        <div className={styles.row}><WorkspaceLink href="/dashboard/assessments?view=list">Assessments</WorkspaceLink><WorkspaceLink href="/dashboard/live-classes">Live classes</WorkspaceLink></div>
       </WorkspacePanel></div></>}
   </>;
+}
+
+function AgendaRow({ item }: { item: WorkspaceAgendaItem }) {
+  const Icon = item.kind === 'class' ? Video : item.kind === 'quiz' ? ListChecks : ClipboardList;
+  return <li className={styles.agendaItem}><Icon aria-hidden="true" /><div><Link href={item.href}><strong>{item.title}</strong></Link>
+    <p className={styles.muted}>{item.course_title} / {item.detail}</p>
+    <p className={styles.agendaMeta}>{item.when ? formatWorkspaceDate(item.when, true) : 'Available now'}<span className={styles.badge}>{item.state}</span></p></div></li>;
 }
 
 export function MemberCourses() {
@@ -94,10 +105,59 @@ export function MemberCertificates() {
 }
 
 export function MemberAccount() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { theme, toggle } = useWorkspaceTheme();
-  return <><WorkspaceHeading title="Account & appearance" description="Your account details and workspace preferences." /><div className={styles.split}>
-    <WorkspacePanel><h2>Your account</h2><dl className={styles.list}><div><dt>Full name</dt><dd>{user?.full_name}</dd></div><div><dt>Email address</dt><dd>{user?.email}</dd></div><div><dt>Account type</dt><dd>{user?.role === 'instructor' ? 'Tutor' : 'Student'}</dd></div></dl><p className={styles.footer}>Contact the academy to correct your name or email address.</p><WorkspaceLink href="/forgot-password">Reset password</WorkspaceLink></WorkspacePanel>
+  const [name, setName] = useState(user?.full_name ?? '');
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProfileBusy(true); setProfileError(''); setProfileMessage('');
+    try {
+      await updateProfile({ full_name: name.trim() });
+      setProfileMessage('Your display name has been updated.');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Your profile could not be saved. Try again.');
+    } finally { setProfileBusy(false); }
+  };
+  const savePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordError(''); setPasswordMessage('');
+    if (next !== confirm) { setPasswordError('The new passwords do not match.'); return; }
+    setPasswordBusy(true);
+    try {
+      await api.changePassword({ current_password: current, new_password: next });
+      setCurrent(''); setNext(''); setConfirm('');
+      setPasswordMessage('Password updated. Every session, including this one, will need to sign in again once its access token expires.');
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Your password could not be changed. Try again.');
+    } finally { setPasswordBusy(false); }
+  };
+  return <><WorkspaceHeading title="Account & appearance" description="Your account details, security and workspace preferences." /><div className={styles.split}>
+    <div className={styles.stack}>
+      <WorkspacePanel><h2>Your account</h2><dl className={styles.list}><div><dt>Email address</dt><dd>{user?.email}</dd></div><div><dt>Account type</dt><dd>{user?.role === 'instructor' ? 'Tutor' : 'Student'}</dd></div></dl>
+        <form className={styles.stack} onSubmit={event => void saveProfile(event)} aria-label="Update your display name"><label className={styles.field}>Full name<input value={name} onChange={event => setName(event.target.value)} maxLength={150} required /></label>
+          {profileError && <p role="alert" className={styles.error}>{profileError}</p>}{profileMessage && <p role="status">{profileMessage}</p>}
+          <div><WorkspaceButton type="submit" loading={profileBusy} disabled={!name.trim() || name.trim() === user?.full_name}>Save display name</WorkspaceButton></div></form>
+        <p className={styles.footer}>Contact the academy to correct your email address. Email changes are staff-controlled so account recovery stays secure.</p>
+      </WorkspacePanel>
+      <WorkspacePanel><h2>Change password</h2><p className={styles.footer}>Use at least eight characters. Changing your password signs every session, including this one, out once its access token expires.</p>
+        <form className={styles.stack} onSubmit={event => void savePassword(event)} aria-label="Change your password">
+          <label className={styles.field}>Current password<input type="password" value={current} onChange={event => setCurrent(event.target.value)} autoComplete="current-password" required /></label>
+          <label className={styles.field}>New password<input type="password" value={next} onChange={event => setNext(event.target.value)} autoComplete="new-password" minLength={8} required /></label>
+          <label className={styles.field}>Confirm new password<input type="password" value={confirm} onChange={event => setConfirm(event.target.value)} autoComplete="new-password" minLength={8} required /></label>
+          {passwordError && <p role="alert" className={styles.error}>{passwordError}</p>}{passwordMessage && <p role="status">{passwordMessage}</p>}
+          <div className={styles.row}><WorkspaceButton type="submit" loading={passwordBusy} disabled={!current || !next || !confirm}>Update password</WorkspaceButton><WorkspaceLink href="/forgot-password">I forgot my password</WorkspaceLink></div>
+        </form>
+      </WorkspacePanel>
+    </div>
     <WorkspacePanel><h2>Workspace appearance</h2><p className={styles.footer}>This preference applies to the student and tutor workspace and is saved on this device when browser storage is available.</p><WorkspaceButton aria-pressed={theme === 'dark'} onClick={toggle}>Dark theme: {theme === 'dark' ? 'on' : 'off'}</WorkspaceButton></WorkspacePanel>
   </div></>;
 }

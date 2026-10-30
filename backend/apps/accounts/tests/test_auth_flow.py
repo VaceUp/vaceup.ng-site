@@ -149,6 +149,40 @@ class AuthFlowTests(APITestCase):
         self.client.force_authenticate(student)
         self.assertEqual(self.client.patch(ME, {"admin_guide_dismissed": True}, format="json").status_code, 403)
 
+    def test_member_can_change_only_their_display_name(self):
+        student = User.objects.create_user(EMAIL, PW1, is_active=True)
+        self.client.force_authenticate(student)
+        response = self.client.patch(ME, {"full_name": "Ada Updated"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["full_name"], "Ada Updated")
+        student.refresh_from_db()
+        self.assertEqual(student.full_name, "Ada Updated")
+        forbidden = self.client.patch(
+            ME, {"full_name": "Ada", "role": "admin", "email": "other@example.com"}, format="json")
+        self.assertEqual(forbidden.status_code, 400)
+        student.refresh_from_db()
+        self.assertEqual(student.role, User.Role.STUDENT)
+        self.assertEqual(student.email, EMAIL)
+
+    def test_change_password_requires_current_password_and_revokes_sessions(self):
+        student = User.objects.create_user(EMAIL, PW1, is_active=True)
+        login = self.client.post(LOGIN, {"email": EMAIL, "password": PW1}, format="json")
+        self.assertEqual(login.status_code, 200)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        wrong = self.client.post(
+            "/api/v1/auth/change-password/",
+            {"current_password": "not-the-password", "new_password": PW2}, format="json")
+        self.assertEqual(wrong.status_code, 400)
+        changed = self.client.post(
+            "/api/v1/auth/change-password/",
+            {"current_password": PW1, "new_password": PW2}, format="json")
+        self.assertEqual(changed.status_code, 200)
+        student.refresh_from_db()
+        self.assertTrue(student.check_password(PW2))
+        refresh = self.client.post(
+            "/api/v1/auth/token/refresh/", {"refresh": login.data["refresh"]}, format="json")
+        self.assertEqual(refresh.status_code, 401)
+
     # --- verification -------------------------------------------------------
     def test_login_blocked_until_verified_with_clear_message(self):
         self._register()

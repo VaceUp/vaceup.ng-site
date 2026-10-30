@@ -47,6 +47,42 @@ class LiveClassTests(APITestCase):
             join_url="https://meet.example/abc", **kw)
 
     # --- scheduling ---------------------------------------------------------
+    def test_learner_links_hidden_until_join_and_access_is_json_serializable(self):
+        lc = self._class(start=timezone.now() + timedelta(days=1))
+        self.client.force_authenticate(self.student)
+        result = self.client.get(f"{LC}{lc.pk}/")
+        self.assertNotIn("join_url", result.data)
+        access = self.client.get(f"{LC}{lc.pk}/access/")
+        self.assertEqual(access.status_code, 200, access.data)
+        self.assertIsInstance(access.data["enrollment"], int)
+        self.assertNotIn("join_url", access.data["live_class"])
+        self.assertIn(b'can_join_live', access.content)
+        self.client.force_authenticate(self.instr)
+        self.assertEqual(self.client.get(f"{LC}{lc.pk}/").data["join_url"], lc.join_url)
+
+    def test_external_meeting_validation_and_student_cannot_host(self):
+        lc = self._class()
+        self.client.force_authenticate(self.instr)
+        for url in ["http://meet.example/x", "https://name:secret@meet.example/x"]:
+            self.assertEqual(self.client.patch(f"{LC}{lc.pk}/", {"join_url": url}, format="json").status_code, 400)
+        self.assertEqual(self.client.patch(f"{LC}{lc.pk}/", {"duration_minutes": 0}, format="json").status_code, 400)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.patch(f"{LC}{lc.pk}/", {"status": "live"}, format="json").status_code, 403)
+
+    def test_cancelled_session_cannot_be_joined_by_student(self):
+        lc = self._class()
+        self.client.force_authenticate(self.instr)
+        self.assertEqual(self.client.patch(f"{LC}{lc.pk}/", {"status": "cancelled"}, format="json").status_code, 200)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.post(f"{LC}{lc.pk}/join/").status_code, 409)
+
+    def test_session_with_attendance_cannot_move_course(self):
+        lc = self._class()
+        Attendance.objects.create(live_class=lc, student=self.student)
+        other = Course.objects.create(title="Other taught course", category=self.cat, instructor=self.instr)
+        self.client.force_authenticate(self.instr)
+        self.assertEqual(self.client.patch(f"{LC}{lc.pk}/", {"course": other.pk}, format="json").status_code, 400)
+
     def test_instructor_schedules_on_own_course(self):
         self.client.force_authenticate(self.instr)
         r = self.client.post(LC, {

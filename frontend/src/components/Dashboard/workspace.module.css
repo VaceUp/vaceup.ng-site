@@ -80,6 +80,31 @@
 .record dt { color: var(--workspace-muted); font-size: var(--text-xs); }
 .record dd { font-size: var(--text-sm); margin-block-start: var(--spacing); }
 .footer { padding-block: calc(var(--spacing) * 8); color: var(--workspace-muted); font-size: var(--text-xs); }
+.taskRow { display: flex; flex-wrap: wrap; gap: var(--spacing); margin-block: calc(var(--spacing) * 6); padding: 0; list-style: none; }
+.task { display: inline-flex; align-items: center; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3); border: thin solid var(--workspace-line); border-radius: var(--radius-xl); background: var(--workspace-surface); color: var(--workspace-text); font-size: var(--text-sm); }
+.task:hover { background: var(--workspace-subtle); }
+.task strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.task svg { inline-size: calc(var(--spacing) * 4); block-size: calc(var(--spacing) * 4); color: var(--workspace-muted); }
+.agendaList { display: grid; gap: calc(var(--spacing) * 4); margin-block-start: calc(var(--spacing) * 4); padding: 0; list-style: none; }
+.agendaItem { display: flex; gap: calc(var(--spacing) * 3); padding-block-end: calc(var(--spacing) * 4); border-block-end: thin solid var(--workspace-line); }
+.agendaItem:last-child { border: 0; padding-block-end: 0; }
+.agendaItem > svg { flex-shrink: 0; inline-size: calc(var(--spacing) * 5); block-size: calc(var(--spacing) * 5); color: var(--workspace-muted); }
+.agendaItem a { color: var(--workspace-text); }
+.agendaMeta { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 2); margin-block-start: var(--spacing); color: var(--workspace-muted); font-size: var(--text-xs); }
+.announcementSummary { display: flex; align-items: center; gap: calc(var(--spacing) * 3); min-block-size: calc(var(--spacing) * 11); cursor: pointer; }
+.announcementSummary > svg { flex-shrink: 0; inline-size: calc(var(--spacing) * 5); block-size: calc(var(--spacing) * 5); color: var(--workspace-muted); }
+.announcementSummary > span { display: grid; gap: var(--spacing); }
+.announcementBody { display: grid; gap: calc(var(--spacing) * 4); padding-block-start: calc(var(--spacing) * 4); }
+.announcementBody p { white-space: pre-wrap; line-height: var(--leading-relaxed); max-inline-size: var(--container-3xl); }
+.tableWrap { overflow-x: auto; border: thin solid var(--workspace-line); border-radius: var(--radius-2xl); background: var(--workspace-surface); }
+.gradebook { inline-size: 100%; min-inline-size: max-content; border-collapse: collapse; font-size: var(--text-sm); }
+.gradebook caption { text-align: start; padding: calc(var(--spacing) * 4); color: var(--workspace-muted); font-size: var(--text-xs); }
+.gradebook th, .gradebook td { padding: calc(var(--spacing) * 3); border-block-end: thin solid var(--workspace-line); text-align: start; vertical-align: top; }
+.gradebook thead th { position: sticky; inset-block-start: 0; z-index: 1; background: var(--workspace-subtle); }
+.gradebook thead th span, .gradebook tbody th span { display: block; }
+.gradebook tbody th { font-weight: var(--font-weight-semibold); }
+.gradebook tbody tr:last-child > * { border-block-end: 0; }
+.gradebook .badge { margin-inline-start: calc(var(--spacing) * 2); }
 .lessonNav { display: grid; gap: calc(var(--spacing) * 4); align-content: start; }
 .lessonNav summary { cursor: pointer; min-block-size: calc(var(--spacing) * 11); padding-block: calc(var(--spacing) * 3); font-weight: var(--font-weight-semibold); }
 .lessonButton { inline-size: 100%; justify-content: flex-start; text-align: start; margin-block-end: calc(var(--spacing) * 2); }

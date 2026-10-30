@@ -7,12 +7,15 @@ from django.core.management import call_command, CommandError
 from django.test import SimpleTestCase
 from django.urls import resolve
 
+from apps.core.management.commands.check_release_routes import REQUIRED_ROUTES
+
 
 class ReleaseRouteTests(SimpleTestCase):
     def test_current_routes_pass_without_database_access(self):
         output = StringIO()
         call_command("check_release_routes", stdout=output)
-        self.assertEqual(output.getvalue().count("PASS "), 14)
+        self.assertNotIn("MISSING ", output.getvalue())
+        self.assertEqual(output.getvalue().count("PASS "), len(REQUIRED_ROUTES))
 
     def test_get_detail_route_is_not_a_settings_action(self):
         for path in (

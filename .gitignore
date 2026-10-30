@@ -83,5 +83,7 @@ node_modules/
 
 # Local artifacts that must never be committed
 backend.zip
+vaceup-backend-*.zip
+vaceup-backend-*.zip.sha256
 artifacts/admin-auth-catalog/
 ~/

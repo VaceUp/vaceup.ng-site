@@ -3,10 +3,12 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from apps.assignments.models import Assignment, Quiz, QuizAttempt, Submission
 from apps.courses.models import Category, Course, Module, Lesson
 from apps.enrollment.models import Enrollment, LessonProgress
 from apps.liveclasses.models import LiveClass, Attendance
@@ -114,6 +116,115 @@ class WorkspaceTests(APITestCase):
         self.assertEqual(LessonProgress.objects.filter(enrollment=self.enrollment, lesson=self.lesson).count(), 1)
         detail = self.client.get(f'/api/v1/dashboard/courses/{self.course.pk}/').data
         self.assertEqual(detail['completed_lesson_ids'], [self.lesson.pk])
+
+    def test_student_agenda_and_tasks_are_account_scoped(self):
+        now = timezone.now()
+        mine = Assignment.objects.create(
+            course=self.course, instructor=self.tutor, title="Essay",
+            due_at=now + timedelta(days=2))
+        foreign = Assignment.objects.create(
+            course=self.foreign, instructor=self.other_tutor, title="Foreign essay",
+            due_at=now + timedelta(days=2))
+        quiz = Quiz.objects.create(
+            course=self.course, instructor=self.tutor, title="Checkpoint",
+            status=Quiz.Status.PUBLISHED)
+        foreign_quiz = Quiz.objects.create(
+            course=self.foreign, instructor=self.other_tutor, title="Foreign checkpoint",
+            status=Quiz.Status.PUBLISHED)
+        data = self.client.get('/api/v1/dashboard/overview/').data
+        agenda = {(row['kind'], row['id']) for row in data['agenda']}
+        self.assertIn(('assignment', mine.pk), agenda)
+        self.assertIn(('quiz', quiz.pk), agenda)
+        self.assertNotIn(('assignment', foreign.pk), agenda)
+        self.assertNotIn(('quiz', foreign_quiz.pk), agenda)
+        tasks = {row['kind']: row['count'] for row in data['tasks']}
+        self.assertEqual(tasks['assignments'], 1)
+        self.assertEqual(tasks['quizzes'], 1)
+        self.assertEqual(tasks['lessons'], 1)
+        Submission.objects.create(
+            student=self.student, assignment=mine, status=Submission.Status.SUBMITTED,
+            submitted_at=now)
+        data = self.client.get('/api/v1/dashboard/overview/').data
+        tasks = {row['kind']: row['count'] for row in data['tasks']}
+        self.assertEqual(tasks['assignments'], 0)
+
+    def test_tutor_agenda_surfaces_work_awaiting_grading(self):
+        assignment = Assignment.objects.create(
+            course=self.course, instructor=self.tutor, title="Project",
+            due_at=timezone.now() - timedelta(days=1))
+        Submission.objects.create(
+            student=self.student, assignment=assignment,
+            status=Submission.Status.SUBMITTED, submitted_at=timezone.now())
+        self.client.force_authenticate(self.tutor)
+        data = self.client.get('/api/v1/dashboard/overview/').data
+        row = next(item for item in data['agenda']
+                   if item['kind'] == 'assignment' and item['id'] == assignment.pk)
+        self.assertEqual(row['state'], 'overdue')
+        self.assertIn('1 submission', row['detail'])
+        tasks = {item['kind']: item['count'] for item in data['tasks']}
+        self.assertEqual(tasks['grading'], 1)
+
+    def test_agenda_skips_classes_whose_window_closed(self):
+        stale = LiveClass.objects.create(
+            course=self.course, title="Stale workshop",
+            scheduled_start=timezone.now() - timedelta(hours=3), duration_minutes=30)
+        data = self.client.get('/api/v1/dashboard/overview/').data
+        agenda = {(row['kind'], row['id']) for row in data['agenda']}
+        self.assertNotIn(('class', stale.pk), agenda)
+
+    def test_gradebook_is_scoped_and_normalises_scores(self):
+        assignment = Assignment.objects.create(
+            course=self.course, instructor=self.tutor, title="Midterm",
+            due_at=timezone.now(), max_score=50)
+        Submission.objects.create(
+            student=self.student, assignment=assignment,
+            status=Submission.Status.GRADED, score=40, submitted_at=timezone.now())
+        quiz = Quiz.objects.create(
+            course=self.course, instructor=self.tutor, title="Unit quiz",
+            status=Quiz.Status.PUBLISHED)
+        QuizAttempt.objects.create(
+            student=self.student, quiz=quiz, status=QuizAttempt.Status.GRADED,
+            total_score=80, passed=True)
+        self.client.force_authenticate(self.tutor)
+        response = self.client.get(
+            f'/api/v1/instructor/courses/{self.course.pk}/gradebook/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['summary']['students'], 1)
+        student = response.data['students'][0]
+        self.assertEqual(student['assignments'][str(assignment.pk)]['percent'], 80.0)
+        self.assertEqual(student['quizzes'][str(quiz.pk)]['percent'], 80.0)
+        self.assertEqual(student['average_percent'], 80.0)
+        self.assertEqual(response.data['summary']['average_grade'], 80.0)
+        self.client.force_authenticate(self.other_tutor)
+        self.assertEqual(self.client.get(
+            f'/api/v1/instructor/courses/{self.course.pk}/gradebook/').status_code, 404)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.get(
+            f'/api/v1/instructor/courses/{self.course.pk}/gradebook/').status_code, 403)
+
+    def test_my_attendance_reflects_recorded_join(self):
+        path = f'/api/v1/live-classes/{self.session.pk}/my-attendance/'
+        self.assertFalse(self.client.get(path).data['attended'])
+        self.client.post(f'/api/v1/live-classes/{self.session.pk}/join/')
+        result = self.client.get(path).data
+        self.assertTrue(result['attended'])
+        self.assertIsNotNone(result['joined_at'])
+
+    @override_settings(
+        AWS_ACCESS_KEY_ID="test-key", AWS_SECRET_ACCESS_KEY="test-secret",
+        AWS_STORAGE_BUCKET_NAME="test-bucket", AWS_S3_ENDPOINT_URL="https://storage.example.test",
+        AWS_S3_REGION_NAME="auto")
+    def test_recording_url_requires_attendance_and_ready_state(self):
+        self.session.recording_key = "recordings/workshop.mp4"
+        self.session.recording_status = "ready"
+        self.session.save(update_fields=["recording_key", "recording_status"])
+        path = f'/api/v1/live-classes/{self.session.pk}/recording-url/'
+        self.assertEqual(self.client.get(path).status_code, 403)
+        self.client.post(f'/api/v1/live-classes/{self.session.pk}/join/')
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("workshop.mp4", response.data['url'])
+        self.assertEqual(response.data['expires_in'], 3600)
 
     def test_course_search_pagination_and_constant_queries(self):
         # Warm the shared throttle bucket: first-use INSERT/savepoint queries

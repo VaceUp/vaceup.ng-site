@@ -153,7 +153,7 @@ export default function AboutPage() {
               Send a message
             </Link>
           </div>
-          <ul className="flex justify-center gap-4">
+          <ul className="flex flex-wrap justify-center gap-4">
             {(socials.length ? socials : SOCIAL_LINKS).map((social) => (
               <li key={social.label}>
                 <a href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} className="flex size-11 items-center justify-center rounded-xl bg-navy-900 text-navy-200 hover:text-gold-brand transition-colors">

@@ -22,6 +22,25 @@ class RateLimitUnavailable(APIException):
     default_detail = "Security checks are temporarily unavailable. Please retry shortly."
 
 
+LOCK_WAIT_TIMEOUT = 1205
+DEADLOCK = 1213
+
+# SQLite reports the same contention as a text error, so codes alone miss it.
+TRANSIENT_LOCK_MESSAGES = ("database is locked", "database table is locked", "deadlock found")
+
+
+def is_transient_lock_error(exc: OperationalError) -> bool:
+    cause = exc.__cause__ or exc
+    if cause.args and isinstance(cause.args[0], int):
+        return cause.args[0] in (LOCK_WAIT_TIMEOUT, DEADLOCK)
+    message = str(cause).lower()
+    return any(marker in message for marker in TRANSIENT_LOCK_MESSAGES)
+
+
+# Five tries costs at most 150ms of backoff before the limit fails closed.
+LOCK_RETRY_ATTEMPTS = 5
+
+
 class DatabaseLimitMixin:
     def allow_request(self, request, view):
         if isinstance(self, ScopedRateThrottle):
@@ -41,7 +60,7 @@ class DatabaseLimitMixin:
         # A deadlock aborts a MySQL transaction: retry only our own transaction,
         # never a caller-owned transaction that may contain other work.
         caller_transaction = connection.in_atomic_block
-        for attempt in range(3):
+        for attempt in range(LOCK_RETRY_ATTEMPTS):
             try:
                 now = timezone.now()
                 RateLimitBucket.objects.get_or_create(
@@ -49,9 +68,8 @@ class DatabaseLimitMixin:
                 )
                 return self._consume(key)
             except OperationalError as exc:
-                cause = exc.__cause__ or exc
-                code = cause.args[0] if cause.args else None
-                if code not in (1205, 1213) or caller_transaction or attempt == 2:
+                exhausted = attempt == LOCK_RETRY_ATTEMPTS - 1
+                if not is_transient_lock_error(exc) or caller_transaction or exhausted:
                     raise RateLimitUnavailable() from exc
                 sleep(0.01 * (2 ** attempt))
             except DatabaseError as exc:

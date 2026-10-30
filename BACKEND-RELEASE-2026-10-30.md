@@ -24,6 +24,9 @@ no wholesale `apps/` folder.
   carries the applicant's city and country.
 - Media storage: course covers, team photos and event covers now fall back to local
   disk when no S3 bucket is configured, so direct image upload works on shared hosting.
+- Rate limiting no longer fails a request as `503 Service Unavailable` when the
+  database reports ordinary lock contention. Contention is retried; a genuinely
+  unavailable database still fails closed.
 
 ## Migrations applied by this release
 
@@ -164,9 +167,22 @@ Pass `--with-unchanged` only if you deliberately want to re-ship `manage.py`,
 Measured on this machine against `config.settings_test` (SQLite) and the local
 Node toolchain:
 
-- Backend suite: `Ran 355 tests in 11.636s` / `OK (skipped=3)`, exit 0.
+- Backend suite: `Ran 357 tests in 10.553s` / `OK (skipped=3)`, exit 0.
 - Certificates app alone: 11 tests, including the preview authorization tests and the
   no-WeasyPrint PDF render, `OK`.
+- Rate limiter (`apps.core.tests.RateLimitFailureTests`): 5 tests `OK`, covering the
+  MySQL deadlock retry, the bounded retry, fail-closed on a missing table or a dead
+  connection, no retry inside a caller-owned transaction, and the text-form
+  `database is locked` contention now retried the same way.
+- Concurrent anonymous burst against `/api/v1/website/team/` on the local preview
+  (single-file SQLite, so this is a worst case rather than the MySQL row-lock
+  behaviour): before the fix 4 parallel requests returned 2 x `200` and 2 x `503`;
+  after it 4 x `200`. At 8 and 12 parallel writes the SQLite file still saturates
+  (7/8 and 9/12), which is the storage engine, not the limiter.
+- Public About page rendered in headless Chrome against the local API at 1440px and
+  390px on a cold load: `Meet the founder` and `The people who teach here` both
+  present, zero console errors, one `team` and one `profile` request per load. The
+  footer social row now wraps instead of overflowing at 280-320px.
 - `python manage.py check`: `System check identified no issues (0 silenced).`
 - `python manage.py makemigrations --check --dry-run`: `No changes detected`.
 - `npx tsc --noEmit --incremental false`: exit 0.
@@ -181,6 +197,8 @@ Node toolchain:
 Not verified yet on this machine: the certificate PDF's pixel-level appearance (no
 rasterizer is installed here, so layout was confirmed by extracted text coordinates and
 contrast math, not by looking at an image), the CSS design in a real WeasyPrint render
-(WeasyPrint is not installed locally either), live Google Meet links and Paystack
-charges against production accounts, and the `scripts/accuracy_report.mjs` /
-`scripts/verify_responsive.mjs` gates against the dashboard screens.
+(WeasyPrint is not installed locally either), the rate limiter against a real MySQL
+server (the 1205/1213 paths are covered by tests, not by a live InnoDB burst), live
+Google Meet links and Paystack charges against production accounts, and the
+`scripts/accuracy_report.mjs` / `scripts/verify_responsive.mjs` gates against the
+dashboard screens.

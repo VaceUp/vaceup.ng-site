@@ -50,7 +50,8 @@ class RateLimitFailureTests(TransactionTestCase):
 
     def test_failures_are_closed_and_retries_are_bounded(self):
         from apps.core.models import RateLimitBucket
-        for code, calls in ((1213, 3), (2003, 1), (1146, 1)):
+        from apps.core.throttling import LOCK_RETRY_ATTEMPTS
+        for code, calls in ((1213, LOCK_RETRY_ATTEMPTS), (2003, 1), (1146, 1)):
             with patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=OperationalError(code, 'synthetic private database detail')) as operation:
                 with self.assertRaises(RateLimitUnavailable) as caught:
                     self.attempt()
@@ -58,6 +59,28 @@ class RateLimitFailureTests(TransactionTestCase):
                 self.assertEqual(caught.exception.status_code, 503)
                 self.assertNotIn('private', str(caught.exception))
         self.assertFalse(RateLimitBucket.objects.exists())
+
+    def test_text_lock_contention_retries_like_a_deadlock(self):
+        """SQLite raises 'database is locked' with no numeric code."""
+        from apps.core.models import RateLimitBucket
+        original = RateLimitBucket.objects.get_or_create
+        calls = []
+        def flaky(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise OperationalError('database is locked')
+            return original(*args, **kwargs)
+        with patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=flaky):
+            self.assertTrue(self.attempt())
+        self.assertEqual(RateLimitBucket.objects.get().count, 1)
+
+    def test_persistent_text_lock_contention_still_fails_closed(self):
+        from apps.core.models import RateLimitBucket
+        from apps.core.throttling import LOCK_RETRY_ATTEMPTS
+        with patch.object(RateLimitBucket.objects, 'get_or_create', side_effect=OperationalError('database is locked')) as operation:
+            with self.assertRaises(RateLimitUnavailable):
+                self.attempt()
+            self.assertEqual(operation.call_count, LOCK_RETRY_ATTEMPTS)
 
     def test_does_not_retry_a_caller_owned_transaction(self):
         from apps.core.models import RateLimitBucket

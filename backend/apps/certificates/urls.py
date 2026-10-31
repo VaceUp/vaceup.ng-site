@@ -5,6 +5,8 @@ from rest_framework.routers import DefaultRouter
 from apps.certificates.views import (
     CertificateTemplateViewSet,
     CertificateViewSet,
+    ManagementSignatureView,
+    TutorSignatureView,
     verify_certificate,
     certificate_verification_page,
 )
@@ -14,6 +16,11 @@ router.register("certificates/templates", CertificateTemplateViewSet, basename="
 router.register("certificates", CertificateViewSet, basename="certificate")
 
 urlpatterns = [
+    # These exact paths must precede the certificate detail route.
+    path("certificates/signature/management/", ManagementSignatureView.as_view(),
+         name="certificate-management-signature"),
+    path("certificates/signature/", TutorSignatureView.as_view(),
+         name="certificate-tutor-signature"),
     path("", include(router.urls)),
     # Public verification endpoints
     path("verify/<str:verification_code>/", verify_certificate, name="verify-certificate"),

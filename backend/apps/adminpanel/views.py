@@ -405,14 +405,25 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             course_id = int(request.data.get("course_id"))
         except (TypeError, ValueError):
             raise DomainError("Select a valid student and course.", code="params") from None
+        tutor = None
+        tutor_id = request.data.get("tutor_id")
+        if tutor_id not in (None, ""):
+            try:
+                tutor = User.objects.get(pk=int(tutor_id), role=User.Role.INSTRUCTOR, is_active=True)
+            except (TypeError, ValueError, User.DoesNotExist):
+                raise DomainError(
+                    "That tutor is not available. Select an active tutor from the list.",
+                    code="tutor_not_found",
+                ) from None
         enrollment = enrollment_for_issuance(student_id=student_id, course_id=course_id)
-        certificate = issue_certificate(enrollment=enrollment)
+        certificate = issue_certificate(enrollment=enrollment, tutor=tutor)
         return Response({
             "detail": "Certificate issued.",
             "certificate_number": certificate.certificate_number,
             "verification_code": certificate.verification_code,
             "student_name": certificate.student_name_at_issue,
             "course_title": certificate.course_title_at_issue,
+            "tutor_name": certificate.instructor_name_at_issue,
         })
 
     @action(detail=False, methods=["get"], url_path="users")

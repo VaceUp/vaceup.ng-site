@@ -85,6 +85,7 @@ export const Footer = () => {
             <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">About</h4>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li><Link href="/about" className={linkClass}>About VaceUp</Link></li>
+              <li><Link href="/team" className={linkClass}>Meet the Team</Link></li>
               <li><Link href="/courses" className={linkClass}>All Courses</Link></li>
               <li><Link href={SITE.kidsUrl} className={linkClass}>Kids Tech Academy</Link></li>
               <li><Link href="/testimonials" className={linkClass}>Success Stories</Link></li>

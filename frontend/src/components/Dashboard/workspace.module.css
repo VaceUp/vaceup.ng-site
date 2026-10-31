@@ -75,6 +75,12 @@
 .field :is(input,select,textarea):hover { border-color: var(--workspace-focus); }
 .pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: calc(var(--spacing) * 3); margin-block-start: calc(var(--spacing) * 6); color: var(--workspace-muted); font-size: var(--text-sm); }
 .records { display: grid; gap: calc(var(--spacing) * 4); }
+.accepted { border-inline-start: calc(var(--spacing) * 1.5) solid var(--workspace-primary); margin-block-end: calc(var(--spacing) * 6); }
+.accepted h2 { margin-block: calc(var(--spacing) * 2); }
+.accepted > .muted { max-inline-size: var(--container-2xl); }
+.price { font-size: var(--text-lg); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.signaturePreview { display: block; max-inline-size: min(100%, calc(var(--spacing) * 64)); max-block-size: calc(var(--spacing) * 24); object-fit: contain; padding: calc(var(--spacing) * 3); border: thin solid var(--workspace-line); border-radius: var(--radius-lg); background: var(--workspace-subtle); }
+.signatureForm { margin-block-start: calc(var(--spacing) * 5); }
 .record { display: grid; gap: calc(var(--spacing) * 4); padding: calc(var(--spacing) * 5); border: thin solid var(--workspace-line); border-radius: var(--radius-xl); background: var(--workspace-surface); }
 .record dl { display: flex; flex-wrap: wrap; gap: calc(var(--spacing) * 6); }
 .record dt { color: var(--workspace-muted); font-size: var(--text-xs); }

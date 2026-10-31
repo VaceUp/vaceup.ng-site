@@ -1,6 +1,7 @@
 """Certificate services: generation, PDF rendering, verification."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 import uuid
@@ -25,6 +26,144 @@ from apps.courses.models import Course
 from apps.enrollment.models import Enrollment
 
 logger = logging.getLogger(__name__)
+
+MANAGEMENT_SIGNATURE_KEY = "certificate_management_signature"
+MAX_SIGNATURE_BYTES = 400 * 1024
+ALLOWED_SIGNATURE_TYPES = {
+    "image/png": "PNG",
+    "image/jpeg": "JPEG",
+    "image/webp": "WebP",
+}
+DEFAULT_MANAGEMENT_NAME = "VaceUp"
+DEFAULT_MANAGEMENT_TITLE = "Academy Director"
+
+
+def _decode_signature_upload(upload) -> str:
+    """Validate a signature image and return it as a self-contained data URL."""
+    size = getattr(upload, "size", 0) or 0
+    if size <= 0:
+        raise DomainError("Choose a signature image to upload.", code="signature_missing")
+    if size > MAX_SIGNATURE_BYTES:
+        raise DomainError(
+            "The signature image is too large. Use an image under 400 KB.", code="signature_too_large",
+        )
+    content_type = (getattr(upload, "content_type", "") or "").lower()
+    if content_type not in ALLOWED_SIGNATURE_TYPES:
+        raise DomainError(
+            "Upload the signature as a PNG, JPEG or WebP image.", code="signature_type",
+        )
+    raw = upload.read()
+    try:
+        from PIL import Image
+        with Image.open(BytesIO(raw)) as image:
+            image.verify()
+        with Image.open(BytesIO(raw)) as image:
+            width, height = image.size
+    except Exception:
+        raise DomainError(
+            "That file is not a readable image. Upload a PNG, JPEG or WebP signature.",
+            code="signature_invalid",
+        ) from None
+    if width < 40 or height < 16:
+        raise DomainError("The signature image is too small to print. Upload a larger image.", code="signature_small")
+    if width > 2400 or height > 1200:
+        raise DomainError(
+            "The signature image is too large. Use an image under 2400 x 1200 pixels.",
+            code="signature_dimensions",
+        )
+    return f"data:{content_type};base64,{base64.b64encode(raw).decode('ascii')}"
+
+
+def _safe_signature_data_url(value) -> str:
+    """Only ever put a base64 image data URL in rendered certificate markup."""
+    import re
+    if not isinstance(value, str) or len(value) > 2_000_000:
+        return ""
+    return value if re.fullmatch(r"data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+", value) else ""
+
+
+def management_signature() -> dict:
+    """The academy-wide signature and signatory printed beside the tutor's."""
+    from apps.adminpanel.models import AdminSettings
+    row = AdminSettings.objects.filter(key=MANAGEMENT_SIGNATURE_KEY).values_list("value", flat=True).first()
+    value = row if isinstance(row, dict) else {}
+    signature = _safe_signature_data_url(value.get("signature"))
+    name = str(value.get("name") or DEFAULT_MANAGEMENT_NAME).strip()[:120] or DEFAULT_MANAGEMENT_NAME
+    title = str(value.get("title") or DEFAULT_MANAGEMENT_TITLE).strip()[:120] or DEFAULT_MANAGEMENT_TITLE
+    return {
+        "signature": signature,
+        "name": name,
+        "title": title,
+        "updated_at": value.get("updated_at"),
+    }
+
+
+def save_management_signature(*, signature=None, name=None, title=None) -> dict:
+    """Create or update the management signatory without erasing existing details."""
+    from apps.adminpanel.models import AdminSettings
+    current = management_signature()
+    if signature is not None:
+        current["signature"] = _decode_signature_upload(signature)
+    if name is not None:
+        cleaned = str(name).strip()[:120]
+        current["name"] = cleaned or DEFAULT_MANAGEMENT_NAME
+    if title is not None:
+        cleaned = str(title).strip()[:120]
+        current["title"] = cleaned or DEFAULT_MANAGEMENT_TITLE
+    current["updated_at"] = timezone.now().isoformat()
+    AdminSettings.objects.update_or_create(
+        key=MANAGEMENT_SIGNATURE_KEY,
+        defaults={
+            "value": current,
+            "description": "Signature and signatory printed on issued certificates.",
+            "is_public": False,
+        },
+    )
+    return current
+
+
+def clear_management_signature() -> dict:
+    from apps.adminpanel.models import AdminSettings
+    current = management_signature()
+    current["signature"] = ""
+    current["updated_at"] = timezone.now().isoformat()
+    AdminSettings.objects.update_or_create(
+        key=MANAGEMENT_SIGNATURE_KEY,
+        defaults={
+            "value": current,
+            "description": "Signature and signatory printed on issued certificates.",
+            "is_public": False,
+        },
+    )
+    return current
+
+
+def tutor_signature(tutor) -> dict:
+    if tutor is None:
+        return {"signature": "", "updated_at": None}
+    profile = getattr(tutor, "tutor_profile", None)
+    if profile is None:
+        return {"signature": "", "updated_at": None}
+    return {
+        "signature": _safe_signature_data_url(profile.certificate_signature),
+        "updated_at": profile.certificate_signature_updated_at,
+    }
+
+
+def save_tutor_signature(*, tutor, signature) -> dict:
+    from apps.accounts.models import TutorProfile
+    profile, _ = TutorProfile.objects.get_or_create(user=tutor)
+    profile.certificate_signature = _decode_signature_upload(signature)
+    profile.certificate_signature_updated_at = timezone.now()
+    profile.save(update_fields=["certificate_signature", "certificate_signature_updated_at", "updated_at"])
+    return tutor_signature(tutor)
+
+
+def clear_tutor_signature(*, tutor) -> None:
+    from apps.accounts.models import TutorProfile
+    TutorProfile.objects.filter(user=tutor).update(
+        certificate_signature="", certificate_signature_updated_at=None,
+    )
 
 
 def generate_verification_code() -> str:
@@ -96,6 +235,7 @@ body { margin: 0; background: #ffffff; color: #101642;
              font-family: 'DejaVu Sans', Helvetica, Arial, sans-serif; }
 .cert-seal-cell { width: 34%; vertical-align: middle; text-align: center; }
 .cert-sign-line { border-top: 0.3mm solid #a3a8f3; padding-top: 2mm; }
+.cert-sign-image { display: block; margin: 0 auto 2mm; max-width: 46mm; max-height: 16mm; }
 .cert-sign-name { font-size: 10pt; font-weight: bold; color: #00088A; }
 .cert-sign-role { margin-top: 1mm; font-size: 7.5pt; letter-spacing: 0.12em;
                   text-transform: uppercase; color: #4a5378; }
@@ -139,6 +279,7 @@ DEFAULT_CERTIFICATE_HTML = """
     <table class="cert-signatures">
       <tr>
         <td class="cert-sign">
+          {% if tutor_signature %}<img class="cert-sign-image" src="{{ tutor_signature }}" alt="" />{% endif %}
           <p class="cert-sign-name">{{ instructor_name }}</p>
           <div class="cert-sign-line"><p class="cert-sign-role">Course Instructor</p></div>
         </td>
@@ -146,8 +287,9 @@ DEFAULT_CERTIFICATE_HTML = """
           <div class="cert-seal"><div class="cert-seal-inner"><p class="cert-seal-text">VACEUP</p></div></div>
         </td>
         <td class="cert-sign">
-          <p class="cert-sign-name">{{ institution_name }}</p>
-          <div class="cert-sign-line"><p class="cert-sign-role">Academy Director</p></div>
+          {% if management_signature %}<img class="cert-sign-image" src="{{ management_signature }}" alt="" />{% endif %}
+          <p class="cert-sign-name">{{ management_name }}</p>
+          <div class="cert-sign-line"><p class="cert-sign-role">{{ management_title }}</p></div>
         </td>
       </tr>
     </table>
@@ -164,6 +306,9 @@ DEFAULT_CERTIFICATE_HTML = """
 def certificate_context(certificate: "Certificate") -> dict:
     """The award facts every renderer (HTML, PDF) draws from."""
     verify_base = str(getattr(django_settings, "FRONTEND_BASE_URL", "") or "https://vaceup.ng")
+    tutor = certificate.tutor or certificate.course.instructor
+    signature = tutor_signature(tutor)
+    management = management_signature()
     return {
         "student_name": certificate.student_name_at_issue,
         "course_title": certificate.course_title_at_issue,
@@ -174,6 +319,10 @@ def certificate_context(certificate: "Certificate") -> dict:
         "institution_name": certificate.institution_name_at_issue,
         "issue_date": certificate.issue_date.strftime("%B %d, %Y"),
         "verify_url": f"{verify_base.rstrip('/')}/verify/",
+        "tutor_signature": signature["signature"],
+        "management_signature": management["signature"],
+        "management_name": management["name"],
+        "management_title": management["title"],
     }
 
 
@@ -194,14 +343,15 @@ def render_certificate_html(certificate: "Certificate") -> str:
     return full_html
 
 
-def preview_certificate_html(*, template: CertificateTemplate, student, course) -> str:
+def preview_certificate_html(*, template: CertificateTemplate, student, course, tutor=None) -> str:
     """Render the design for review. Nothing is saved and no award is issued."""
+    tutor = tutor or course.instructor
     sample = Certificate(
-        student=student, course=course, template=template,
+        student=student, course=course, template=template, tutor=tutor,
         certificate_number=uuid.uuid4(), verification_code="PREVIEW-SAMPLE",
         student_name_at_issue=student.full_name or student.email,
         course_title_at_issue=course.title,
-        instructor_name_at_issue=course.instructor.full_name or course.instructor.email,
+        instructor_name_at_issue=tutor.full_name or tutor.email,
         institution_name_at_issue="VaceUp",
         completion_date=timezone.localdate(), issue_date=timezone.localdate(),
     )
@@ -263,6 +413,21 @@ def _wrap(text, font, size, max_width, limit=2):
     if current and len(lines) < limit:
         lines.append(current)
     return lines
+
+
+def _signature_image(data_url):
+    """A ReportLab image reader for a stored signature, or None when absent/invalid."""
+    if not data_url or not str(data_url).startswith("data:image/") or "," not in data_url:
+        return None
+    try:
+        raw = base64.b64decode(str(data_url).split(",", 1)[1], validate=True)
+        from reportlab.lib.utils import ImageReader
+        reader = ImageReader(BytesIO(raw))
+        reader.getSize()
+        return reader
+    except Exception:
+        logger.warning("Skipping a certificate signature that could not be decoded")
+        return None
 
 
 def generate_branded_pdf(context: dict, *, page_size="A4", orientation="portrait") -> bytes:
@@ -337,10 +502,20 @@ def generate_branded_pdf(context: dict, *, page_size="A4", orientation="portrait
 
     left, right = width * 0.27, width * 0.73
     sign_y = max(118.0, detail_y - 0.22 * height)
-    for x, name_text, role in (
-        (left, str(context["instructor_name"]), "COURSE INSTRUCTOR"),
-        (right, str(context["institution_name"]), "ACADEMY DIRECTOR"),
+    for x, name_text, role, signature in (
+        (left, str(context["instructor_name"]), "COURSE INSTRUCTOR", context.get("tutor_signature", "")),
+        (right, str(context.get("management_name") or context["institution_name"]),
+         str(context.get("management_title") or "ACADEMY DIRECTOR").upper(),
+         context.get("management_signature", "")),
     ):
+        reader = _signature_image(signature)
+        if reader is not None:
+            image_w, image_h = reader.getSize()
+            scale = min((width * 0.22) / image_w, 30.0 / image_h)
+            sheet.drawImage(
+                reader, x - (image_w * scale) / 2, sign_y + 3,
+                width=image_w * scale, height=image_h * scale, mask="auto",
+            )
         at(sign_y, name_text, "Helvetica-Bold", 10, BRAND_NAVY, x=x, max_width=width * 0.24)
         sheet.setStrokeColor(HexColor(BRAND_RULE)); sheet.setLineWidth(0.8)
         sheet.line(x - 76, sign_y - 11, x + 76, sign_y - 11)
@@ -416,13 +591,17 @@ def generate_pdf_fallback(html: str, *, page_size="A4", orientation="portrait") 
     return buffer.getvalue()
 
 
-def issue_certificate(*, enrollment: Enrollment) -> "Certificate":
+def issue_certificate(*, enrollment: Enrollment, tutor=None) -> "Certificate":
     """Serialize issuance and retries; success requires a persisted PDF.
 
     An enrollment lock serializes requests before a certificate exists. A
     certificate lock also serializes retries with revocation. PDF/storage
     failures roll back new rows; existing pending rows retain their identity.
     """
+    if tutor is not None and not tutor.is_instructor:
+        raise DomainError(
+            "Select a tutor account to sign this certificate.", code="not_instructor",
+        )
     saved_file = None
     try:
         with transaction.atomic():
@@ -458,13 +637,14 @@ def issue_certificate(*, enrollment: Enrollment) -> "Certificate":
             if certificate is None:
                 student = enrollment.student
                 course = enrollment.course
+                signatory = tutor or course.instructor
                 certificate = Certificate.objects.create(
-                    student=student, course=course, enrollment=enrollment,
+                    student=student, course=course, enrollment=enrollment, tutor=signatory,
                     template=get_template_for_course(course),
                     verification_code=generate_verification_code(),
                     student_name_at_issue=student.full_name or student.email,
                     course_title_at_issue=course.title,
-                    instructor_name_at_issue=course.instructor.full_name or course.instructor.email,
+                    instructor_name_at_issue=signatory.full_name or signatory.email,
                     institution_name_at_issue="VaceUp",
                     completion_date=enrollment.completed_at.date(),
                     issue_date=timezone.now().date(),

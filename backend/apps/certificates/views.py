@@ -9,6 +9,7 @@ from rest_framework.decorators import action, api_view, permission_classes, auth
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.views import APIView
 from django.db import IntegrityError, transaction
 
 from apps.certificates import services
@@ -30,6 +31,72 @@ class IsAdminOrInstructor(BasePermission):
             request.user and request.user.is_authenticated
             and (request.user.is_admin or request.user.is_instructor)
         )
+
+
+class IsAcademyAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_admin)
+
+
+class IsTutor(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_instructor)
+
+
+class TutorSignatureView(APIView):
+    """GET/POST/DELETE /certificates/signature/ - the signed-in tutor's signature."""
+
+    permission_classes = [IsAuthenticated, IsTutor]
+
+    def get(self, request):
+        data = services.tutor_signature(request.user)
+        return Response({
+            "signature": data["signature"],
+            "updated_at": data["updated_at"],
+            "name": request.user.full_name or request.user.email,
+        })
+
+    def post(self, request):
+        upload = request.FILES.get("signature")
+        if upload is None:
+            raise ValidationError({"signature": "Choose a signature image to upload."})
+        data = services.save_tutor_signature(tutor=request.user, signature=upload)
+        return Response({
+            "detail": "Your certificate signature has been saved.",
+            "signature": data["signature"],
+            "updated_at": data["updated_at"],
+            "name": request.user.full_name or request.user.email,
+        })
+
+    def delete(self, request):
+        services.clear_tutor_signature(tutor=request.user)
+        return Response({"detail": "Your certificate signature has been removed."})
+
+
+class ManagementSignatureView(APIView):
+    """GET/POST/DELETE /certificates/signature/management/ - academy signatory."""
+
+    permission_classes = [IsAuthenticated, IsAcademyAdmin]
+
+    def get(self, request):
+        return Response(services.management_signature())
+
+    def post(self, request):
+        upload = request.FILES.get("signature")
+        has_name = "name" in request.data
+        has_title = "title" in request.data
+        if upload is None and not (has_name or has_title):
+            raise ValidationError({"signature": "Choose a signature image to upload."})
+        data = services.save_management_signature(
+            signature=upload,
+            name=request.data.get("name") if has_name else None,
+            title=request.data.get("title") if has_title else None,
+        )
+        return Response({"detail": "The management signature has been saved.", **data})
+
+    def delete(self, request):
+        data = services.clear_management_signature()
+        return Response({"detail": "The management signature has been removed.", **data})
 
 
 class CertificateTemplateViewSet(viewsets.ModelViewSet):
@@ -85,6 +152,18 @@ class CertificateTemplateViewSet(viewsets.ModelViewSet):
         student = get_user_model().objects.filter(pk=int(student_id), is_active=True).first()
         if student is None:
             raise ValidationError("That student account is not available. Select another student.")
+        tutor = course.instructor
+        tutor_id = request.query_params.get("tutor", "")
+        if tutor_id:
+            if not tutor_id.isdigit():
+                raise ValidationError("That tutor is not available. Select a tutor from the list.")
+            tutor = get_user_model().objects.filter(
+                pk=int(tutor_id), is_active=True, role="instructor",
+            ).first()
+            if tutor is None:
+                raise ValidationError("That tutor is not available. Select a tutor from the list.")
+        if not request.user.is_admin and tutor.pk != request.user.pk:
+            raise PermissionDenied("Tutors may only preview certificates signed by themselves.")
         template_id = request.query_params.get("template", "")
         template = (
             CertificateTemplate.objects.filter(pk=int(template_id)).first()
@@ -95,7 +174,9 @@ class CertificateTemplateViewSet(viewsets.ModelViewSet):
         if not request.user.is_admin and (template.course_id is None or template.course.instructor_id != request.user.pk):
             raise PermissionDenied("Tutors may only preview their own course templates.")
         try:
-            html = services.preview_certificate_html(template=template, student=student, course=course)
+            html = services.preview_certificate_html(
+                template=template, student=student, course=course, tutor=tutor,
+            )
         except ValidationError:
             raise
         except Exception as exc:

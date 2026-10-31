@@ -132,6 +132,10 @@ class TutorProfile(TimeStampedModel):
     )
     expertise = models.CharField(max_length=200, blank=True)
     years_experience = models.PositiveIntegerField(default=0)
+    # A signature image stored as a data URL so certificate rendering never
+    # needs a network or filesystem fetch for it.
+    certificate_signature = models.TextField(blank=True, default="")
+    certificate_signature_updated_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"TutorProfile<{self.user_id}>"

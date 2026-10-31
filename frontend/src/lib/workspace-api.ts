@@ -20,10 +20,15 @@ export interface WorkspaceAgendaItem {
   detail: string; href: string;
 }
 export interface WorkspaceTask { kind: string; label: string; count: number; href: string; }
+export interface WorkspaceApplication {
+  id: number; course: number; course_title: string; course_slug: string;
+  price: string; reviewed_at: string | null;
+}
 export interface WorkspaceOverview {
   role: 'student' | 'instructor'; counts: Record<string, number>;
   recent_courses: WorkspaceCourse[]; upcoming_classes: WorkspaceClass[];
-  agenda: WorkspaceAgendaItem[]; tasks: WorkspaceTask[]; updated_at: string;
+  agenda: WorkspaceAgendaItem[]; tasks: WorkspaceTask[];
+  approved_applications: WorkspaceApplication[]; updated_at: string;
 }
 export interface WorkspaceLesson {
   id: number; title: string; content: string; duration_seconds: number;

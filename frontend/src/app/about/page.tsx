@@ -88,8 +88,13 @@ export default function AboutPage() {
       {others.length > 0 && (
         <section className="py-20 bg-white" aria-labelledby="team-heading">
           <div className="mx-auto max-w-7xl px-6">
-            <h2 id="team-heading" className="text-3xl font-bold text-navy-950 mb-2 text-center">The people who teach here</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto mb-12 text-center">Practitioners who deliver the classes and mentor the projects.</p>
+            <h2 id="team-heading" className="text-3xl font-bold text-navy-950 mb-2 text-center">Meet the team</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto mb-4 text-center">Practitioners who deliver the classes and mentor the projects.</p>
+            <p className="text-center mb-12">
+              <Link href="/team" className="font-semibold text-navy-900 underline decoration-gold-brand decoration-2 underline-offset-4 hover:text-gold-brand">
+                See everyone at the academy
+              </Link>
+            </p>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {others.map((member) => (
                 <article key={member.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-6">

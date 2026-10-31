@@ -8,6 +8,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from apps.applications.models import Application
 from apps.assignments.models import Assignment, Quiz, QuizAttempt, Submission
 from apps.courses.models import Category, Course, Module, Lesson
 from apps.enrollment.models import Enrollment, LessonProgress
@@ -89,6 +90,44 @@ class WorkspaceTests(APITestCase):
         self.assertEqual(self.client.get(f'/api/v1/dashboard/courses/{self.foreign.pk}/').status_code, 404)
         roster = self.client.get('/api/v1/instructor/students/').data
         self.assertEqual([row['student_id'] for row in roster['results']], [self.student.pk])
+
+    def test_approved_application_awaits_payment_until_enrolled(self):
+        paid = Course.objects.create(
+            title="Paid track", slug="paid-track", category=self.course.category,
+            instructor=self.tutor, is_published=True, price="25000.00",
+        )
+        application = Application.objects.create(
+            student=self.student, course=paid, status=Application.Status.APPROVED,
+            reviewed_at=timezone.now(),
+        )
+        overview = self.client.get('/api/v1/dashboard/overview/').data
+        self.assertEqual(
+            [row['course'] for row in overview['approved_applications']], [paid.pk],
+        )
+        self.assertEqual(overview['approved_applications'][0]['price'], '25000.00')
+        self.assertIn('payment', {row['kind'] for row in overview['tasks']})
+        listing = self.client.get('/api/v1/dashboard/applications/').data
+        self.assertEqual([row['id'] for row in listing['results']], [application.pk])
+
+        Enrollment.objects.create(student=self.student, course=paid)
+        self.assertEqual(
+            self.client.get('/api/v1/dashboard/applications/').data['results'], [],
+        )
+        overview = self.client.get('/api/v1/dashboard/overview/').data
+        self.assertEqual(overview['approved_applications'], [])
+
+    def test_approved_applications_are_account_scoped(self):
+        application = Application.objects.create(
+            student=self.other, course=self.course, status=Application.Status.APPROVED,
+        )
+        self.assertEqual(
+            self.client.get('/api/v1/dashboard/applications/').data['results'], [],
+        )
+        self.client.force_authenticate(self.other)
+        self.assertEqual(
+            [row['id'] for row in self.client.get('/api/v1/dashboard/applications/').data['results']],
+            [application.pk],
+        )
 
     def test_payments_are_private_and_exclude_gateway_details(self):
         Payment.objects.create(student=self.student, course=self.course, amount='12500', gateway_response={'private': 'value'})

@@ -31,6 +31,7 @@ class CertificateSerializer(serializers.ModelSerializer):
 
     student_name = serializers.CharField(source="student.full_name", read_only=True)
     course_title = serializers.CharField(source="course.title", read_only=True)
+    tutor_name = serializers.CharField(source="tutor.full_name", read_only=True, default="")
     template_name = serializers.CharField(source="template.name", read_only=True)
     pdf_url = serializers.SerializerMethodField()
     pdf_file = serializers.SerializerMethodField()
@@ -45,6 +46,8 @@ class CertificateSerializer(serializers.ModelSerializer):
             "student_name",
             "course",
             "course_title",
+            "tutor",
+            "tutor_name",
             "template",
             "template_name",
             "status",

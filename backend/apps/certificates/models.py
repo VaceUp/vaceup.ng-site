@@ -94,6 +94,15 @@ class Certificate(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="issued_certificates",
     )
+    tutor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="signed_certificates",
+        limit_choices_to={"role": "instructor"},
+        help_text="The tutor who signed this award. Falls back to the course instructor.",
+    )
     enrollment = models.OneToOneField(
         "enrollment.Enrollment",
         on_delete=models.CASCADE,

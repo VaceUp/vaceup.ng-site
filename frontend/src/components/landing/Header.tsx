@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: '/courses', label: 'Courses' },
   { href: SITE.kidsUrl, label: 'Kids Academy' },
   { href: '/about', label: 'About' },
+  { href: '/team', label: 'Team' },
   { href: '/events', label: 'Events' },
   { href: '/blog', label: 'Blog' },
   { href: '/resources', label: 'Resources' },
@@ -88,7 +89,7 @@ export const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden sm:flex items-center gap-4 sm:gap-6 lg:gap-8 text-xs sm:text-sm font-semibold text-gray-700 flex-wrap">
+          <nav className="hidden sm:flex items-center gap-4 lg:gap-5 xl:gap-8 text-xs sm:text-sm font-semibold text-gray-700 flex-wrap">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.label}

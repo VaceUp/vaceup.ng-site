@@ -2,8 +2,9 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { api, type PaginatedResponse } from '@/lib/api';
-import { managementList, type ManagedCourse } from '@/lib/course-management';
+import { managementList, managedTutors, type ManagedCourse, type ManagedTutor } from '@/lib/course-management';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
+import { ManagementSignatureCard } from './CertificateSignatures';
 import { formatWorkspaceDate } from '@/lib/workspace-api';
 import {
   Action,
@@ -60,6 +61,7 @@ interface IssuedResult {
   verification_code: string;
   student_name: string;
   course_title: string;
+  tutor_name?: string;
 }
 
 interface Preview {
@@ -90,6 +92,8 @@ export function CertificatesTab() {
 
   const [courses, setCourses] = useState<ManagedCourse[]>([]);
   const [coursesError, setCoursesError] = useState('');
+  const [tutors, setTutors] = useState<ManagedTutor[]>([]);
+  const [tutorsError, setTutorsError] = useState('');
 
   const [studentQuery, setStudentQuery] = useState('');
   const [appliedQuery, setAppliedQuery] = useState('');
@@ -98,6 +102,7 @@ export function CertificatesTab() {
     appliedQuery ? `/admin/dashboard/users/?role=student&search=${encodeURIComponent(appliedQuery)}` : '/admin/dashboard/users/?role=student',
   );
   const [courseId, setCourseId] = useState('');
+  const [tutorId, setTutorId] = useState('');
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -123,6 +128,11 @@ export function CertificatesTab() {
       .catch((error: unknown) => {
         if (active) setCoursesError(error instanceof Error ? error.message : 'Courses could not be loaded.');
       });
+    managedTutors()
+      .then((rows) => { if (active) { setTutors(rows); setTutorsError(''); } })
+      .catch((error: unknown) => {
+        if (active) setTutorsError(error instanceof Error ? error.message : 'Tutors could not be loaded.');
+      });
     return () => { active = false; };
   }, []);
 
@@ -143,7 +153,8 @@ export function CertificatesTab() {
     let active = true;
     setPreviewBusy(true);
     setPreviewError('');
-    api.request<{ html: string; template: string }>(`/certificates/templates/preview/?course=${courseId}&student=${studentId}`)
+    const tutorQuery = tutorId ? `&tutor=${encodeURIComponent(tutorId)}` : '';
+    api.request<{ html: string; template: string }>(`/certificates/templates/preview/?course=${courseId}&student=${studentId}${tutorQuery}`)
       .then((result) => { if (active) setPreview(result); })
       .catch((error: unknown) => {
         if (!active) return;
@@ -152,7 +163,7 @@ export function CertificatesTab() {
       })
       .finally(() => { if (active) setPreviewBusy(false); });
     return () => { active = false; };
-  }, [studentId, courseId]);
+  }, [studentId, courseId, tutorId]);
 
   const previewPage = useMemo(() => {
     const letter = preview?.page_size === 'Letter';
@@ -190,6 +201,8 @@ export function CertificatesTab() {
 
   const chooseCourse = (value: string) => {
     setCourseId(value);
+    const course = courses.find((row) => String(row.id) === value);
+    setTutorId(course ? String(course.instructor) : '');
     setIssued(null);
     setIssueError('');
   };
@@ -208,11 +221,15 @@ export function CertificatesTab() {
       setIssueError('Choose the student and the course.');
       return;
     }
+    if (!tutorId) {
+      setIssueError('Choose the tutor who signs this certificate.');
+      return;
+    }
     setIssuing(true);
     try {
       const result = await api.request<IssuedResult>('/admin/dashboard/certificates/issue/', {
         method: 'POST',
-        body: JSON.stringify({ student_id: studentId, course_id: Number(courseId) }),
+        body: JSON.stringify({ student_id: studentId, course_id: Number(courseId), tutor_id: Number(tutorId) }),
       });
       setIssued(result);
       toast.push(`Certificate ${result.certificate_number} issued to ${result.student_name}.`, 'success');
@@ -289,6 +306,8 @@ export function CertificatesTab() {
 
   return (
     <>
+      <ManagementSignatureCard />
+
       <AdminSection
         title="Issue a certificate"
         description="Certificates are issued only for a completed enrollment. Choose the student and course: the preview is drawn by the same code that renders the PDF."
@@ -346,8 +365,28 @@ export function CertificatesTab() {
                   ))}
                 </select>
               </Field>
+              <Field
+                label="Tutor who signs"
+                required
+                error={tutorsError || undefined}
+                hint="Defaults to the course tutor. Choose another tutor to sign this award on their behalf."
+              >
+                <select
+                  className={controlClass}
+                  value={tutorId}
+                  disabled={Boolean(tutorsError) || tutors.length === 0}
+                  onChange={(event) => { setTutorId(event.target.value); setIssued(null); setIssueError(''); }}
+                >
+                  <option value="">{tutors.length ? 'Choose a tutor' : 'No active tutors'}</option>
+                  {tutors.map((tutor) => (
+                    <option key={tutor.id} value={tutor.id}>
+                      {tutor.full_name ? `${tutor.full_name} (${tutor.email})` : tutor.email}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <div className={adminStyles.actions}>
-                <Action intent="primary" type="submit" loading={issuing} disabled={!studentId || !courseId || Boolean(coursesError)}>
+                <Action intent="primary" type="submit" loading={issuing} disabled={!studentId || !courseId || !tutorId || Boolean(coursesError || tutorsError)}>
                   Issue certificate
                 </Action>
               </div>

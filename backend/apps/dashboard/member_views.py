@@ -10,6 +10,7 @@ from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.applications.models import Application
 from apps.assignments.models import Assignment, Quiz, QuizAttempt, Submission
 from apps.certificates.models import Certificate
 from apps.courses.models import Course, Lesson
@@ -118,6 +119,27 @@ class WorkspaceTaskSerializer(serializers.Serializer):
     label = serializers.CharField()
     count = serializers.IntegerField()
     href = serializers.CharField()
+
+
+class WorkspaceApplicationSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    course = serializers.IntegerField(source="course_id")
+    course_title = serializers.CharField(source="course.title")
+    course_slug = serializers.CharField(source="course.slug")
+    price = serializers.DecimalField(source="course.price", max_digits=10, decimal_places=2)
+    reviewed_at = serializers.DateTimeField(allow_null=True)
+
+
+def approved_applications(user):
+    """Applications accepted by the academy that still need a paid checkout."""
+    if user.is_instructor:
+        return Application.objects.none()
+    return (
+        Application.objects.filter(student=user, status=Application.Status.APPROVED)
+        .exclude(course__enrollments__student=user)
+        .select_related("course")
+        .order_by("-reviewed_at", "-pk")
+    )
 
 
 def _agenda_item(kind, pk, title, course, when, state, detail, href):
@@ -285,6 +307,7 @@ class WorkspaceOverviewSerializer(serializers.Serializer):
     upcoming_classes = WorkspaceLiveClassSerializer(many=True)
     agenda = WorkspaceAgendaItemSerializer(many=True)
     tasks = WorkspaceTaskSerializer(many=True)
+    approved_applications = WorkspaceApplicationSerializer(many=True)
     updated_at = serializers.DateTimeField()
 
 
@@ -326,10 +349,18 @@ class WorkspaceOverviewView(PrivateWorkspaceResponse, GenericAPIView):
                   else _student_agenda(user, courses))
         tasks = (_tutor_tasks(user, courses) if user.is_instructor
                  else _student_tasks(user, courses))
+        awaiting = approved_applications(user)
+        awaiting_count = awaiting.count()
+        if awaiting_count:
+            tasks = [{
+                "kind": "payment", "label": "Accepted courses to pay for",
+                "count": awaiting_count, "href": "/dashboard/courses",
+            }, *tasks]
         return Response(self.get_serializer({
             "role": user.role, "counts": counts,
             "recent_courses": workspace_courses(user)[:3],
             "upcoming_classes": upcoming, "agenda": agenda, "tasks": tasks,
+            "approved_applications": awaiting[:5],
             "updated_at": timezone.now(),
         }).data)
 
@@ -375,3 +406,15 @@ class WorkspacePaymentListView(PrivateWorkspaceResponse, ListAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Payment.objects.none()
         return Payment.objects.filter(student=self.request.user).select_related("course").order_by("-created_at", "-pk")
+
+
+class WorkspaceApplicationListView(PrivateWorkspaceResponse, ListAPIView):
+    """Accepted applications whose course still needs a payment or grant."""
+
+    permission_classes = [IsWorkspaceMember]
+    serializer_class = WorkspaceApplicationSerializer
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Application.objects.none()
+        return approved_applications(self.request.user)

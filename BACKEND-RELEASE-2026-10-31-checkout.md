@@ -62,6 +62,32 @@ running an older copy of the marketing module that did not have it.
 
 No other app is replaced or removed.
 
+Measured against the live API on 2026-10-31, before this release:
+
+| Request | Answer | Meaning |
+|---------|--------|---------|
+| `GET /api/v1/marketing/campaigns/` | 401 | The module loads; only the sign-in is missing |
+| `GET /api/v1/marketing/campaigns/3/stats/` | 401 | The old actions are registered |
+| `GET /api/v1/marketing/campaigns/3/recipients/` | 401 | The old actions are registered |
+| `GET /api/v1/marketing/campaigns/3/audience/` | 404 | The action does not exist on the server |
+| `GET /api/v1/marketing/campaigns/3/queue/` | 404 | The action does not exist on the server |
+
+A 404 on the two new actions and a 401 on the old ones means the server is running the
+marketing module from before the campaign rewrite, not that the API is misrouted.
+
+The three modules that the current marketing module imports were confirmed to be
+present on the server, so replacing the folder cannot break the API:
+
+| Imported module | Confirmed by |
+|-----------------|--------------|
+| `apps.accounts.mail_delivery` | `apps/accounts/services.py` imports it at module level and the account routes answer 401/405 |
+| `apps.adminpanel.platform_settings` | `GET /api/v1/admin/settings/definitions/` answers 401 |
+| `apps.core.schema` | `apps/courses/views.py` imports it and `GET /api/v1/courses/` answers 200 |
+
+The marketing models gained only four nullable or defaulted columns since the original
+version, and the migration that adds them is in this overlay. No existing campaign,
+recipient or log row is rewritten.
+
 ## Migrations
 
 | App | Migration | What it does |
@@ -69,7 +95,23 @@ No other app is replaced or removed.
 | marketing | `0002_delivery_claims` | Adds the queue-claim columns to `marketing_emailrecipient` so two workers cannot send the same email twice |
 
 `0001_initial` is shipped too, but it is only applied if the server has never run it.
-All the columns are additive; no existing campaign, recipient or log row is rewritten.
+All the columns are additive.
+
+Read `migrate --plan` before you migrate:
+
+```bash
+source /home/coqrpund/virtualenv/vaceup_api/3.12/bin/activate
+cd /home/coqrpund/vaceup_api
+python manage.py migrate --plan
+```
+
+- If the plan lists `marketing 0002_delivery_claims`, run `python manage.py migrate
+  --noinput` as written below.
+- If the plan lists `marketing 0001_initial`, the marketing tables exist but Django does
+  not have them recorded. Stop and check the table structure before doing anything
+  else. Do not use `--fake` blindly.
+- If the plan lists nothing for marketing, the columns are already there. Continue with
+  the remaining commands.
 
 `makemigrations --check` reports no unmade migrations for this tree.
 
@@ -123,6 +165,14 @@ The health check must answer 200. Then:
 - Send one test email to yourself and confirm it arrives. The delivery report must
   show the recipient as accepted by SMTP.
 
+## Known issue this release does not fix
+
+`https://api.vaceup.ng/api/schema/` answers HTTP 500, and the Swagger pages built on it
+(`/api/docs/`, `/api/redoc/`) fail with it. The cause is a drf-spectacular and Django
+REST Framework version interaction in the schema generator, not anything this overlay
+touches. The API itself is unaffected: every business route answers normally. It is
+recorded here so the 500 is not mistaken for damage from this install.
+
 ## Rollback
 
 Restore the backed-up source files, then restart the app. The new marketing columns are
@@ -175,6 +225,8 @@ Measured on this machine against `config.settings_test` (SQLite):
 - `GET /api/v1/marketing/campaigns/3/audience/` on the local preview server answered
   HTTP 200 with the recipient count, and the admin review panel rendered the count
   with the send button disabled until the audience is confirmed.
+- The live API was probed on 2026-10-31 to establish the starting state. The table in
+  "The campaign review screen can load its recipient list" records those answers.
 - `python3 scripts/check_no_secrets.py`: `clean (981 tracked files scanned)`.
 - The archive contains 19 entries and no `manage.py`, `passenger_wsgi.py` or
   `requirements.txt`. Its SHA-256 is written to

@@ -22,6 +22,9 @@
  */
 
 @theme {
+  /* Monospaced stack for code surfaces. Matches Tailwind's default so the
+     font-mono utility is unchanged. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   /* Semantic surfaces shared by account recovery, catalogue and admin guidance. */
   --color-surface: var(--color-white);
   --color-surface-subtle: var(--color-gray-50);
@@ -164,6 +167,27 @@
   --workspace-success: var(--color-teal-brand);
   --workspace-success-bg: color-mix(in oklab, var(--color-teal-brand) 12%, var(--color-white));
   --workspace-success-text: color-mix(in oklab, var(--color-teal-brand) 72%, var(--color-navy-950));
+
+  /* Code surface tokens. The practice editor renders its syntax palette from these.
+     These alias primitives, not other semantic tokens: a custom property that
+     references another custom property is substituted where it is declared, so
+     aliasing --workspace-* would freeze the light values in the dark theme. */
+  --code-surface: var(--color-white);
+  --code-text: var(--color-ink);
+  --code-muted: var(--color-gray-600);
+  --code-line: var(--color-gray-200);
+  --code-active: var(--color-navy-50);
+  --code-focus: var(--color-navy-900);
+  --code-menu: var(--color-white);
+  --code-keyword: var(--color-navy-700);
+  --code-string: var(--color-teal-brand);
+  --code-number: var(--color-gold-700);
+  --code-function: var(--color-navy-900);
+  --code-type: var(--color-teal-brand);
+  --code-comment: var(--color-gray-500);
+  --code-punctuation: var(--color-gray-700);
+  --code-selection: var(--color-navy-100);
+  --code-selection-text: var(--color-navy-950);
 }
 
 [data-workspace-theme="dark"] {
@@ -182,6 +206,23 @@
   --workspace-success: var(--color-teal-400);
   --workspace-success-bg: color-mix(in oklab, var(--color-teal-400) 16%, var(--color-slate-900));
   --workspace-success-text: var(--color-teal-300);
+
+  --code-surface: var(--color-slate-900);
+  --code-text: var(--color-slate-50);
+  --code-muted: var(--color-slate-300);
+  --code-line: var(--color-slate-700);
+  --code-active: var(--color-slate-800);
+  --code-focus: var(--color-gold-brand);
+  --code-menu: var(--color-slate-900);
+  --code-keyword: var(--color-navy-200);
+  --code-string: var(--color-teal-300);
+  --code-number: var(--color-gold-300);
+  --code-function: var(--color-navy-100);
+  --code-type: var(--color-teal-300);
+  --code-comment: var(--color-slate-400);
+  --code-punctuation: var(--color-slate-300);
+  --code-selection: var(--color-navy-900);
+  --code-selection-text: var(--color-navy-50);
 }
 
 body {

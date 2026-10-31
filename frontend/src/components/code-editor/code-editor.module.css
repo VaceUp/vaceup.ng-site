@@ -1,0 +1,69 @@
+@reference "../../app/globals.css";
+
+.editor {
+  inline-size: 100%;
+  overflow: hidden;
+  border: thin solid var(--code-line);
+  border-radius: var(--radius-lg);
+  background: var(--code-surface);
+}
+
+.editor:focus-within {
+  border-color: var(--code-focus);
+  box-shadow: 0 0 0 2px var(--code-focus);
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.suggestionsLegend {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--workspace-text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  min-block-size: calc(var(--spacing) * 11);
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+  border: thin solid var(--workspace-control);
+  border-radius: var(--radius-lg);
+  background: var(--workspace-surface);
+  color: var(--workspace-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--workspace-subtle);
+  border-color: var(--workspace-focus);
+}
+
+.chip:active {
+  background: var(--workspace-line);
+}
+
+.chip:focus-visible {
+  outline: calc(var(--spacing) / 2) solid var(--workspace-focus);
+  outline-offset: calc(var(--spacing) / 2);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--workspace-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}

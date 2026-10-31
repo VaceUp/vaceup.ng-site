@@ -206,7 +206,7 @@ toolchain:
   console errors, one h1 per screen, no unlabelled fields, no missing image alt text,
   no fake buttons and no negative tabindex. Loading skeletons, the humanised network
   error state with recovery, the empty filtered state, the campaign drawer focus trap,
-  Escape-to-close, focus return, the guide dialog and the mobile section menu were
+  Escape-to-close, the guide dialog's focus return and the mobile section menu were
   exercised in the same run.
 - Assignments and Feature Flags were exercised end to end: create an assignment draft
   and publish it, create a quiz draft, open both compact detail pages, save a platform

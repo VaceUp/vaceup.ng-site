@@ -6,6 +6,7 @@ import { ADMIN_SECTIONS, type AdminTab } from '@/lib/admin-sections';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import { NativeDialog } from '@/components/ui/Modal';
+import styles from './admin.module.css';
 
 const QUICK_START: { title: string; description: string; destinations: AdminTab[] }[] = [
   { title: 'Bring the right people in', description: 'Set up your tutors, review applications and confirm learner access.', destinations: ['users', 'applications', 'enrollments'] },
@@ -35,13 +36,17 @@ export default function AdminGuide({ currentTab, onNavigate }: { currentTab: Adm
   const tour = QUICK_START[step];
 
   useEffect(() => {
-    if (!user || user.role !== 'admin' || openedFor.current === String(user.id)) return;
+    // One automatic tour per account, and only over the Overview — the Guide button
+    // in every section header is the way back.
+    if (!user || user.role !== 'admin' || currentTab !== 'overview' || openedFor.current === String(user.id)) return;
     openedFor.current = String(user.id);
     setNeverShow(Boolean(user.admin_guide_dismissed));
     let seen = false;
-    try { seen = sessionStorage.getItem(`vaceup:admin-guide:seen:${user.id}`) === 'true'; } catch { /* Keep the guide usable without browser storage. */ }
-    if (!user.admin_guide_dismissed && !seen) dialog.current?.showModal();
-  }, [user]);
+    try { seen = localStorage.getItem(`vaceup:admin-guide:seen:${user.id}`) === 'true'; } catch { /* Keep the guide usable without browser storage. */ }
+    if (user.admin_guide_dismissed || seen) return;
+    try { localStorage.setItem(`vaceup:admin-guide:seen:${user.id}`, 'true'); } catch { /* The account preference still persists on the server. */ }
+    dialog.current?.showModal();
+  }, [user, currentTab]);
 
   const open = () => {
     setView('map');
@@ -67,14 +72,14 @@ export default function AdminGuide({ currentTab, onNavigate }: { currentTab: Adm
   };
 
   return <>
-    <section aria-label={`${active.name} guidance`} className="flex flex-col gap-4 rounded-2xl border border-navy-100 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        <Lightbulb className="mt-1 h-5 w-5 shrink-0 text-teal-brand" aria-hidden="true" />
-        <div className="min-w-0">
-          <h2 className="font-semibold text-navy-950">{active.name}</h2>
-          <p className="mt-1 text-sm text-content-muted">{active.hint}</p>
-        </div>
-      </div>
+    <section aria-label={`${active.name} guidance`} className={styles.hintBar}>
+      <p className={styles.hintLead}>
+        <Lightbulb className={styles.hintIcon} aria-hidden="true" />
+        <span>
+          <span className={styles.hintTitle}>Before you start</span>
+          <span className={styles.hintText}>{active.hint}</span>
+        </span>
+      </p>
       <button type="button" ref={trigger} onClick={open} className={cn(secondary, 'shrink-0')}>
         <Compass className="h-4 w-4" aria-hidden="true" /> Guide &amp; site map
       </button>

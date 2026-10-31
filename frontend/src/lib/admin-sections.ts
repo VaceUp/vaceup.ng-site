@@ -12,7 +12,7 @@ export const ADMIN_SECTIONS = [
     description: 'Create courses and control what appears in the public catalog.',
     steps: ['Define or rename Categories, then create a course with its category, tutor, level, description and price.', 'Keep it in draft while you prepare lessons in Content.', 'Review its details, then publish it. The homepage and public catalogue read published courses from this backend.'],
     hint: 'Create courses and categories here, or import the original catalogue as drafts. Open Content for full course editing. Only published courses appear to visitors.' },
-  { id: 'content', name: 'Content', icon: 'folder-open', group: 'Course setup',
+  { id: 'content', name: 'Content', icon: 'folder2-open', group: 'Course setup',
     description: 'Control the full course: public details, pricing, tutor, publication and teaching content.',
     steps: ['Select a course, including drafts.', 'Edit its description, learning outcomes, requirements and public outline. Create a missing category without leaving the form.', 'Save course details, then add modules and lessons with private videos. Review the public page before publishing.'],
     hint: 'The public outline is a syllabus. Add paid lesson text and videos under Modules and lessons, not in the public description or outline.' },

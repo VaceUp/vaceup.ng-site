@@ -1,131 +1,177 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import ManualEnrollmentForm from './ManualEnrollmentForm';
+import { useMemo, useState } from 'react';
+import { useWorkspaceResource } from '@/lib/use-workspace-resource';
+import { formatWorkspaceDate } from '@/lib/workspace-api';
+import GrantAccessDrawer from './ManualEnrollmentForm';
+import {
+  Action,
+  AdminList,
+  AdminRow,
+  AdminSection,
+  EmptyState,
+  Pill,
+  Skeleton,
+  StatusNote,
+  TextInput,
+  Toolbar,
+  adminStyles,
+  controlClass,
+} from './AdminUI';
 
 /**
- * Enrollments management — every enrollment on the platform, with status
- * and progress. Wired to /admin/dashboard/enrollments/.
+ * Course access: every enrolment, its progress and whether it is active.
+ * Access arrives from a paid checkout, a free course, or a verified
+ * off-platform payment granted from the drawer.
  */
 
-interface EnrollmentT {
+interface Enrollment {
   id: string;
   student_name: string;
   student_email: string;
   course_title: string;
-  status: string;
+  status: 'active' | 'completed' | 'suspended';
   progress_percent: number;
   enrolled_at: string;
 }
 
-export function EnrollmentsTab() {
-  const [enrollments, setEnrollments] = useState<EnrollmentT[]>([]);
-  const [loading, setLoading] = useState(true);
+const STATUS: Record<Enrollment['status'], { label: string; tone: 'live' | 'muted' | 'danger' }> = {
+  active: { label: 'Active', tone: 'live' },
+  completed: { label: 'Completed', tone: 'muted' },
+  suspended: { label: 'Suspended', tone: 'danger' },
+};
+
+export default function EnrollmentsTab() {
+  const resource = useWorkspaceResource<Enrollment[] | { results: Enrollment[] }>('/admin/dashboard/enrollments/');
+  const enrollments = useMemo(() => {
+    const data = resource.data;
+    if (Array.isArray(data)) return data;
+    return data?.results ?? [];
+  }, [resource.data]);
+
   const [search, setSearch] = useState('');
-  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [grantOpen, setGrantOpen] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    api
-      .request('/admin/dashboard/enrollments/')
-      .then((res: any) => setEnrollments(res.results ?? res ?? []))
-      .catch((err) => setError(err?.message || 'Failed to load enrollments.'))
-      .finally(() => setLoading(false));
-  }, []);
+  const counts = useMemo(() => enrollments.reduce(
+    (totals, row) => ({ ...totals, [row.status]: totals[row.status] + 1 }),
+    { active: 0, completed: 0, suspended: 0 } as Record<Enrollment['status'], number>,
+  ), [enrollments]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filtered = enrollments.filter(
-    (e) =>
-      !search ||
-      e.student_name?.toLowerCase().includes(search.toLowerCase()) ||
-      e.student_email?.toLowerCase().includes(search.toLowerCase()) ||
-      e.course_title?.toLowerCase().includes(search.toLowerCase())
-  );
+  const rows = useMemo(() => enrollments.filter((row) => {
+    if (status && row.status !== status) return false;
+    const needle = search.trim().toLowerCase();
+    if (!needle) return true;
+    return `${row.student_name} ${row.student_email} ${row.course_title}`.toLowerCase().includes(needle);
+  }), [enrollments, search, status]);
 
   return (
-    <div className="space-y-5">
-      <ManualEnrollmentForm onGranted={load} />
-      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 font-black text-navy-950">
-          All Enrollments ({enrollments.length})
-        </h3>
-        <input
-          type="text"
-          placeholder="Search by student or course…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-navy-900 focus:bg-white focus:outline-none sm:max-w-md"
-        />
-        {loading ? (
-          <div className="space-y-2">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded-xl bg-gray-100" />
-            ))}
+    <>
+      <AdminSection
+        title="Enrollments"
+        description="Who can open which course, and how far they have got. A checkout or a granted payment creates this record — deleting it would not refund anyone."
+        actions={<>
+          <Action onClick={resource.refresh} disabled={resource.loading}>Refresh</Action>
+          <Action intent="primary" onClick={() => setGrantOpen(true)}>Grant access</Action>
+        </>}
+      >
+        <div className={adminStyles.stats}>
+          <div className={adminStyles.stat}>
+            <p className={adminStyles.statLabel}>Everyone</p>
+            <p className={adminStyles.statValue}>{enrollments.length}</p>
+            <p className={adminStyles.statNote}>Latest 300 records</p>
           </div>
-        ) : error ? (
-          <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-500">No enrollments match.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400">
-                  <th className="pb-2 pr-4">Student</th>
-                  <th className="pb-2 pr-4">Course</th>
-                  <th className="pb-2 pr-4">Status</th>
-                  <th className="pb-2">Progress</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map((e) => (
-                  <tr key={e.id}>
-                    <td className="py-3 pr-4">
-                      <p className="font-semibold text-navy-950">{e.student_name}</p>
-                      <p className="text-xs text-gray-400">{e.student_email}</p>
-                    </td>
-                    <td className="py-3 pr-4 text-gray-700">{e.course_title}</td>
-                    <td className="py-3 pr-4">
-                      <span
-                        className={cn(
-                          'rounded-full px-2.5 py-1 text-[11px] font-bold capitalize',
-                          e.status === 'active'
-                            ? 'bg-teal-brand/10 text-teal-700'
-                            : e.status === 'completed'
-                              ? 'bg-navy-50 text-navy-900'
-                              : 'bg-gray-100 text-gray-600'
-                        )}
-                      >
-                        {e.status}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className="h-full rounded-full bg-gold-brand"
-                            style={{ width: `${Math.round(e.progress_percent ?? 0)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {Math.round(e.progress_percent ?? 0)}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className={adminStyles.stat}>
+            <p className={adminStyles.statLabel}>Active</p>
+            <p className={adminStyles.statValue}>{counts.active}</p>
+            <p className={adminStyles.statNote}>Currently learning</p>
           </div>
+          <div className={adminStyles.stat}>
+            <p className={adminStyles.statLabel}>Completed</p>
+            <p className={adminStyles.statValue}>{counts.completed}</p>
+            <p className={adminStyles.statNote}>All lessons finished</p>
+          </div>
+          <div className={adminStyles.stat}>
+            <p className={adminStyles.statLabel}>Suspended</p>
+            <p className={adminStyles.statValue}>{counts.suspended}</p>
+            <p className={adminStyles.statNote}>Access withdrawn</p>
+          </div>
+        </div>
+
+        <Toolbar label="Filter enrollments">
+          <TextInput
+            type="search"
+            placeholder="Search learner or course"
+            aria-label="Search enrollments"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <select
+            className={controlClass}
+            aria-label="Filter by enrollment status"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">Every status</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </Toolbar>
+
+        {resource.error && (
+          <StatusNote tone="error">
+            {resource.error}
+            <span className={adminStyles.inlineActions}><Action onClick={resource.refresh}>Retry</Action></span>
+          </StatusNote>
         )}
-      </div>
-    </div>
+
+        {resource.loading && !resource.data && <Skeleton rows={6} />}
+
+        {!resource.loading && !resource.error && enrollments.length === 0 && (
+          <EmptyState
+            icon="bi-door-open"
+            title="Nobody has course access yet"
+            description="Access is created when a learner pays for a course, enrolls in a free one, or when you grant it here after an off-platform payment."
+            action={<Action intent="primary" onClick={() => setGrantOpen(true)}>Grant access</Action>}
+          />
+        )}
+
+        {enrollments.length > 0 && rows.length === 0 && (
+          <EmptyState
+            icon="bi-funnel"
+            title="No enrollment matches that filter"
+            description="Clear the status filter or shorten the search."
+          />
+        )}
+
+        {rows.length > 0 && (
+          <AdminList label="Course enrollments">
+            {rows.map((row) => {
+              const progress = Math.round(Number(row.progress_percent) || 0);
+              return (
+                <AdminRow
+                  key={row.id}
+                  round
+                  placeholder="bi-door-open"
+                  title={row.student_name || 'Account removed'}
+                  badges={<>
+                    <Pill tone={STATUS[row.status].tone}>{STATUS[row.status].label}</Pill>
+                    <span className={adminStyles.amount}>{progress}% complete</span>
+                  </>}
+                  meta={`${row.student_email || 'No email on record'} · ${row.course_title} · started ${formatWorkspaceDate(row.enrolled_at)}`}
+                />
+              );
+            })}
+          </AdminList>
+        )}
+      </AdminSection>
+
+      <GrantAccessDrawer
+        open={grantOpen}
+        onClose={() => setGrantOpen(false)}
+        onGranted={resource.refresh}
+      />
+    </>
   );
 }
-
-export default EnrollmentsTab;

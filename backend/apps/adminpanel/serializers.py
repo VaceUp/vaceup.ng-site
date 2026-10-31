@@ -7,6 +7,8 @@ from rest_framework import serializers
 from apps.adminpanel.models import AdminActionLog, AdminSettings, SystemAnnouncement
 from apps.courses.serializers import CourseBasicSerializer
 from apps.accounts.serializers import UserSerializer
+from apps.payments.models import Payment
+from apps.payments.serializers import PaymentItemSerializer
 
 
 class AdminActionLogSerializer(serializers.ModelSerializer):
@@ -176,6 +178,33 @@ class AdminUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "email", "full_name", "role", "is_active", "date_joined")
+        read_only_fields = fields
+
+
+class AdminPaymentSerializer(serializers.ModelSerializer):
+    """Read shape for the platform payments list (admin only)."""
+
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+    student_email = serializers.CharField(source="student.email", read_only=True)
+    course_title = serializers.CharField(source="course.title", read_only=True)
+    items = PaymentItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = (
+            "reference",
+            "student",
+            "student_name",
+            "student_email",
+            "course",
+            "course_title",
+            "amount",
+            "currency",
+            "status",
+            "paid_at",
+            "created_at",
+            "items",
+        )
         read_only_fields = fields
 
 

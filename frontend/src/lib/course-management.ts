@@ -37,4 +37,11 @@ export const managedCourses = () => managementList<ManagedCourse>('/admin/dashbo
 export const managedCategories = () => managementList<ManagedCategory>('/categories/');
 export const managedTutors = async () => (await managementList<ManagedTutor>('/admin/dashboard/users/?role=instructor')).filter((tutor) => tutor.is_active);
 export const courseEndpoint = (course: Pick<ManagedCourse, 'slug'>) => `/courses/${encodeURIComponent(course.slug)}/`;
-export const failureMessage = (error: unknown) => error instanceof Error ? error.message : 'The change could not be saved. Please try again.';
+export const failureMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message.trim() : '';
+  // Browsers report dropped connections as terse fetch errors; admins get plain language instead.
+  if (!message || /failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
+    return 'The server could not be reached. Check the internet connection, then try again.';
+  }
+  return message;
+};

@@ -8,6 +8,9 @@
 .between { justify-content: space-between; }
 .heading { display: grid; gap: calc(var(--spacing) * 3); }
 .heading h2 { font-size: var(--text-4xl); font-weight: var(--font-weight-bold); line-height: var(--leading-tight); }
+.heading .subheading { font-size: var(--text-2xl); }
+.detailHeading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: calc(var(--spacing) * 3); }
+.detailHeading h2 { font-size: var(--text-2xl); font-weight: var(--font-weight-bold); line-height: var(--leading-tight); }
 .muted { color: var(--workspace-muted); font-size: var(--text-sm); line-height: var(--leading-relaxed); max-inline-size: var(--container-2xl); }
 .panel { padding: calc(var(--spacing) * 5); border: thin solid var(--workspace-line); border-radius: var(--radius-2xl); background: var(--workspace-surface); }
 .panel h3 { font-size: var(--text-xl); font-weight: var(--font-weight-semibold); }

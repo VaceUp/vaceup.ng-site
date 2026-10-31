@@ -161,6 +161,9 @@
   --workspace-error: var(--color-red-700);
   --workspace-error-bg: var(--color-red-50);
   --workspace-progress: var(--color-teal-brand);
+  --workspace-success: var(--color-teal-brand);
+  --workspace-success-bg: color-mix(in oklab, var(--color-teal-brand) 12%, var(--color-white));
+  --workspace-success-text: color-mix(in oklab, var(--color-teal-brand) 72%, var(--color-navy-950));
 }
 
 [data-workspace-theme="dark"] {
@@ -176,6 +179,9 @@
   --workspace-error: var(--color-red-200);
   --workspace-error-bg: var(--color-red-950);
   --workspace-progress: var(--color-teal-400);
+  --workspace-success: var(--color-teal-400);
+  --workspace-success-bg: color-mix(in oklab, var(--color-teal-400) 16%, var(--color-slate-900));
+  --workspace-success-text: var(--color-teal-300);
 }
 
 body {

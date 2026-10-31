@@ -102,7 +102,12 @@ class CertificateTemplateViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 "This template could not be rendered. Check its Django template syntax."
             ) from exc
-        return Response({"html": html, "template": template.name})
+        return Response({
+            "html": html,
+            "template": template.name,
+            "page_size": template.page_size,
+            "orientation": template.orientation,
+        })
 
 
 class CertificateViewSet(viewsets.ReadOnlyModelViewSet):

@@ -58,16 +58,20 @@ function LearnerAttempt({ quiz, onSaved }: { quiz: Quiz; onSaved: () => void }) 
   </section>;
 }
 
-export default function QuizWorkspace({ id, teacher }: { id: number; teacher: boolean }) {
+export default function QuizWorkspace({ id, teacher, embedded = false }: { id: number; teacher: boolean; embedded?: boolean }) {
   const resource = useWorkspaceResource<Quiz>(`/quizzes/${id}/`);
   const [page, setPage] = useState(1);
   const attempts = useWorkspaceResource<WorkspacePage<Attempt>>(teacher ? `/quiz-attempts/?quiz=${id}&page=${page}` : null);
   const quiz = resource.data;
-  return <><WorkspaceHeading title={quiz?.title || 'Quiz'} description={quiz?.course_title || 'Loading quiz details.'} />
+  const refresh = teacher ? <Action loading={resource.loading || attempts.loading} onClick={() => { resource.refresh(); attempts.refresh(); }}>Refresh quiz</Action> : null;
+  const header = embedded
+    ? <header className={styles.detailHeading}><div><h2>{quiz?.title || 'Quiz'}</h2><p className={styles.muted}>{quiz?.course_title || 'Loading quiz details.'}</p></div>{refresh}</header>
+    : <WorkspaceHeading title={quiz?.title || 'Quiz'} description={quiz?.course_title || 'Loading quiz details.'} />;
+  return <>{header}
     <WorkspaceFeedback {...resource} hasData={!!quiz} onRetry={resource.refresh} />
     {quiz && (teacher ? <><QuizBuilder quiz={quiz} onSaved={resource.refresh} /><h2>Learner attempts</h2><WorkspaceFeedback {...attempts} hasData={!!attempts.data} onRetry={attempts.refresh} />
       {attempts.data?.results.map(attempt => <AttemptReview key={attempt.id} attempt={attempt} quiz={quiz} onSaved={attempts.refresh} />)}
-      {attempts.data && <><p>{attempts.data.count} attempts recorded.</p><WorkspacePagination page={page} count={attempts.data.count} hasNext={!!attempts.data.next} loading={attempts.loading} onPage={setPage} /></>}
+      {attempts.data && attempts.data.count > 0 && <><p>{attempts.data.count} attempts recorded.</p><WorkspacePagination page={page} count={attempts.data.count} hasNext={!!attempts.data.next} loading={attempts.loading} onPage={setPage} /></>}
     </> : <LearnerAttempt quiz={quiz} onSaved={resource.refresh} />)}
   </>;
 }

@@ -1,314 +1,515 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { api, type PaginatedResponse } from '@/lib/api';
+import { managementList, type ManagedCourse } from '@/lib/course-management';
+import { useWorkspaceResource } from '@/lib/use-workspace-resource';
+import { formatWorkspaceDate } from '@/lib/workspace-api';
+import {
+  Action,
+  AdminList,
+  AdminRow,
+  AdminSection,
+  Drawer,
+  EmptyState,
+  Field,
+  FormGrid,
+  FormGroup,
+  LinkAction,
+  Pager,
+  Pill,
+  Skeleton,
+  StatusNote,
+  TextInput,
+  Toolbar,
+  adminStyles,
+  controlClass,
+  formClass,
+  useToast,
+} from './AdminUI';
 
 /**
- * Certificates management — list all issued certificates (admin sees all),
- * download PDF, open the public verify page, revoke bad ones.
+ * Certificates: issue one for a completed enrollment (the preview is rendered
+ * by the same code that draws the PDF), download the PDF, open public
+ * verification, and revoke an award with a recorded reason.
  */
 
-interface CertificateT {
-  id: string;
+interface CertificateRow {
+  id: number;
   certificate_number: string;
-  student_name?: string;
-  student?: { full_name: string };
-  course_title?: string;
-  course?: { title: string } | string;
-  issued_at?: string;
-  status?: string;
+  verification_code: string;
+  student_name: string;
+  course_title: string;
+  student_name_at_issue: string;
+  course_title_at_issue: string;
+  status: 'issued' | 'revoked' | 'expired' | string;
+  issue_date: string;
+  pdf_url: string | null;
+  pdf_generated_at: string | null;
 }
 
-const inputCls =
-  'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm transition-all focus:border-navy-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-900/20';
+interface StudentOption {
+  id: number;
+  full_name: string;
+  email: string;
+  is_active: boolean;
+}
+
+interface IssuedResult {
+  certificate_number: string;
+  verification_code: string;
+  student_name: string;
+  course_title: string;
+}
+
+interface Preview {
+  html: string;
+  template: string;
+  page_size?: string;
+  orientation?: string;
+}
+
+const STATUS: Record<string, { label: string; tone: 'live' | 'danger' | 'muted' }> = {
+  issued: { label: 'Valid', tone: 'live' },
+  revoked: { label: 'Revoked', tone: 'danger' },
+  expired: { label: 'Expired', tone: 'muted' },
+};
+
+const rowsOf = <T,>(value: PaginatedResponse<T> | T[] | undefined): T[] =>
+  !value ? [] : Array.isArray(value) ? value : value.results;
+
+const studentName = (row: CertificateRow) => row.student_name_at_issue || row.student_name || 'Student';
+const courseTitle = (row: CertificateRow) => row.course_title_at_issue || row.course_title || 'Course';
 
 export function CertificatesTab() {
-  const [certs, setCerts] = useState<CertificateT[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
-  const [search, setSearch] = useState('');
+  const toast = useToast();
 
-  // Issue studio
-  const [students, setStudents] = useState<{ id: string; full_name: string; email: string }[]>([]);
-  const [courses, setCourses] = useState<{ id: string; title: string }[]>([]);
-  const [issueSel, setIssueSel] = useState({ student_id: '', course_id: '' });
-  const [issuing, setIssuing] = useState(false);
-  const [issueMsg, setIssueMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [page, setPage] = useState(1);
+  const certificates = useWorkspaceResource<PaginatedResponse<CertificateRow>>(`/certificates/?page=${page}`);
+  const [filter, setFilter] = useState('');
 
-  useEffect(() => {
-    api
-      .request('/admin/dashboard/users/?role=student')
-      .then((res: any) => setStudents(res.results ?? res ?? []))
-      .catch(() => undefined);
-    api
-      .request('/admin/dashboard/courses/')
-      .then((res: any) => setCourses(res.results ?? res ?? []))
-      .catch(() => undefined);
-  }, []);
+  const [courses, setCourses] = useState<ManagedCourse[]>([]);
+  const [coursesError, setCoursesError] = useState('');
 
-  const [preview, setPreview] = useState<{ html: string; template: string } | null>(null);
+  const [studentQuery, setStudentQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
+  const students = useWorkspaceResource<PaginatedResponse<StudentOption> | StudentOption[]>(
+    appliedQuery ? `/admin/dashboard/users/?role=student&search=${encodeURIComponent(appliedQuery)}` : '/admin/dashboard/users/?role=student',
+  );
+  const [courseId, setCourseId] = useState('');
+
+  const [preview, setPreview] = useState<Preview | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const previewBox = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0);
+
+  const [issuing, setIssuing] = useState(false);
+  const [issueError, setIssueError] = useState('');
+  const [issued, setIssued] = useState<IssuedResult | null>(null);
+
+  const [revoking, setRevoking] = useState<CertificateRow | null>(null);
+  const [revokeReason, setRevokeReason] = useState('');
+  const [revokeBusy, setRevokeBusy] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
+
+  const [pdfBusy, setPdfBusy] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!issueSel.student_id || !issueSel.course_id) {
-      setPreview(null); setPreviewError(''); setPreviewBusy(false);
-      return;
+    let active = true;
+    managementList<ManagedCourse>('/admin/dashboard/courses/')
+      .then((rows) => { if (active) { setCourses(rows); setCoursesError(''); } })
+      .catch((error: unknown) => {
+        if (active) setCoursesError(error instanceof Error ? error.message : 'Courses could not be loaded.');
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const term = studentQuery.trim();
+    const timer = window.setTimeout(() => setAppliedQuery(term.length >= 2 ? term : ''), 350);
+    return () => window.clearTimeout(timer);
+  }, [studentQuery]);
+
+  const studentId = selectedStudent?.id;
+  useEffect(() => {
+    if (!studentId || !courseId) {
+      setPreview(null);
+      setPreviewError('');
+      setPreviewBusy(false);
+      return undefined;
     }
     let active = true;
-    setPreviewBusy(true); setPreviewError('');
-    api.request<{ html: string; template: string }>(
-      `/certificates/templates/preview/?course=${encodeURIComponent(issueSel.course_id)}&student=${encodeURIComponent(issueSel.student_id)}`,
-    )
-      .then((result) => { if (active) { setPreview(result); setPreviewError(''); } })
-      .catch((err: unknown) => {
+    setPreviewBusy(true);
+    setPreviewError('');
+    api.request<{ html: string; template: string }>(`/certificates/templates/preview/?course=${courseId}&student=${studentId}`)
+      .then((result) => { if (active) setPreview(result); })
+      .catch((error: unknown) => {
         if (!active) return;
         setPreview(null);
-        setPreviewError(err instanceof Error ? err.message : 'The certificate design could not be previewed.');
+        setPreviewError(error instanceof Error ? error.message : 'The certificate design could not be previewed.');
       })
       .finally(() => { if (active) setPreviewBusy(false); });
     return () => { active = false; };
-  }, [issueSel.student_id, issueSel.course_id]);
+  }, [studentId, courseId]);
 
-  const handleIssue = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIssueMsg(null);
-    if (!issueSel.student_id || !issueSel.course_id) {
-      setIssueMsg({ ok: false, text: 'Select the student and the course.' });
+  const previewPage = useMemo(() => {
+    const letter = preview?.page_size === 'Letter';
+    const portrait = preview?.orientation !== 'landscape';
+    const shortSide = letter ? 816 : 794;
+    const longSide = letter ? 1056 : 1123;
+    return portrait
+      ? { width: shortSide, height: longSide }
+      : { width: longSide, height: shortSide };
+  }, [preview?.page_size, preview?.orientation]);
+
+  useLayoutEffect(() => {
+    const box = previewBox.current;
+    if (!box || !preview) return undefined;
+    const measure = () => setPreviewScale(box.clientWidth / previewPage.width);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [preview, previewPage.width]);
+
+  const studentOptions = useMemo(() => {
+    const rows = rowsOf(students.data);
+    return selectedStudent && !rows.some((row) => row.id === selectedStudent.id)
+      ? [selectedStudent, ...rows]
+      : rows;
+  }, [students.data, selectedStudent]);
+
+  const onStudentQuery = (value: string) => {
+    setStudentQuery(value);
+    setSelectedStudent(null);
+    setIssued(null);
+    setIssueError('');
+  };
+
+  const chooseCourse = (value: string) => {
+    setCourseId(value);
+    setIssued(null);
+    setIssueError('');
+  };
+
+  const chooseStudent = (value: string) => {
+    setSelectedStudent(studentOptions.find((row) => String(row.id) === value) ?? null);
+    setIssued(null);
+    setIssueError('');
+  };
+
+  const issue = async (event: FormEvent) => {
+    event.preventDefault();
+    setIssueError('');
+    setIssued(null);
+    if (!studentId || !courseId) {
+      setIssueError('Choose the student and the course.');
       return;
     }
     setIssuing(true);
     try {
-      const res = await fetch(`${api.baseUrl}/admin/dashboard/certificates/issue/`, {
+      const result = await api.request<IssuedResult>('/admin/dashboard/certificates/issue/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${api.getToken()}`,
-        },
-        body: JSON.stringify(issueSel),
+        body: JSON.stringify({ student_id: studentId, course_id: Number(courseId) }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.detail || data.error?.detail || 'Issuing failed.');
-      }
-      setIssueMsg({
-        ok: true,
-        text: `Certificate ${data.certificate_number} issued to ${data.student_name}.`,
-      });
-      load();
-    } catch (err: any) {
-      setIssueMsg({ ok: false, text: err.message });
+      setIssued(result);
+      toast.push(`Certificate ${result.certificate_number} issued to ${result.student_name}.`, 'success');
+      setPage(1);
+      certificates.refresh();
+    } catch (error) {
+      setIssueError(error instanceof Error ? error.message : 'The certificate could not be issued.');
     } finally {
       setIssuing(false);
     }
   };
 
-  const load = useCallback(() => {
-    setLoading(true);
-    api
-      .request('/certificates/')
-      .then((res: any) => setCerts(res.results ?? res ?? []))
-      .catch(() => setCerts([]))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const revoke = async (cert: CertificateT) => {
-    if (!window.confirm(`Revoke certificate ${cert.certificate_number}? This cannot be undone.`)) return;
+  const downloadPdf = async (row: CertificateRow) => {
+    if (!row.pdf_url) return;
+    setPdfBusy(row.id);
     try {
-      await api.request(`/certificates/${cert.certificate_number}/revoke/`, { method: 'POST' });
-      setMsg({ id: cert.id, ok: true, text: 'Certificate revoked.' });
-      load();
-    } catch (err: any) {
-      setMsg({ id: cert.id, ok: false, text: err.message });
+      const get = (token: string | null) => fetch(`${api.baseUrl}/certificates/${encodeURIComponent(row.certificate_number)}/pdf/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      let response = await get(api.getToken());
+      if (response.status === 401) {
+        await api.refreshToken();
+        response = await get(api.getToken());
+      }
+      if (!response.ok) {
+        throw new Error(response.status === 404
+          ? 'The PDF is still being generated. Try again in a moment.'
+          : 'The PDF could not be downloaded.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `certificate-${row.certificate_number}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : 'The PDF could not be downloaded.', 'error');
+    } finally {
+      setPdfBusy(null);
     }
   };
 
-  const studentName = (c: CertificateT) =>
-    c.student_name || c.student?.full_name || 'Student';
-  const courseTitle = (c: CertificateT) =>
-    c.course_title || (typeof c.course === 'object' ? c.course?.title : c.course) || 'Course';
+  const revoke = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!revoking) return;
+    setRevokeBusy(true);
+    setRevokeError('');
+    try {
+      await api.request(`/certificates/${encodeURIComponent(revoking.certificate_number)}/revoke/`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: revokeReason.trim() }),
+      });
+      toast.push(`Certificate ${revoking.certificate_number} revoked.`, 'success');
+      setRevoking(null);
+      setRevokeReason('');
+      certificates.refresh();
+    } catch (error) {
+      setRevokeError(error instanceof Error ? error.message : 'The certificate could not be revoked.');
+    } finally {
+      setRevokeBusy(false);
+    }
+  };
 
-  const filtered = certs.filter(
-    (c) =>
-      !search ||
-      studentName(c).toLowerCase().includes(search.toLowerCase()) ||
-      String(c.certificate_number).toLowerCase().includes(search.toLowerCase())
-  );
+  const total = certificates.data?.count ?? 0;
+  const rows = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    const all = rowsOf(certificates.data);
+    if (!needle) return all;
+    return all.filter((row) => `${studentName(row)} ${courseTitle(row)} ${row.certificate_number}`.toLowerCase().includes(needle));
+  }, [certificates.data, filter]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="text"
-          placeholder="Search by student or certificate number…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-navy-900 focus:bg-white focus:outline-none"
-        />
-        <a
-          href="/verify"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-xl border-2 border-navy-900 px-5 py-2.5 text-center text-sm font-bold text-navy-900 hover:bg-navy-50"
-        >
-          Open Verify Page
-        </a>
-      </div>
-
-      {/* ═══ Issue Certificate studio ═══ */}
-      <div className="mb-10 grid gap-6 lg:grid-cols-2">
-        <form onSubmit={handleIssue} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 font-black text-navy-950">Issue a Certificate</h3>
-          <p className="mb-5 text-xs text-gray-500">
-            Select the student and the course — the preview updates live, then issue it.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Student</label>
-              <select required value={issueSel.student_id}
-                onChange={(e) => setIssueSel({ ...issueSel, student_id: e.target.value })}
-                className={inputCls}>
-                <option value="">Select student...</option>
-                {students.map((st) => (
-                  <option key={st.id} value={st.id}>{st.full_name || st.email}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Course</label>
-              <select required value={issueSel.course_id}
-                onChange={(e) => setIssueSel({ ...issueSel, course_id: e.target.value })}
-                className={inputCls}>
-                <option value="">Select course...</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" disabled={issuing}
-              className="w-full rounded-xl bg-gold-brand py-3.5 font-bold text-navy-950 shadow-md transition-all hover:bg-gold-hover disabled:opacity-60">
-              {issuing ? 'Issuing...' : 'Issue Certificate'}
-            </button>
-            {issueMsg && (
-              <p className={cn('rounded-xl px-4 py-3 text-xs',
-                issueMsg.ok ? 'bg-teal-brand/10 text-teal-700' : 'bg-red-50 text-red-700')}>
-                {issueMsg.text}
-              </p>
-            )}
-          </div>
-        </form>
-
-        {/* Live preview — rendered by the same code that issues the PDF */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Certificate preview</p>
-            {preview && <p className="text-xs text-gray-500">Design: {preview.template}</p>}
-          </div>
-          {!issueSel.student_id || !issueSel.course_id ? (
-            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
-              Choose a student and a course to see the exact certificate they would receive.
-            </div>
-          ) : previewBusy && !preview ? (
-            <div className="min-h-40 animate-pulse rounded-xl bg-gray-100" aria-busy="true" />
-          ) : previewError ? (
-            <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{previewError}</p>
-          ) : preview ? (
-            <iframe
-              title="Certificate preview"
-              srcDoc={preview.html}
-              sandbox=""
-              className="aspect-[297/210] w-full rounded-xl border border-gray-200 bg-white"
-            />
-          ) : null}
-          <p className="mt-3 text-center text-xs text-gray-400">
-            Names, dates and the verification code come from the real course records.
-          </p>
-        </div>
-      </div>
-
-      {/* ═══ Issued certificates list ═══ */}
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-          No certificates issued yet. Certificates are generated automatically when students
-          complete their courses.
-        </div>
-      ) : (
-        <ul className="space-y-3">
-          {filtered.map((c) => (
-            <li
-              key={c.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-navy-950">
-                  {studentName(c)}
-                  {c.status === 'revoked' && (
-                    <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                      REVOKED
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {courseTitle(c)} ·{' '}
-                  <span className="font-mono">{c.certificate_number}</span>
-                  {c.issued_at && (
-                    <> · issued {new Date(c.issued_at).toLocaleDateString('en-NG')}</>
-                  )}
-                </p>
+    <>
+      <AdminSection
+        title="Issue a certificate"
+        description="Certificates are issued only for a completed enrollment. Choose the student and course: the preview is drawn by the same code that renders the PDF."
+      >
+        <form id="issue-certificate-form" className={formClass} onSubmit={issue}>
+          <FormGrid>
+            <FormGroup title="Recipient">
+              <Field label="Find the student" hint="Search by name or email. The newest students are listed until you search.">
+                <TextInput
+                  type="search"
+                  value={studentQuery}
+                  placeholder="Start typing a name or email"
+                  onChange={(event) => onStudentQuery(event.target.value)}
+                />
+              </Field>
+              <Field
+                label="Student"
+                required
+                error={students.error || undefined}
+                hint={appliedQuery ? `Matching “${appliedQuery}”.` : 'Showing the newest students on the platform.'}
+              >
+                <select
+                  className={controlClass}
+                  value={selectedStudent ? String(selectedStudent.id) : ''}
+                  disabled={students.loading || studentOptions.length === 0}
+                  onChange={(event) => chooseStudent(event.target.value)}
+                >
+                  <option value="">
+                    {students.loading ? 'Loading students…' : studentOptions.length ? 'Choose a student' : 'No student matches'}
+                  </option>
+                  {studentOptions.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.full_name || student.email}{student.is_active ? '' : ' (inactive)'}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label="Course"
+                required
+                error={coursesError || undefined}
+                hint="The certificate records this course's title and tutor at the moment you issue it."
+              >
+                <select
+                  className={controlClass}
+                  value={courseId}
+                  disabled={Boolean(coursesError)}
+                  onChange={(event) => chooseCourse(event.target.value)}
+                >
+                  <option value="">Choose a course</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.title}{course.is_published ? '' : ' (Draft)'}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className={adminStyles.actions}>
+                <Action intent="primary" type="submit" loading={issuing} disabled={!studentId || !courseId || Boolean(coursesError)}>
+                  Issue certificate
+                </Action>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={`${api.baseUrl}/certificates/${c.certificate_number}/pdf/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
-                >
-                  PDF
-                </a>
-                <a
-                  href={`/verify?code=${c.certificate_number}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-bold text-navy-900 hover:bg-navy-100"
-                >
-                  Verify
-                </a>
-                {c.status !== 'revoked' && (
-                  <button
-                    type="button"
-                    onClick={() => revoke(c)}
-                    className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100"
-                  >
-                    Revoke
-                  </button>
-                )}
-              </div>
-              {msg?.id === c.id && (
-                <p
-                  className={cn(
-                    'w-full rounded-lg px-3 py-2 text-xs',
-                    msg.ok ? 'bg-teal-brand/10 text-teal-700' : 'bg-red-50 text-red-700'
-                  )}
-                >
-                  {msg.text}
-                </p>
+              {issueError && <StatusNote tone="error">{issueError}</StatusNote>}
+              {issued && (
+                <StatusNote tone="ok">
+                  Certificate {issued.certificate_number} issued to {issued.student_name} for {issued.course_title}.{' '}
+                  <LinkAction href={`/verify?code=${encodeURIComponent(issued.verification_code)}`} external>Open the public check</LinkAction>
+                </StatusNote>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+            </FormGroup>
+
+            <FormGroup title="Preview">
+              {!studentId || !courseId ? (
+                <EmptyState
+                  icon="bi-award"
+                  title="The award, before you issue it"
+                  description="Choose a student and a course to see the exact certificate they would receive, including names, dates and the verification code."
+                />
+              ) : previewBusy && !preview ? (
+                <Skeleton rows={3} />
+              ) : previewError ? (
+                <StatusNote tone="error">{previewError}</StatusNote>
+              ) : preview ? (
+                <>
+                  <div
+                    ref={previewBox}
+                    className={adminStyles.embed}
+                    style={{ aspectRatio: `${previewPage.width} / ${previewPage.height}` }}
+                  >
+                    {previewScale > 0 && (
+                      <iframe
+                        title="Certificate preview"
+                        srcDoc={preview.html}
+                        sandbox=""
+                        width={previewPage.width}
+                        height={previewPage.height}
+                        className={adminStyles.previewPage}
+                        style={{ transform: `scale(${previewScale})` }}
+                      />
+                    )}
+                  </div>
+                  <p className={adminStyles.hint}>Design: {preview.template}. Details come from the real course records.</p>
+                </>
+              ) : null}
+            </FormGroup>
+          </FormGrid>
+        </form>
+      </AdminSection>
+
+      <AdminSection
+        title="Issued certificates"
+        description="Newest first. Valid certificates can be downloaded and checked publicly; revoked awards stay on record with their reason."
+        actions={<>
+          <Action disabled={certificates.loading} onClick={certificates.refresh}>Refresh</Action>
+          <LinkAction href="/verify" external>Open verify page</LinkAction>
+        </>}
+      >
+        {total > 0 && (
+          <Toolbar label="Filter issued certificates">
+            <Field label="Filter this page" hint="Pagination stays on the server, so this narrows the certificates listed below.">
+              <TextInput
+                type="search"
+                value={filter}
+                placeholder="Student, course or certificate number"
+                onChange={(event) => setFilter(event.target.value)}
+              />
+            </Field>
+          </Toolbar>
+        )}
+
+        {certificates.error && <StatusNote tone="error">{certificates.error}</StatusNote>}
+        {certificates.loading && !certificates.data && <Skeleton rows={4} />}
+
+        {!certificates.loading && !certificates.error && total === 0 && (
+          <EmptyState
+            icon="bi-award"
+            title="No certificates issued yet"
+            description="Issue one above for a student who has completed a course, or let the platform issue them automatically on completion."
+          />
+        )}
+
+        {total > 0 && rows.length === 0 && (
+          <EmptyState
+            icon="bi-search"
+            title="Nothing matches this filter"
+            description="This filter only narrows the certificates on this page. Clear it to see everything on the page, or move to another page."
+            action={<Action onClick={() => setFilter('')}>Clear filter</Action>}
+          />
+        )}
+
+        {rows.length > 0 && (
+          <AdminList label="Issued certificates">
+            {rows.map((row) => {
+              const state = STATUS[row.status] ?? { label: row.status, tone: 'muted' as const };
+              return (
+                <AdminRow
+                  key={row.id}
+                  placeholder="bi-award"
+                  title={studentName(row)}
+                  badges={<>
+                    <Pill tone={state.tone}>{state.label}</Pill>
+                    {row.status === 'issued' && !row.pdf_url && <Pill tone="muted">PDF pending</Pill>}
+                  </>}
+                  meta={`${courseTitle(row)} · ${row.certificate_number} · issued ${formatWorkspaceDate(row.issue_date)}`}
+                  actions={<>
+                    {row.status === 'issued' && row.pdf_url && (
+                      <Action loading={pdfBusy === row.id} onClick={() => void downloadPdf(row)}>Download PDF</Action>
+                    )}
+                    <LinkAction href={`/verify?code=${encodeURIComponent(row.verification_code)}`} external>Verify</LinkAction>
+                    {row.status === 'issued' && (
+                      <Action intent="danger" onClick={() => { setRevokeError(''); setRevokeReason(''); setRevoking(row); }}>Revoke</Action>
+                    )}
+                  </>}
+                />
+              );
+            })}
+          </AdminList>
+        )}
+
+        {total > 0 && (
+          <Pager
+            page={page}
+            count={total}
+            hasNext={Boolean(certificates.data?.next)}
+            label="Issued certificates"
+            busy={certificates.loading}
+            onPrev={() => setPage((value) => Math.max(1, value - 1))}
+            onNext={() => setPage((value) => value + 1)}
+          />
+        )}
+      </AdminSection>
+
+      <Drawer
+        open={Boolean(revoking)}
+        title={revoking ? `Revoke “${studentName(revoking)}” certificate` : 'Revoke certificate'}
+        description="Revoking keeps the record but the public verification page will report the award as revoked. This cannot be undone from here."
+        onClose={() => { if (!revokeBusy) setRevoking(null); }}
+        footer={<>
+          <Action disabled={revokeBusy} onClick={() => setRevoking(null)}>Cancel</Action>
+          <Action intent="danger" type="submit" form="revoke-certificate-form" loading={revokeBusy}>Revoke certificate</Action>
+        </>}
+      >
+        {revoking && (
+          <form id="revoke-certificate-form" className={formClass} onSubmit={revoke}>
+            <StatusNote tone="info">
+              {studentName(revoking)} · {courseTitle(revoking)} · issued {formatWorkspaceDate(revoking.issue_date)}
+            </StatusNote>
+            <Field label="Reason" optional hint="Kept on record so the decision can be explained later.">
+              <textarea
+                className={controlClass}
+                rows={4}
+                value={revokeReason}
+                placeholder="For example: issued in error, or the completion was reversed."
+                onChange={(event) => setRevokeReason(event.target.value)}
+              />
+            </Field>
+            {revokeError && <StatusNote tone="error">{revokeError}</StatusNote>}
+          </form>
+        )}
+      </Drawer>
+    </>
   );
 }
 

@@ -2,8 +2,10 @@
 import { useAuth } from '@/lib/auth-context';
 import { MemberCourses } from '@/components/Dashboard/MemberPages';
 import CourseManager from '@/components/Dashboard/admin/CourseManager';
+import { AdminPage } from '@/components/Dashboard/admin/AdminUI';
 
 export default function CoursesPage() {
   const { user } = useAuth();
-  return user?.role === 'admin' ? <div className="p-4 sm:p-6"><CourseManager /></div> : <MemberCourses />;
+  if (user?.role !== 'admin') return <MemberCourses />;
+  return <AdminPage tab="courses"><CourseManager /></AdminPage>;
 }

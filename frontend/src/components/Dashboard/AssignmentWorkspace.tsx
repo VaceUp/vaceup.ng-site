@@ -64,7 +64,7 @@ function TeacherControls({ assignment, locked, onSaved }: { assignment: Assignme
   </section>;
 }
 
-export default function AssignmentWorkspace({ id, teacher }: { id: number; teacher: boolean }) {
+export default function AssignmentWorkspace({ id, teacher, embedded = false }: { id: number; teacher: boolean; embedded?: boolean }) {
   const [page, setPage] = useState(1);
   const resource = useWorkspaceResource<Assignment>(`/assignments/${id}/`);
   const submissions = useWorkspaceResource<WorkspacePage<Submission>>(`/submissions/?assignment=${id}&page=${page}`);
@@ -81,16 +81,20 @@ export default function AssignmentWorkspace({ id, teacher }: { id: number; teach
     try { await api.request('/submissions/', { method: 'POST', body: payload }); setNotice('Your work was submitted. You can revise it until it is graded, subject to the deadline.'); const upload = form.elements.namedItem('file') as HTMLInputElement; if (upload) upload.value = ''; submissions.refresh(); }
     catch (err) { setError(failureMessage(err)); } finally { setBusy(false); }
   }
-  return <><WorkspaceHeading title={assignment?.title || 'Assignment'} description={assignment?.course_title || 'Loading course details.'} action={<Action loading={resource.loading || submissions.loading} onClick={() => { resource.refresh(); submissions.refresh(); }}>Refresh assignment</Action>} />
+  const refresh = <Action loading={resource.loading || submissions.loading} onClick={() => { resource.refresh(); submissions.refresh(); }}>Refresh assignment</Action>;
+  const header = embedded
+    ? <header className={styles.detailHeading}><div><h2>{assignment?.title || 'Assignment'}</h2><p className={styles.muted}>{assignment?.course_title || 'Loading course details.'}</p></div>{refresh}</header>
+    : <WorkspaceHeading title={assignment?.title || 'Assignment'} description={assignment?.course_title || 'Loading course details.'} action={refresh} />;
+  return <>{header}
     <WorkspaceFeedback {...resource} hasData={!!assignment} onRetry={resource.refresh} />
     {assignment && <>{teacher && <TeacherControls assignment={assignment} locked={!!submissions.data?.results.length} onSaved={() => { resource.refresh(); submissions.refresh(); }} />}
-      <p className={styles.preview}>{assignment.description}</p><p>Due {formatWorkspaceDate(assignment.due_at, true)} / {assignment.max_score} points. {assignment.allow_late_submission ? 'Late submissions are accepted and marked late.' : 'Submissions close at the deadline.'}</p>
+      {(!embedded || !teacher) && <><p className={styles.preview}>{assignment.description}</p><p>Due {formatWorkspaceDate(assignment.due_at, true)} / {assignment.max_score} points. {assignment.allow_late_submission ? 'Late submissions are accepted and marked late.' : 'Submissions close at the deadline.'}</p></>}
       <WorkspaceFeedback {...submissions} hasData={!!submissions.data} onRetry={submissions.refresh} />
       {!teacher && submissions.data && (previous?.score == null) && <form className={`${styles.panel} ${styles.stack}`} onSubmit={submit} aria-label="Submit assignment"><Field label="Your answer"><textarea rows={10} maxLength={50000} disabled={busy} value={answer ?? previous?.text_answer ?? ''} onChange={e => setAnswer(e.target.value)} /></Field><Field label="Assignment attachment (optional, up to 10 MB)"><input type="file" name="file" accept=".pdf,.txt,.docx,.png,.jpg,.jpeg" disabled={busy} /></Field><p className={styles.muted}>Provide text or an attachment. New attachments are private to your account, the assigned tutor and administrators. Updating without a new file keeps the existing attachment.</p><div><Action type="submit" intent="primary" loading={busy}>{previous ? 'Update submission' : 'Submit assignment'}</Action></div></form>}
       <Feedback error={error} message={notice} />
       {submissions.data?.results.map(item => <SubmissionReview key={item.id} submission={item} assignment={assignment} teacher={teacher} onSaved={submissions.refresh} />)}
       {teacher && submissions.data && !submissions.data.results.length && <p>No submissions yet. Enrolled learners can open this assignment from their assessment page.</p>}
-      {submissions.data && <WorkspacePagination page={page} count={submissions.data.count} hasNext={!!submissions.data.next} loading={submissions.loading} onPage={setPage} />}
+      {submissions.data && submissions.data.count > 0 && <WorkspacePagination page={page} count={submissions.data.count} hasNext={!!submissions.data.next} loading={submissions.loading} onPage={setPage} />}
     </>}
   </>;
 }

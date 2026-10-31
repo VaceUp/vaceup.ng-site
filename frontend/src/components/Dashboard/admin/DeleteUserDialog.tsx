@@ -2,9 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/Button';
 import { NativeDialog } from '@/components/ui/Modal';
-import { catalogInput } from '@/components/homepage/PublicCatalog';
+import { cn } from '@/lib/utils';
+import {
+  Action,
+  Field,
+  StatusNote,
+  TextInput,
+  adminStyles,
+  dialogClass,
+} from './AdminUI';
 
 type Target = { id: string | number; email: string; full_name: string };
 type Preview = {
@@ -12,6 +19,11 @@ type Preview = {
   blockers: string[]; records: { model: string; label: string; count: number }[];
   confirmation_token: string | null;
 };
+
+/**
+ * Permanent account deletion. The preview lists every dependent record first,
+ * then requires the account email and the signed-in administrator's password.
+ */
 
 export default function DeleteUserDialog({ target, onClose, onDeleted }: {
   target: Target; onClose: () => void; onDeleted: (id: string | number) => void;
@@ -58,29 +70,92 @@ export default function DeleteUserDialog({ target, onClose, onDeleted }: {
     finally { setBusy(false); }
   }
 
-  return <NativeDialog ref={dialog} aria-labelledby={heading} aria-describedby={description}
-    onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
-    className="m-auto max-h-dvh w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 text-navy-950 shadow-xl backdrop:bg-navy-950/60 sm:p-6">
-    <form onSubmit={remove} className="min-w-0 space-y-5">
-      <h2 id={heading} className="text-2xl font-bold">Permanently delete user</h2>
-      <p id={description} className="break-words text-sm text-content-secondary">Delete {target.full_name || target.email} and the related database records listed below. This cannot be undone from the panel. Backups, externally stored uploads, and retained audit records are not erased.</p>
-      <p className="break-all font-semibold">{target.email}</p>
-      {loading && <p role="status">Checking related records...</p>}
-      {preview && <>
-        {preview.blockers.length > 0 && <ul className="list-inside list-disc space-y-2 text-sm text-feedback-error">{preview.blockers.map((item) => <li key={item}>{item}</li>)}</ul>}
-        {preview.can_delete && <>
-          <div className="rounded-xl border border-line p-4"><h3 className="font-semibold">Records to remove</h3><ul className="mt-2 space-y-1 text-sm">{preview.records.map((row) => <li key={row.model} className="flex justify-between gap-3"><span className="capitalize">{row.label}</span><span>{row.count}</span></li>)}</ul></div>
-          <p className="text-sm text-content-secondary">Messages will disappear from both participants' conversations. Issued certificates removed here will no longer verify. For a temporary restriction, cancel and use Disable instead.</p>
-          <label className="block text-sm font-semibold">Type this user's email to confirm<input required type="email" autoComplete="off" spellCheck={false} value={confirmation} disabled={busy} onChange={(event) => setConfirmation(event.target.value)} className={catalogInput} /></label>
-          <label className="block text-sm font-semibold">Your administrator password<input required type="password" autoComplete="current-password" value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} className={catalogInput} /></label>
-        </>}
-      </>}
-      {error && <p role="alert" className="text-sm text-feedback-error">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-3">
-        <Button variant="outline" className="rounded-xl" disabled={busy} onClick={onClose}>Cancel</Button>
-        {error && <Button variant="outline" className="rounded-xl" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Refresh preview</Button>}
-        {preview?.can_delete && <Button type="submit" variant="destructive" className="rounded-xl" loading={busy} disabled={loading || confirmation.trim().toLowerCase() !== preview.email.toLowerCase() || !password}>Permanently delete user</Button>}
-      </div>
-    </form>
-  </NativeDialog>;
+  return (
+    <NativeDialog
+      ref={dialog}
+      aria-labelledby={heading}
+      aria-describedby={description}
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+      className={cn(dialogClass, adminStyles.form)}
+    >
+      <form onSubmit={remove} className={adminStyles.form}>
+        <div>
+          <h2 id={heading} className={adminStyles.dialogTitle}>Permanently delete user</h2>
+          <p id={description} className={adminStyles.hint}>
+            Delete {target.full_name || target.email} and the related database records listed below.
+            This cannot be undone from the panel. Backups, externally stored uploads and retained
+            audit records are not erased.
+          </p>
+        </div>
+        <p className={adminStyles.rowTitle}>{target.email}</p>
+        {loading && <StatusNote tone="info">Checking related records…</StatusNote>}
+        {preview && (
+          <>
+            {preview.blockers.length > 0 && (
+              <StatusNote tone="error">
+                <ul className={adminStyles.plainList}>
+                  {preview.blockers.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </StatusNote>
+            )}
+            {preview.can_delete && (
+              <>
+                <div className={adminStyles.moduleCard}>
+                  <p className={adminStyles.formGroupTitle}>Records to remove</p>
+                  <ul className={adminStyles.plainList}>
+                    {preview.records.map((row) => (
+                      <li key={row.model} className={adminStyles.between}>
+                        <span>{row.label}</span>
+                        <span className={adminStyles.amount}>{row.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className={adminStyles.hint}>
+                  Messages disappear from both participants' conversations. Issued certificates removed
+                  here will no longer verify. For a temporary restriction, cancel and disable sign-in instead.
+                </p>
+                <Field label="Type this user's email to confirm" required>
+                  <TextInput
+                    required
+                    type="email"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={confirmation}
+                    disabled={busy}
+                    onChange={(event) => setConfirmation(event.target.value)}
+                  />
+                </Field>
+                <Field label="Your administrator password" required hint="Confirms that you are the person making this change.">
+                  <TextInput
+                    required
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    disabled={busy}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </Field>
+              </>
+            )}
+          </>
+        )}
+        {error && <StatusNote tone="error">{error}</StatusNote>}
+        <div className={adminStyles.actions}>
+          <Action disabled={busy} onClick={onClose}>Cancel</Action>
+          {error && <Action disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Refresh preview</Action>}
+          {preview?.can_delete && (
+            <Action
+              intent="danger"
+              type="submit"
+              loading={busy}
+              disabled={loading || confirmation.trim().toLowerCase() !== preview.email.toLowerCase() || !password}
+            >
+              Permanently delete user
+            </Action>
+          )}
+        </div>
+      </form>
+    </NativeDialog>
+  );
 }

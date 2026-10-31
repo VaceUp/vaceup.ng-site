@@ -25,13 +25,13 @@ from apps.adminpanel.serializers import (
     AdminCourseListSerializer,
     AdminCourseUpdateSerializer,
     AdminUserListSerializer,
+    AdminPaymentSerializer,
 )
 from apps.courses.models import Course
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.text import slugify
 from apps.core.exceptions import AlreadyExists, DomainError
-from apps.payments.serializers import PaymentSerializer
 from apps.payments.models import Payment
 
 User = get_user_model()
@@ -478,7 +478,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
     def payments_list(self, request):
         """GET /admin/dashboard/payments/ — every payment on the platform."""
         payments = Payment.objects.select_related("student", "course").order_by("-created_at")[:200]
-        return Response(PaymentSerializer(payments, many=True).data)
+        return Response(AdminPaymentSerializer(payments, many=True).data)
 
     # ────────────────────────────────────────────── course management (admin panel)
     @action(detail=False, methods=["get"], url_path="courses")

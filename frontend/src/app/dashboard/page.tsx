@@ -40,15 +40,7 @@ export default function DashboardPage() {
   const role = (user as any)?.role as string | undefined;
 
   if (role === 'admin') {
-    return (
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="mb-1 text-3xl font-black text-navy-950">Platform Control Panel</h1>
-        <p className="mb-8 text-sm text-gray-500">
-          Everything users, courses, money and features - from one place.
-        </p>
-        <AdminHome />
-      </div>
-    );
+    return <AdminHome />;
   }
 
   if (role === 'instructor') {

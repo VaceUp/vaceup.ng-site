@@ -31,7 +31,7 @@ function Content() {
   return <section className={`${styles.root} ${styles.stack}`} aria-label="Tutor course editor"><WorkspaceHeading title="Course content" description="Prepare the lessons, syllabus and videos for courses assigned to you." />
     <Feedback error={error} /><Field label="Course to edit"><select value={id} onChange={e => router.push(`/dashboard/content?course=${e.target.value}`)}><option value="">Choose your course</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></Field>
     {id && <WorkspaceFeedback {...resource} hasData={!!resource.data} onRetry={resource.refresh} />}
-    {resource.data && <><CourseDescription key={resource.data.course.id} course={resource.data.course} onSaved={resource.refresh} /><CourseCurriculum key={resource.data.course.id} fixedCourse={resource.data.course} /></>}
+    {resource.data && <><CourseDescription key={resource.data.course.id} course={resource.data.course} onSaved={resource.refresh} /><CourseCurriculum key={resource.data.course.id} course={resource.data.course} /></>}
     {!id && <p>Select a course to edit its public teaching details, modules and lesson materials.</p>}
   </section>;
 }

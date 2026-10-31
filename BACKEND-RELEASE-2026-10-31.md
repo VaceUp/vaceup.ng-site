@@ -8,8 +8,8 @@ exactly where they are. There is no full-backend replacement here and no wholesa
 `apps/` folder.
 
 This package supersedes `vaceup-backend-2026-10-30.zip` and is cumulative from
-`fc8d421`. If you already extracted the 2026-10-30 overlay, only these three files are
-new in this one:
+`fc8d421`. If you already extracted the 2026-10-30 overlay, only these three files
+differ from it:
 
 - `apps/adminpanel/serializers.py`
 - `apps/adminpanel/views.py`

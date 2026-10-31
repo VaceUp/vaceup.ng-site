@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 
 MANAGEMENT_SIGNATURE_KEY = "certificate_management_signature"
 MAX_SIGNATURE_BYTES = 400 * 1024
+# The stored copy is a data URL in a TEXT column, and MySQL caps TEXT at 64 KB.
+# 44 KB of image becomes roughly 59 KB of base64, which still fits.
+MAX_STORED_SIGNATURE_BYTES = 44 * 1024
+SIGNATURE_MAX_WIDTH = 1200
+SIGNATURE_MAX_HEIGHT = 400
 ALLOWED_SIGNATURE_TYPES = {
     "image/png": "PNG",
     "image/jpeg": "JPEG",
@@ -36,6 +41,43 @@ ALLOWED_SIGNATURE_TYPES = {
 }
 DEFAULT_MANAGEMENT_NAME = "VaceUp"
 DEFAULT_MANAGEMENT_TITLE = "Academy Director"
+
+
+def _normalise_signature(raw: bytes) -> tuple[bytes, str]:
+    """Re-encode a signature so it always fits the column that stores it."""
+    from PIL import Image
+
+    with Image.open(BytesIO(raw)) as image:
+        image.load()
+        if image.mode not in ("RGB", "RGBA"):
+            image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+        image.thumbnail((SIGNATURE_MAX_WIDTH, SIGNATURE_MAX_HEIGHT))
+
+        buffer = BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        encoded = buffer.getvalue()
+
+        if len(encoded) > MAX_STORED_SIGNATURE_BYTES and image.mode == "RGBA":
+            # Signatures are line art: a small palette keeps the ink and drops
+            # the size without touching legibility.
+            palette = image.convert("P", palette=Image.ADAPTIVE, colors=64)
+            buffer = BytesIO()
+            palette.save(buffer, format="PNG", optimize=True)
+            encoded = buffer.getvalue()
+
+        if len(encoded) > MAX_STORED_SIGNATURE_BYTES:
+            flattened = Image.new("RGB", image.size, "white")
+            flattened.paste(image, mask=image.getchannel("A") if image.mode == "RGBA" else None)
+            buffer = BytesIO()
+            flattened.save(buffer, format="JPEG", quality=85, optimize=True)
+            encoded = buffer.getvalue()
+
+    if len(encoded) > MAX_STORED_SIGNATURE_BYTES:
+        raise DomainError(
+            "That signature image is too detailed to store. Use a simpler or smaller image.",
+            code="signature_too_large",
+        )
+    return encoded, "image/png" if encoded[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
 
 
 def _decode_signature_upload(upload) -> str:
@@ -71,7 +113,16 @@ def _decode_signature_upload(upload) -> str:
             "The signature image is too large. Use an image under 2400 x 1200 pixels.",
             code="signature_dimensions",
         )
-    return f"data:{content_type};base64,{base64.b64encode(raw).decode('ascii')}"
+    try:
+        stored, stored_type = _normalise_signature(raw)
+    except DomainError:
+        raise
+    except Exception:
+        raise DomainError(
+            "That file is not a readable image. Upload a PNG, JPEG or WebP signature.",
+            code="signature_invalid",
+        ) from None
+    return f"data:{stored_type};base64,{base64.b64encode(stored).decode('ascii')}"
 
 
 def _safe_signature_data_url(value) -> str:

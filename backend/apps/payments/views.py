@@ -20,6 +20,7 @@ from apps.cart.models import Cart, CartItem
 from apps.cart.serializers import CartSerializer
 from apps.courses.models import Course
 from apps.core.exceptions import AlreadyExists
+from apps.core.throttling import DatabaseScopedRateThrottle
 from apps.enrollment.models import Enrollment
 from apps.enrollment.services import grant_enrollment
 from apps.payments import services
@@ -107,7 +108,7 @@ class PaymentViewSet(
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
-@throttle_classes([])
+@throttle_classes([DatabaseScopedRateThrottle])
 def paystack_webhook(request):
     """Paystack server-to-server webhook.
 
@@ -115,6 +116,7 @@ def paystack_webhook(request):
     the raw body. Always returns 200 fast so Paystack doesn't retry a processed
     event; the heavy lifting (server-side re-verify + enrol) is idempotent.
     """
+    request.throttle_scope = "payment_webhook"
     raw = request.body
     signature = request.META.get("HTTP_X_PAYSTACK_SIGNATURE")
     if not verify_signature(raw, signature):
@@ -126,3 +128,7 @@ def paystack_webhook(request):
 
     services.handle_webhook_event(event)
     return HttpResponse(status=200)
+
+
+# ScopedRateThrottle reads the scope from the view, not the request.
+paystack_webhook.throttle_scope = "payment_webhook"

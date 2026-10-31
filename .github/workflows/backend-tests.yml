@@ -45,6 +45,9 @@ jobs:
       WEBSOCKETS_ENABLED: 'False'
     steps:
       - uses: actions/checkout@v4
+      - name: No committed secrets
+        working-directory: .
+        run: python3 scripts/check_no_secrets.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

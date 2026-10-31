@@ -197,6 +197,11 @@ def change_password(*, user, new_password):
     user.set_password(new_password)
     user.save(update_fields=["password"])
     _revoke_all_refresh_tokens(user)
+    # A password change also retires outstanding account links: an emailed
+    # verification or reset link must not stay usable after the holder
+    # changed the password.
+    EmailVerificationToken.objects.filter(user=user, used=False).update(used=True)
+    PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
     return user
 
 

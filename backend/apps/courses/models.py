@@ -1,11 +1,15 @@
 """Course catalog hierarchy: Category -> Course -> Module -> Lesson."""
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import TimeStampedModel
 from apps.core.utils import unique_slug
 from config.storages import public_media_storage
+
+# Only real image types may be written to public media.
+IMAGE_UPLOAD_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
 
 
 class Category(TimeStampedModel):
@@ -66,6 +70,7 @@ class Course(TimeStampedModel):
     thumbnail = models.ImageField(
         upload_to="course/thumbnails/", blank=True, null=True,
         storage=public_media_storage,
+        validators=[FileExtensionValidator(IMAGE_UPLOAD_EXTENSIONS)],
     )
     is_published = models.BooleanField(default=False)
 

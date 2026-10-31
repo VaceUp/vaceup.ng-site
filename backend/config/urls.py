@@ -12,7 +12,7 @@ from drf_spectacular.views import (
 from apps.core.views import HealthView
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     # Health probe for the load balancer / uptime monitor.
     path("healthz/", HealthView.as_view(), name="healthz"),
     # Auth: register / verify / password-reset / login / refresh / logout / me

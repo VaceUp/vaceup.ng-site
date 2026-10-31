@@ -116,6 +116,8 @@ REST_FRAMEWORK = {
         "auth_verify": "10/min",
         "auth_resend": "3/min",
         "auth_password_reset": "5/min",
+        # Paystack retries a webhook at most a few times per event.
+        "payment_webhook": "600/min",
     },
     # OpenAPI/Swagger
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -211,7 +213,8 @@ MARKETING_PUBLIC_API_URL = env("MARKETING_PUBLIC_API_URL", default="https://api.
 
 # Token lifetimes (read by apps/accounts/models.py).
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)
-PASSWORD_RESET_TTL = timedelta(hours=1)
+# A reset link is a short-lived key to an account: keep the window small.
+PASSWORD_RESET_TTL = timedelta(minutes=30)
 
 # --- Payments: Paystack (read by apps/payments) ---
 PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", default="")
@@ -404,23 +407,40 @@ if not DEBUG:
     # Configurable: set SECURE_SSL_REDIRECT=False in .env if cPanel already
     # forces HTTPS at the domain level (prevents a redirect loop).
     SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
-    SECURE_HSTS_SECONDS = 31_536_000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31_536_000)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=True)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Send less referrer detail to third parties (the site links out to Paystack).
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     X_FRAME_OPTIONS = "DENY"
-    # Trust the proxy's X-Forwarded-Proto (Nginx/ELB terminating TLS).
+    # Trust the proxy's X-Forwarded-Proto (Cloudflare terminates TLS).
+    # apps.core.middleware.TrustedProxySchemeMiddleware removes the header
+    # first unless the request really came from Cloudflare or this host.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    # Enforce TLS at the origin when behind a proxy that terminates TLS.
-    # NOTE: keep False ONLY if the proxy cannot guarantee https (e.g. cPanel).
+
+# --- Request size limits -------------------------------------------------
+# Django's 2.5 MB default is fine for our largest legitimate upload (a course
+# cover image). Bigger bodies are rejected before they reach a view.
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=2_621_440)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=5_242_880)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default=2000)
+
+# --- Django admin --------------------------------------------------------
+# The staff login lives on a path the operator can change in .env.
+ADMIN_URL = "/" + env("ADMIN_URL", default="admin/").strip("/") + "/"
 
 # --- URLs ---
 ROOT_URLCONF = "config.urls"
 
 # --- Standard Django keys ---
 MIDDLEWARE = [
+    # Runs first: drops a spoofed X-Forwarded-Proto before SecurityMiddleware
+    # decides whether the request is already HTTPS.
+    "apps.core.middleware.TrustedProxySchemeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # serves static on shared host
     "corsheaders.middleware.CorsMiddleware",  # must sit above CommonMiddleware

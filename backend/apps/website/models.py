@@ -1,12 +1,16 @@
 """Public website content: academy profile, team, events and blog posts."""
 
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.core.models import TimeStampedModel
 from config.storages import public_media_storage
+
+# Only real image types may be written to public media.
+IMAGE_UPLOAD_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
 
 
 def _unique_slug(model, value, max_length=200):
@@ -56,7 +60,8 @@ class TeamMember(TimeStampedModel):
     quote = models.TextField(blank=True)
     image_url = models.URLField(blank=True)
     photo = models.ImageField(
-        upload_to="website/team/", blank=True, null=True, storage=public_media_storage
+        upload_to="website/team/", blank=True, null=True, storage=public_media_storage,
+        validators=[FileExtensionValidator(IMAGE_UPLOAD_EXTENSIONS)],
     )
     linkedin_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
@@ -108,7 +113,8 @@ class Event(TimeStampedModel):
     )
     image_url = models.URLField(blank=True)
     cover_image = models.ImageField(
-        upload_to="website/events/", blank=True, null=True, storage=public_media_storage
+        upload_to="website/events/", blank=True, null=True, storage=public_media_storage,
+        validators=[FileExtensionValidator(IMAGE_UPLOAD_EXTENSIONS)],
     )
     is_featured = models.BooleanField(default=False)
     is_published = models.BooleanField(default=False, db_index=True)

@@ -47,6 +47,11 @@ def main():
         "--with-unchanged", action="store_true",
         help="Also include manage.py, passenger_wsgi.py and requirements.txt.",
     )
+    parser.add_argument(
+        "--include", action="append", default=[], metavar="PATH",
+        help="Ship one extra repository file that the diff does not cover "
+             "(for example backend/requirements.txt). Repeatable.",
+    )
     args = parser.parse_args()
 
     notes = ROOT / args.notes
@@ -58,6 +63,13 @@ def main():
 
     files = {}
     sources = ([f"backend/{name}" for name in ALWAYS] if args.with_unchanged else []) + changed_files(args.base)
+    for source in args.include:
+        candidate = (ROOT / source).resolve()
+        if not candidate.is_file():
+            parser.error(f"Extra file not found: {source}")
+        if candidate.suffix in SKIP_SUFFIXES:
+            parser.error(f"Extra file is not shippable: {source}")
+        sources.append(source)
     for source in sources:
         path = ROOT / source
         rel = path.relative_to(BACKEND)

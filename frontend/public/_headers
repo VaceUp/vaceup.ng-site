@@ -22,4 +22,11 @@
   Cache-Control: no-store
   X-Robots-Tag: noindex, nofollow
 
+# The verification code travels in the URL: never let it leak to a third party.
+/verify/*
+  ! Referrer-Policy
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+
 # API CORS is enforced by Django, never by a wildcard here.

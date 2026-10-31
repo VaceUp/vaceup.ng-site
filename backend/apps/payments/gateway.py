@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import urllib.error
 import urllib.request
 from decimal import Decimal
@@ -20,7 +21,13 @@ from django.conf import settings
 
 from apps.core.exceptions import PaymentFailed, PaymentProviderUnavailable
 
+logger = logging.getLogger(__name__)
+
 PAYSTACK_BASE = "https://api.paystack.co"
+# Paystack sits behind Cloudflare, which refuses urllib's default
+# "Python-urllib/x.y" User-Agent with HTTP 403 (Cloudflare error 1010).
+# Every request must identify itself explicitly or the provider rejects it.
+USER_AGENT = "VaceUp-API/1.0 (+https://vaceup.ng)"
 
 
 def to_minor_unit(amount: Decimal) -> int:
@@ -39,6 +46,22 @@ def verify_signature(raw_body: bytes, signature: str | None) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def _error_body(exc: urllib.error.HTTPError) -> str:
+    """Read a provider error body for the server log, never for the user."""
+    try:
+        return exc.read().decode("utf-8", "replace").strip()[:500]
+    except Exception:
+        return ""
+
+
+def _rejection_message(code: int) -> str:
+    if code == 401:
+        return "Payment provider rejected our credentials (HTTP 401). Contact support."
+    if code == 403:
+        return "Payment provider blocked the request (HTTP 403). Contact support."
+    return f"Payment provider rejected the request (HTTP {code}). Contact support."
+
+
 class PaystackGateway:
     """Real Paystack HTTP client."""
 
@@ -52,13 +75,20 @@ class PaystackGateway:
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Authorization", f"Bearer {self.secret_key}")
         req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", USER_AGENT)
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 body = json.loads(resp.read().decode())
         except urllib.error.HTTPError as exc:  # 4xx/5xx from Paystack
+            # The provider's own body distinguishes "key rejected" from
+            # "request blocked"; keep it in the server log, not in the message.
+            logger.warning(
+                "Paystack %s %s rejected: HTTP %s %s",
+                method, path, exc.code, _error_body(exc),
+            )
             if exc.code == 429 or exc.code >= 500:
                 raise PaymentProviderUnavailable() from None
-            raise PaymentFailed(f"Payment provider rejected the request (HTTP {exc.code}). Contact support.") from None
+            raise PaymentFailed(_rejection_message(exc.code)) from None
         except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError):
             raise PaymentProviderUnavailable() from None
         if not body.get("status"):

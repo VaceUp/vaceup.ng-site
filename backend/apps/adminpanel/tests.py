@@ -51,7 +51,7 @@ class AdminReadTests(APITestCase):
 
     def test_homepage_import_preview_idempotency_and_no_overwrites(self):
         from django.core.management import call_command, CommandError
-        from apps.courses.models import Course, Category
+        from apps.courses.models import Course, Category, Lesson
         from io import StringIO
         out = StringIO()
         call_command("import_homepage_catalog", stdout=out)
@@ -60,12 +60,16 @@ class AdminReadTests(APITestCase):
             call_command("import_homepage_catalog", apply=True, stdout=out)
         tutor = get_user_model().objects.create_user("tutor@example.com", "test-password", role="instructor", is_active=True)
         call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=out)
-        self.assertEqual(Course.objects.count(), 10)
+        self.assertEqual(Course.objects.count(), 12)
         self.assertEqual(Category.objects.count(), 6)
+        # The import writes the brief's structure, not a condensed outline.
+        self.assertEqual(
+            Lesson.objects.filter(module__course__slug="virtual-assistant").count(), 62
+        )
         Course.objects.filter(slug="virtual-assistant").update(price="999", is_published=True)
         call_command("import_homepage_catalog", apply=True, instructor_email=tutor.email, stdout=out)
-        self.assertEqual(Course.objects.count(), 10)
-        self.assertEqual(Course.objects.filter(is_published=False).count(), 9)
+        self.assertEqual(Course.objects.count(), 12)
+        self.assertEqual(Course.objects.filter(is_published=False).count(), 11)
         self.assertEqual(str(Course.objects.get(slug="virtual-assistant").price), "999.00")
 
     def test_payments_list_has_model_import(self):

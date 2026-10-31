@@ -107,7 +107,12 @@ class CourseViewSet(viewsets.ModelViewSet):
             result = restore_catalog(tutor, fill_missing_details=options.validated_data["fill_missing_details"])
         except IntegrityError:
             raise ValidationError({"detail": "Another catalogue edit conflicted with this import. No partial import was saved. Refresh and try again."})
-        return Response({"detail": f"Created {len(result['created'])} drafts; kept {len(result['kept'])} existing courses; filled blank details on {len(result['enriched'])}.", **result})
+        detail = (
+            f"Created {len(result['created'])} drafts with {result['modules']} modules and "
+            f"{result['lessons']} lessons; kept {len(result['kept'])} existing courses; "
+            f"filled blank details on {len(result['enriched'])}."
+        )
+        return Response({"detail": detail, **result})
 
     def perform_create(self, serializer):
         if self.request.user.is_admin:

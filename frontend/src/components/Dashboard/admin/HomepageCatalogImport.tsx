@@ -7,7 +7,10 @@ import {
   controlClass, formClass, useToast,
 } from './AdminUI';
 
-interface Preview { slug: string; title: string; category: string; price: string; duration: string; existing_id: number | null; }
+interface Preview {
+  slug: string; title: string; category: string; price: string; duration: string;
+  modules?: number; lessons?: number; existing_id: number | null;
+}
 interface Result { detail: string; created: string[]; kept: string[]; enriched: string[]; }
 
 const REPORT_LABELS = { created: 'New drafts', kept: 'Existing courses retained', enriched: 'Blank public details filled' } as const;
@@ -72,8 +75,8 @@ export default function HomepageCatalogImport({ tutors, onImported }: {
 
   return (
     <AdminSection
-      title="Original catalogue"
-      description="Bring the six professional programmes and four children's programmes from the original site into this dashboard. Imported courses start as drafts."
+      title="Curriculum catalogue"
+      description="Create the seven professional programmes and five children's programmes from the curriculum brief. Anything the catalogue is missing arrives as a draft, with every module and one lesson per topic."
       actions={<Action loading={loading} disabled={busy} onClick={() => void preview()}>Refresh preview</Action>}
     >
       {error && <StatusNote tone="error">{error}</StatusNote>}
@@ -90,7 +93,7 @@ export default function HomepageCatalogImport({ tutors, onImported }: {
       {loading && !rows.length && <Skeleton rows={4} />}
 
       {!loading && !error && rows.length > 0 && (
-        <AdminList label="Original catalogue courses">
+        <AdminList label="Curriculum brief courses">
           {rows.map((row) => (
             <AdminRow
               key={row.slug}
@@ -99,7 +102,11 @@ export default function HomepageCatalogImport({ tutors, onImported }: {
               badges={<Pill tone={row.existing_id ? 'live' : 'draft'}>{row.existing_id ? 'Already in catalogue' : 'Will create draft'}</Pill>}
               meta={row.existing_id
                 ? 'This course already exists here. Importing will not duplicate it.'
-                : `${row.category} · ${money(row.price)} · ${row.duration}`}
+                // The module counts come from the curriculum-aware catalogue patch,
+                // so an older backend must not print "undefined".
+                : [row.category, money(row.price), row.duration,
+                   row.modules ? `${row.modules} modules · ${row.lessons} lessons` : '']
+                  .filter(Boolean).join(' · ')}
             />
           ))}
         </AdminList>
@@ -108,8 +115,8 @@ export default function HomepageCatalogImport({ tutors, onImported }: {
       {!loading && !error && !rows.length && (
         <EmptyState
           icon="bi-check2-circle"
-          title="The original catalogue is already here"
-          description="Every course from the original site exists in this dashboard. Nothing else needs importing."
+          title="The curriculum is already in the catalogue"
+          description="Every course from the curriculum brief exists in this dashboard. Nothing else needs importing."
         />
       )}
 
@@ -126,16 +133,16 @@ export default function HomepageCatalogImport({ tutors, onImported }: {
         </Field>
         <CheckRow
           label="Also fill blank public details on matching courses"
-          hint="Only empty introductions, audiences, outcomes, benefits and outlines are filled. Prices, titles, tutors and authored copy stay unchanged."
+          hint="Only empty introductions, taglines, audiences, outcomes and outlines are filled. Prices, titles, tutors and authored copy stay unchanged."
           disabled={busy}
           checked={fill}
           onChange={(event) => setFill(event.target.checked)}
         />
         <StatusNote>
           {missing
-            ? `${missing} of ${rows.length} original courses are missing here. They are created as drafts, so nothing goes public until you publish it.`
-            : 'All original courses already exist. Import will still fill blank details if you tick the box above.'}
-          {' '}No lessons or student progress are created or changed.
+            ? `${missing} of ${rows.length} curriculum courses are missing here. They are created as drafts, so nothing goes public until you publish it.`
+            : `All ${rows.length} curriculum courses already exist. Import will still fill blank details if you tick the box above.`}
+          {' '}Missing topics are added as lessons on draft courses only. Published courses and student progress are never changed.
         </StatusNote>
         <div>
           <Action type="submit" intent="primary" loading={busy} disabled={!importable}>

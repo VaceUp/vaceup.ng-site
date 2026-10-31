@@ -74,7 +74,7 @@ class CourseAuthoringTests(APITestCase):
         for _ in range(2):
             response = self.client.post(endpoint, {"instructor": self.tutor.pk}, format='json')
             self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(Course.objects.count(), 11)
+        self.assertEqual(Course.objects.count(), 13)
         imported = Course.objects.get(slug="virtual-assistant")
         self.assertFalse(imported.is_published)
         imported.price = 90000; imported.save()
@@ -107,7 +107,7 @@ class CourseAuthoringTests(APITestCase):
                                         price=999, description='Admin description', is_published=True, benefits='Admin benefits')
         endpoint = '/api/v1/courses/import-homepage/'
         preview = self.client.get(endpoint)
-        self.assertEqual(len(preview.data['courses']), 10)
+        self.assertEqual(len(preview.data['courses']), 12)
         self.assertEqual(Course.objects.count(), 2)
         self.client.post(endpoint, {'instructor': self.tutor.pk}, format='json')
         existing.refresh_from_db(); self.assertEqual(existing.outline, '')
@@ -118,9 +118,11 @@ class CourseAuthoringTests(APITestCase):
         self.assertIn('Virtual Assistance', existing.outline)
         self.assertEqual((existing.price, existing.description, existing.benefits, existing.is_published), (999, 'Admin description', 'Admin benefits', True))
         self.assertEqual(existing.category_id, self.category.pk)
-        self.assertEqual(Course.objects.filter(slug__startswith='kids-').count(), 4)
+        self.assertEqual(Course.objects.filter(slug__startswith='kids-').count(), 5)
         self.assertTrue(Course.objects.filter(slug='artificial-intelligence').exists())
-        self.assertFalse(Module.objects.exists())
+        # A course the import creates arrives with the brief's modules.
+        self.assertEqual(Module.objects.filter(course__slug='coding').count(), 10)
+        self.assertEqual(Module.objects.filter(course=existing).count(), 0)
 
     def test_category_inline_creation_and_duplicate_validation(self):
         created = self.client.post('/api/v1/categories/', {'name': 'New category'}, format='json')

@@ -79,8 +79,16 @@ export default function LessonForm({ lesson, moduleId, formId, onSaved, onDirtyC
         { method: 'POST', body: JSON.stringify({ content_type: file.type }) },
       );
       if (!webUrl(ticket.upload_url)) throw new Error('The video upload address is invalid. Contact support.');
-      const uploaded = await fetch(ticket.upload_url, { method: 'PUT', body: file, headers: ticket.headers, credentials: 'omit' });
-      if (!uploaded.ok) throw new Error('Video upload failed. Check the R2 upload/CORS configuration and try again.');
+      let uploaded: Response;
+      try {
+        uploaded = await fetch(ticket.upload_url, { method: 'PUT', body: file, headers: ticket.headers, credentials: 'omit' });
+      } catch {
+        // A bucket with no CORS rule rejects the browser's PUT before it is
+        // sent, so this surfaces as a bare network error and must not be
+        // reported as the visitor's connection.
+        throw new Error('The storage bucket refused this browser upload. Add a CORS rule allowing this site on the R2 bucket, then try again.');
+      }
+      if (!uploaded.ok) throw new Error(`The storage bucket rejected the upload (HTTP ${uploaded.status}). Check the R2 token's write access and try again.`);
       const saved = await api.request<ManagedLesson>(`/lessons/${lesson.id}/attach-video/`, {
         method: 'POST', body: JSON.stringify({ key: ticket.key }),
       });

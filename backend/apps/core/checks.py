@@ -15,10 +15,20 @@ from django.conf import settings
 from django.core.checks import Warning, register
 
 
+def _setting(name, default=""):
+    """Read a setting this module may be newer than.
+
+    Checks run before every management command, so a partial overlay that
+    updates this file without updating ``config/settings.py`` must skip its
+    warning — an AttributeError here would take down ``manage.py`` itself.
+    """
+    return getattr(settings, name, default)
+
+
 @register("vaceup_config")
 def media_storage_check(app_configs, **kwargs):
     issues = []
-    if settings.AWS_S3_ENDPOINT_REJECTED:
+    if _setting("AWS_S3_ENDPOINT_REJECTED", False):
         issues.append(Warning(
             "AWS_S3_ENDPOINT_URL is set to something that is not a URL, so it was "
             "ignored and requests go to AWS S3 rather than an R2/B2 endpoint.",
@@ -26,8 +36,8 @@ def media_storage_check(app_configs, **kwargs):
                  "the line out entirely: an inline comment is read as the value.",
             id="core.W005",
         ))
-    if (settings.AWS_STORAGE_BUCKET_NAME or settings.AWS_ACCESS_KEY_ID
-            or settings.AWS_SECRET_ACCESS_KEY) and not settings.OBJECT_STORAGE_CONFIGURED:
+    if (_setting("AWS_STORAGE_BUCKET_NAME") or _setting("AWS_ACCESS_KEY_ID")
+            or _setting("AWS_SECRET_ACCESS_KEY")) and not _setting("OBJECT_STORAGE_CONFIGURED", False):
         issues.append(Warning(
             "Object storage is only partly configured, so media is kept on local "
             "disk and uploaded videos cannot be stored.",
@@ -35,7 +45,7 @@ def media_storage_check(app_configs, **kwargs):
                  "AWS_STORAGE_BUCKET_NAME together, or clear all three.",
             id="core.W001",
         ))
-    if settings.CLOUDINARY_URL_REJECTED and not settings.CLOUDINARY_CONFIGURED:
+    if _setting("CLOUDINARY_URL_REJECTED", False) and not _setting("CLOUDINARY_CONFIGURED", False):
         issues.append(Warning(
             "CLOUDINARY_URL is set but is not a "
             "cloudinary://<api_key>:<api_secret>@<cloud_name> URL, so public "
@@ -46,9 +56,9 @@ def media_storage_check(app_configs, **kwargs):
             id="core.W006",
         ))
     partial_cloudinary = (
-        bool(settings.CLOUDINARY_CLOUD_NAME or settings.CLOUDINARY_API_KEY
-             or settings.CLOUDINARY_API_SECRET)
-        and not settings.CLOUDINARY_CONFIGURED
+        bool(_setting("CLOUDINARY_CLOUD_NAME") or _setting("CLOUDINARY_API_KEY")
+             or _setting("CLOUDINARY_API_SECRET"))
+        and not _setting("CLOUDINARY_CONFIGURED", False)
     )
     if partial_cloudinary:
         issues.append(Warning(
@@ -59,7 +69,7 @@ def media_storage_check(app_configs, **kwargs):
                  "them.",
             id="core.W007",
         ))
-    if settings.CLOUDINARY_CONFIGURED:
+    if _setting("CLOUDINARY_CONFIGURED", False):
         try:
             import cloudinary  # noqa: F401
         except ImportError:
@@ -70,8 +80,9 @@ def media_storage_check(app_configs, **kwargs):
                      "pip install -r requirements.txt, then restart the Python app.",
                 id="core.W008",
             ))
-    if (settings.OBJECT_STORAGE_CONFIGURED and not settings.CLOUDINARY_CONFIGURED
-            and not settings.AWS_S3_CUSTOM_DOMAIN):
+    if (_setting("OBJECT_STORAGE_CONFIGURED", False)
+            and not _setting("CLOUDINARY_CONFIGURED", False)
+            and not _setting("AWS_S3_CUSTOM_DOMAIN", None)):
         issues.append(Warning(
             "Public images are going to the bucket, whose URL points at the S3 "
             "API endpoint. That endpoint refuses anonymous reads unless the "
@@ -81,7 +92,7 @@ def media_storage_check(app_configs, **kwargs):
                  "domain to the bucket and set it as AWS_S3_CUSTOM_DOMAIN.",
             id="core.W009",
         ))
-    if not settings.OBJECT_STORAGE_CONFIGURED and not os.access(
+    if not _setting("OBJECT_STORAGE_CONFIGURED", False) and not os.access(
         _writable_media_dir(), os.W_OK
     ):
         issues.append(Warning(
@@ -96,7 +107,7 @@ def media_storage_check(app_configs, **kwargs):
 
 def _writable_media_dir():
     """The closest existing ancestor of MEDIA_ROOT — creating paths is not a check's job."""
-    path = str(settings.MEDIA_ROOT)
+    path = str(_setting("MEDIA_ROOT", ""))
     while path and not os.path.isdir(path):
         parent = os.path.dirname(path)
         if parent == path:
@@ -108,19 +119,20 @@ def _writable_media_dir():
 @register("vaceup_config")
 def emailed_link_base_check(app_configs, **kwargs):
     issues = []
-    configured = urlsplit(str(settings.FRONTEND_BASE_URL).strip())
-    api_host = (urlsplit(str(settings.MARKETING_PUBLIC_API_URL).strip()).hostname or "").lower()
+    configured = urlsplit(str(_setting("FRONTEND_BASE_URL", "")).strip())
+    api_host = (urlsplit(str(_setting("MARKETING_PUBLIC_API_URL", "")).strip()).hostname or "").lower()
+    fallback = _setting("FRONTEND_LINK_BASE", "")
     if not configured.netloc:
         issues.append(Warning(
             "FRONTEND_BASE_URL is empty; emailed links fall back to "
-            f"{settings.FRONTEND_LINK_BASE}.",
+            f"{fallback}.",
             hint="Set FRONTEND_BASE_URL to the public site origin.",
             id="core.W003",
         ))
     elif (configured.hostname or "").lower() == api_host:
         issues.append(Warning(
             "FRONTEND_BASE_URL points at the API host, which serves no pages, so "
-            f"emailed links fall back to {settings.FRONTEND_LINK_BASE}.",
+            f"emailed links fall back to {fallback}.",
             hint="Set FRONTEND_BASE_URL to the website origin (https://vaceup.ng), "
                  "not the API origin.",
             id="core.W004",

@@ -344,3 +344,33 @@ class EndpointGuardTests(TestCase):
             AWS_STORAGE_BUCKET_NAME="vaceup-media", OBJECT_STORAGE_CONFIGURED=True,
         ))
         self.assertNotIn("core.W001", self._ids())
+
+
+class LegacySettingsCheckTests(TestCase):
+    """checks.py can be newer than config/settings.py after a partial overlay.
+
+    Checks run before every management command, so a missing setting has to
+    skip its warning rather than take manage.py down with an AttributeError.
+    """
+
+    def test_a_settings_module_without_the_cloudinary_keys_still_runs(self):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from apps.core import checks
+
+        media_root = Path(tempfile.mkdtemp(prefix="vaceup-media-"))
+        self.addCleanup(shutil.rmtree, media_root, True)
+        legacy = SimpleNamespace(
+            MEDIA_ROOT=media_root,
+            AWS_STORAGE_BUCKET_NAME="vaceup-media",
+            AWS_ACCESS_KEY_ID="", AWS_SECRET_ACCESS_KEY="",
+            FRONTEND_BASE_URL="https://vaceup.ng",
+            MARKETING_PUBLIC_API_URL="https://api.vaceup.ng",
+        )
+        with mock.patch.object(checks, "settings", legacy):
+            storage_ids = [issue.id for issue in checks.media_storage_check(None)]
+            link_ids = [issue.id for issue in checks.emailed_link_base_check(None)]
+        self.assertIn("core.W001", storage_ids)
+        self.assertNotIn("core.W006", storage_ids)
+        self.assertNotIn("core.W003", link_ids)

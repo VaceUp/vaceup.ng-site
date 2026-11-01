@@ -72,7 +72,8 @@ class DatabaseLimitMixin:
                 exhausted = attempt == LOCK_RETRY_ATTEMPTS - 1
                 print(  # [ci-diag] temporary
                     f"[ci-diag] operational in_atomic={caller_transaction} attempt={attempt} "
-                    f"type={type(exc).__name__} args={exc.args!r} cause={exc.__cause__!r}",
+                    f"request={request.method} {request.path} user={getattr(request.user, 'pk', None)} "
+                    f"throttle={type(self).__name__} type={type(exc).__name__} args={exc.args!r}",
                     file=sys.stderr, flush=True,
                 )
                 if not is_transient_lock_error(exc) or caller_transaction or exhausted:
@@ -81,7 +82,9 @@ class DatabaseLimitMixin:
             except DatabaseError as exc:
                 print(  # [ci-diag] temporary
                     f"[ci-diag] database in_atomic={caller_transaction} "
-                    f"type={type(exc).__name__} args={exc.args!r} cause={exc.__cause__!r}",
+                    f"needs_rollback={connection.needs_rollback} "
+                    f"request={request.method} {request.path} user={getattr(request.user, 'pk', None)} "
+                    f"throttle={type(self).__name__} type={type(exc).__name__} args={exc.args!r}",
                     file=sys.stderr, flush=True,
                 )
                 raise RateLimitUnavailable() from exc

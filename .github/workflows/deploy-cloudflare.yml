@@ -62,7 +62,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: frontend
-          command: pages deploy out --project-name=vaceup-frontend --branch=${{ github.ref_name }}
+          command: pages deploy out --project-name=vaceup-ng-site --branch=${{ github.ref_name }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # The frontend calls the TrueHost API directly. A separate proxy is opt-in;

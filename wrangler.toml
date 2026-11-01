@@ -4,7 +4,7 @@
 # IMPORTANT: This is for Cloudflare Pages (static hosting), NOT Workers
 # The Worker for API proxy is configured separately in wrangler-worker.toml
 
-name = "vaceup-frontend"
+name = "vaceup-ng-site"
 compatibility_date = "2026-09-04"
 
 [build]

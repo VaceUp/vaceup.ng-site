@@ -185,9 +185,12 @@ class AssessmentWorkflowTests(APITestCase):
                     self.as_user(key)
                     download = self.client.get(path)
                     self.assertEqual(download.status_code, 200, getattr(download, "content", b""))
+                    # Consuming the stream closes the response. Closing it again fires
+                    # request_finished a second time, after the client has restored
+                    # close_old_connections, which drops the MySQL connection inside
+                    # this test's atomic block.
                     self.assertEqual(b''.join(download.streaming_content), b'Private learner work')
                     self.assertIn('no-store', download['Cache-Control'])
-                    download.close()
                 for key in ['peer', 'other']:
                     self.as_user(key)
                     self.assertEqual(self.client.get(path).status_code, 404)

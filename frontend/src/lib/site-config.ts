@@ -6,7 +6,7 @@
 export const SITE = {
   name: 'VaceUp Digital Academy',
   url: 'https://vaceup.ng',
-  email: 'info@vaceup.ng',
+  email: 'vaceupacademy@gmail.com',
   phone: '+234 814 579 8943',
   phoneHref: 'tel:+2348145798943',
   whatsapp: 'https://wa.me/2348145798943',

@@ -306,7 +306,7 @@ export const PENDING_ENDPOINTS = {
     unsubscribe: 'POST /api/v1/newsletter/unsubscribe/',
   },
   contact: {
-    // Contact page form (frontend currently falls back to mailto:info@vaceup.ng)
+    // Contact page form (frontend currently falls back to mailto:vaceupacademy@gmail.com)
     create: 'POST /api/v1/contact/',
   },
   certificates: {

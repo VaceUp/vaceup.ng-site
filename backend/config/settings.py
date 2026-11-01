@@ -8,6 +8,7 @@ present. Secrets are read from the environment (12-factor).
 from datetime import timedelta
 from pathlib import Path
 import ssl
+from urllib.parse import urlsplit
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -210,6 +211,29 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
 # Base URL of the frontend that renders the emailed verify/reset links.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="https://vaceup.ng")
 MARKETING_PUBLIC_API_URL = env("MARKETING_PUBLIC_API_URL", default="https://api.vaceup.ng")
+ACADEMY_SITE_URL = env("ACADEMY_SITE_URL", default="https://vaceup.ng")
+
+
+def _frontend_link_base(base, api_url, fallback_url):
+    """Absolute origin that emailed links can actually open.
+
+    A missing, relative or API-host base produces links that land on a "Not
+    Found" page — which is exactly what a reset email must never do — so the
+    value is repaired here instead of being trusted.
+    """
+    candidate = urlsplit(str(base).strip())
+    api_host = (urlsplit(str(api_url).strip()).hostname or "").lower()
+    if (candidate.scheme not in {"http", "https"} or not candidate.netloc
+            or (candidate.hostname or "").lower() == api_host):
+        candidate = urlsplit(str(fallback_url).strip())
+        if not candidate.netloc:
+            candidate = urlsplit("https://vaceup.ng")
+    return f"{candidate.scheme}://{candidate.netloc}{candidate.path.rstrip('/')}"
+
+
+FRONTEND_LINK_BASE = _frontend_link_base(
+    FRONTEND_BASE_URL, MARKETING_PUBLIC_API_URL, ACADEMY_SITE_URL
+)
 
 # Token lifetimes (read by apps/accounts/models.py).
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)
@@ -241,7 +265,25 @@ AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-1")
 AWS_S3_SIGNATURE_VERSION = "s3v4"  # required for pre-signed URLs
 # Set for S3-compatible providers (Cloudflare R2, Backblaze B2, Wasabi). Leave
 # blank for AWS S3. R2 reuses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
-AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="") or None
+def _endpoint_url(raw):
+    """A leftover .env.example comment is not an endpoint, so it counts as unset."""
+    value = str(raw).strip()
+    return value if value.lower().startswith(("http://", "https://")) else ""
+
+
+_AWS_S3_ENDPOINT_RAW = env("AWS_S3_ENDPOINT_URL", default="")
+AWS_S3_ENDPOINT_URL = _endpoint_url(_AWS_S3_ENDPOINT_RAW) or None
+# Reported by apps.core.checks: a value that was set but unusable must not be
+# dropped in silence, or the operator keeps a bucket they are never using.
+AWS_S3_ENDPOINT_REJECTED = bool(_AWS_S3_ENDPOINT_RAW.strip()) and AWS_S3_ENDPOINT_URL is None
+
+# A bucket name on its own is not a usable object store: without the access
+# keys every write becomes an anonymous S3 request that fails, and image
+# uploads in the admin panel return a 5xx. Object storage is only selected
+# when the bucket AND both keys are present; anything else is local disk.
+OBJECT_STORAGE_CONFIGURED = bool(
+    AWS_STORAGE_BUCKET_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+)
 
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
@@ -250,7 +292,7 @@ MEDIA_URL = "/media/"
 # still work. Only media/public is served over HTTP (see config/urls.py).
 STORAGES = {
     "default": {
-        "BACKEND": "config.storages.PrivateMediaStorage" if AWS_STORAGE_BUCKET_NAME
+        "BACKEND": "config.storages.PrivateMediaStorage" if OBJECT_STORAGE_CONFIGURED
         else "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
@@ -259,7 +301,7 @@ STORAGES = {
         )
     },
 }
-if not AWS_STORAGE_BUCKET_NAME:
+if not OBJECT_STORAGE_CONFIGURED:
     STORAGES["default"]["OPTIONS"] = {
         "location": BASE_DIR / "media" / "private",
         "base_url": "/media/private/",

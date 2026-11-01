@@ -149,7 +149,7 @@ export default function VerifyPage() {
             <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
               We could not find a certificate with the code{' '}
               <span className="font-mono font-bold">{code}</span>. Double-check the code — or if
-              you believe this certificate is genuine, contact us at info@vaceup.ng.
+              you believe this certificate is genuine, contact us at vaceupacademy@gmail.com.
             </p>
           </div>
         )}

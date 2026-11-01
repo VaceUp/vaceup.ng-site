@@ -32,7 +32,7 @@ export const initializePayment = async ({
   const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
   if (!publicKey) {
     // Never fall back to a fake key — payments must fail visibly, not silently.
-    alert('Payments are temporarily unavailable. Please contact support at info@vaceup.ng.');
+    alert('Payments are temporarily unavailable. Please contact support at vaceupacademy@gmail.com.');
     return;
   }
 

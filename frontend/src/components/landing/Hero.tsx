@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatCohortDate, useAcademyProfile } from '@/lib/use-academy-profile';
 
 interface HeroProps {
   onOpenAuth: (mode: 'signin' | 'signup') => void;
@@ -8,6 +9,7 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
   // Academy statistics live in the single Stats band (components/homepage/Stats.tsx).
+  const cohortDate = formatCohortDate(useAcademyProfile()?.next_cohort_start);
 
   return (
     <div className="w-full">
@@ -19,11 +21,13 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
             {/* Left Content Column */}
             <div className="flex flex-col items-start lg:col-span-7">
               
-              {/* Cohort Notification Badge */}
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs sm:text-sm font-medium backdrop-blur-md">
-                <span className="text-gold-brand">✨</span>
-                <span>New cohort starts 21 September 2026</span>
-              </div>
+              {/* Cohort Notification Badge — dated from Admin > Website > Academy profile */}
+              {cohortDate && (
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs sm:text-sm font-medium backdrop-blur-md">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-gold-brand" aria-hidden="true" />
+                  <span>New cohort starts {cohortDate}</span>
+                </div>
+              )}
 
               {/* Main Heading */}
               <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl md:text-6xl lg:text-6xl xl:text-7xl leading-[1.1]">

@@ -3,12 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { Reveal } from '@/components/ui/Reveal';
+import { formatCohortDate, useAcademyProfile } from '@/lib/use-academy-profile';
 
 /**
  * Full-width closing call-to-action (PRD §13):
  * "Your Digital Career Starts Here." with Explore Courses + Talk to Us.
  */
 export function FinalCTA() {
+  const cohortDate = formatCohortDate(useAcademyProfile()?.next_cohort_start);
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-navy-900 via-navy-950 to-navy-950 py-20" aria-labelledby="final-cta-heading">
       {/* Gold glow accents */}
@@ -52,7 +54,7 @@ export function FinalCTA() {
           </Link>
         </div>
         <p className="mt-6 text-xs text-navy-300">
-          Next cohort starts 21 September 2026 · Limited seats per course
+          {cohortDate ? `Next cohort starts ${cohortDate} · ` : ''}Limited seats per course
         </p>
       </Reveal>
     </section>

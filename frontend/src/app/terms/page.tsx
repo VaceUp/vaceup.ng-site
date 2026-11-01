@@ -21,7 +21,7 @@ export default function TermsPage() {
           bullets: [
             'You must be at least 13 years old to create an account independently. Learners under 13 may only use the platform through a parent or guardian, including our Kids Tech Academy programs.',
             'One person per account — account sharing is not permitted and may result in suspension.',
-            'Notify us immediately at info@vaceup.ng if you suspect unauthorised access to your account.',
+            'Notify us immediately at vaceupacademy@gmail.com if you suspect unauthorised access to your account.',
           ],
         },
         {

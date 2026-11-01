@@ -259,4 +259,4 @@ def certificate_verification_page(request, verification_code):
     from urllib.parse import urlencode
     from django.conf import settings
     from django.shortcuts import redirect
-    return redirect(f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify?{urlencode({'code': verification_code})}")
+    return redirect(f"{settings.FRONTEND_LINK_BASE.rstrip('/')}/verify/?{urlencode({'code': verification_code})}")

@@ -106,7 +106,7 @@ def _deliver(job):
     send_live_class_reminder(
         email=job.user.email, class_title=live_class.title, course_title=live_class.course.title,
         when=live_class.scheduled_start,
-        join_hint=f"Open {settings.FRONTEND_BASE_URL.rstrip('/')}/dashboard/live-classes/ to join.",
+        join_hint=f"Open {settings.FRONTEND_LINK_BASE.rstrip('/')}/dashboard/live-classes/ to join.",
     )
     return True
 

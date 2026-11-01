@@ -78,7 +78,7 @@ export default function PrivacyPage() {
         {
           heading: 'Contact our data team',
           body: [
-            'To exercise any right or ask a privacy question, email info@vaceup.ng with the subject “Data Request”. We respond within 14 days.',
+            'To exercise any right or ask a privacy question, email vaceupacademy@gmail.com with the subject “Data Request”. We respond within 14 days.',
           ],
         },
       ]}

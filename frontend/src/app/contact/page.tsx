@@ -34,7 +34,7 @@ export default function ContactPage() {
     const body = encodeURIComponent(
       `${formData.message}\n\n— ${formData.name} (${formData.email})`
     );
-    window.location.href = `mailto:info@vaceup.ng?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:vaceupacademy@gmail.com?subject=${subject}&body=${body}`;
 
     setIsSubmitting(false);
     setSubmitStatus('success');
@@ -84,7 +84,7 @@ export default function ContactPage() {
                         </div>
                         <div>
                           <h3 className="font-bold text-navy-950">Email Us</h3>
-                          <a href="mailto:info@vaceup.ng" className="text-navy-700 hover:text-gold-brand transition-colors">info@vaceup.ng</a>
+                          <a href="mailto:vaceupacademy@gmail.com" className="text-navy-700 hover:text-gold-brand transition-colors">vaceupacademy@gmail.com</a>
                           <p className="text-sm text-gray-500 mt-1">For general inquiries</p>
                         </div>
                       </div>

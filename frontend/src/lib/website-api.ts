@@ -10,6 +10,7 @@ export interface AcademyProfile {
   story: string;
   location: string;
   founded_year: number | null;
+  next_cohort_start?: string | null;
   email: string;
   phone: string;
   linkedin_url: string;

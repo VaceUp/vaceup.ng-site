@@ -356,7 +356,7 @@ DEFAULT_CERTIFICATE_HTML = """
 
 def certificate_context(certificate: "Certificate") -> dict:
     """The award facts every renderer (HTML, PDF) draws from."""
-    verify_base = str(getattr(django_settings, "FRONTEND_BASE_URL", "") or "https://vaceup.ng")
+    verify_base = str(django_settings.FRONTEND_LINK_BASE)
     tutor = certificate.tutor or certificate.course.instructor
     signature = tutor_signature(tutor)
     management = management_signature()

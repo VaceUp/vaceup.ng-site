@@ -32,6 +32,9 @@ class AcademyProfile(TimeStampedModel):
     story = models.TextField(blank=True)
     location = models.CharField(max_length=200, blank=True)
     founded_year = models.PositiveIntegerField(null=True, blank=True)
+    # The date the homepage advertises. Editable by an admin so a new cohort
+    # can be announced without a code change; blank means no banner.
+    next_cohort_start = models.DateField(null=True, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=40, blank=True)
     linkedin_url = models.URLField(blank=True)

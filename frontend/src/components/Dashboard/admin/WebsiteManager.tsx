@@ -19,6 +19,7 @@ interface ProfileForm {
   story: string;
   location: string;
   founded_year: string;
+  next_cohort_start: string;
   email: string;
   phone: string;
   linkedin_url: string;
@@ -26,6 +27,9 @@ interface ProfileForm {
   facebook_url: string;
   website_url: string;
 }
+
+// Not editable from this screen: the academy's contact details and social
+// links are fixed, so saveProfile() omits them from every PATCH.
 
 interface TeamRow {
   id: number;
@@ -44,12 +48,13 @@ interface TeamRow {
 
 const emptyProfile = (): ProfileForm => ({
   id: null, name: '', tagline: '', mission: '', story: '', location: '', founded_year: '',
+  next_cohort_start: '',
   email: '', phone: '', linkedin_url: '', instagram_url: '', facebook_url: '', website_url: '',
 });
 
 const emptyMember = () => ({
   name: '', role_title: '', bio: '', quote: '', image_url: '',
-  linkedin_url: '', instagram_url: '', website_url: '',
+  website_url: '',
   is_founder: false, order: '0', is_published: false,
 });
 
@@ -77,7 +82,12 @@ export default function WebsiteManager() {
     api.request<Partial<ProfileForm>>('/website/profile/', {}, false)
       .then((data) => {
         if (!active) return;
-        const loaded = { ...emptyProfile(), ...data, founded_year: data.founded_year ? String(data.founded_year) : '' };
+        const loaded = {
+          ...emptyProfile(),
+          ...data,
+          founded_year: data.founded_year ? String(data.founded_year) : '',
+          next_cohort_start: data.next_cohort_start || '',
+        };
         setProfile(loaded);
         setBaseline(JSON.stringify(loaded));
         setProfileLoaded(true);
@@ -94,9 +104,19 @@ export default function WebsiteManager() {
     event.preventDefault();
     setProfileBusy(true); setProfileError('');
     try {
-      const payload = { ...profile, founded_year: profile.founded_year ? Number(profile.founded_year) : null };
+      const { location, email, phone, linkedin_url, instagram_url, facebook_url, ...editable } = profile;
+      const payload = {
+        ...editable,
+        founded_year: profile.founded_year ? Number(profile.founded_year) : null,
+        next_cohort_start: profile.next_cohort_start || null,
+      };
       const saved = await api.request<Partial<ProfileForm>>('/website/profile/', { method: 'PATCH', body: JSON.stringify(payload) });
-      const merged = { ...profile, ...saved, founded_year: saved.founded_year ? String(saved.founded_year) : '' };
+      const merged = {
+        ...profile,
+        ...saved,
+        founded_year: saved.founded_year ? String(saved.founded_year) : '',
+        next_cohort_start: saved.next_cohort_start || '',
+      };
       setProfile(merged);
       setBaseline(JSON.stringify(merged));
       toast.push('Academy profile saved. The About page reads from it immediately.', 'success');
@@ -110,7 +130,7 @@ export default function WebsiteManager() {
     setPhoto(null);
     setMember({
       name: row.name, role_title: row.role_title, bio: row.bio, quote: row.quote, image_url: '',
-      linkedin_url: row.linkedin_url, instagram_url: row.instagram_url, website_url: row.website_url,
+      website_url: row.website_url,
       is_founder: row.is_founder, order: String(row.order), is_published: row.is_published,
     });
     setFormError('');
@@ -193,16 +213,18 @@ export default function WebsiteManager() {
                   <textarea className={controlClass} rows={4} value={profile.mission} onChange={(event) => set('mission', event.target.value)} />
                 </Field>
               </FormGrid>
-              <FormGrid columns={3}>
-                <Field label="Location"><TextInput value={profile.location} onChange={(event) => set('location', event.target.value)} maxLength={200} /></Field>
-                <Field label="Public email"><TextInput type="email" value={profile.email} onChange={(event) => set('email', event.target.value)} /></Field>
-                <Field label="Phone"><TextInput value={profile.phone} onChange={(event) => set('phone', event.target.value)} maxLength={40} /></Field>
+              <FormGrid>
+                <Field label="Next cohort starts" hint="The date on the homepage banner. Leave it empty to hide the banner.">
+                  <TextInput type="date" value={profile.next_cohort_start} onChange={(event) => set('next_cohort_start', event.target.value)} />
+                </Field>
+                <Field label="Website" optional>
+                  <TextInput type="url" placeholder="https://…" value={profile.website_url} onChange={(event) => set('website_url', event.target.value)} />
+                </Field>
               </FormGrid>
-              <FormGrid columns={3}>
-                <Field label="LinkedIn" optional><TextInput type="url" placeholder="https://…" value={profile.linkedin_url} onChange={(event) => set('linkedin_url', event.target.value)} /></Field>
-                <Field label="Instagram" optional><TextInput type="url" placeholder="https://…" value={profile.instagram_url} onChange={(event) => set('instagram_url', event.target.value)} /></Field>
-                <Field label="Facebook" optional><TextInput type="url" placeholder="https://…" value={profile.facebook_url} onChange={(event) => set('facebook_url', event.target.value)} /></Field>
-              </FormGrid>
+              <p className="mt-4 text-sm text-ink-500">
+                Contact details published on the site: {[profile.location, profile.email, profile.phone].filter(Boolean).join(' · ') || 'none set yet'}.
+                {' '}They are fixed, so this screen shows them but cannot change them.
+              </p>
             </>
           )}
         </form>
@@ -264,7 +286,7 @@ export default function WebsiteManager() {
         onClose={() => { setFormOpen(false); setEditing(null); }}
         footer={<>
           <Action disabled={busy} onClick={() => { setFormOpen(false); setEditing(null); }}>Cancel</Action>
-          <Action type="submit" form="team-member-form" intent="primary" loading={busy}>{editing ? 'Save profile' : 'Add profile'}</Action>
+          <Action type="submit" form="team-member-form" intent="primary" loading={busy}>{editing ? 'Save team profile' : 'Add profile'}</Action>
         </>}
       >
         <form id="team-member-form" onSubmit={(event) => void saveMember(event)}>
@@ -283,9 +305,10 @@ export default function WebsiteManager() {
             currentUrl={editing?.image}
             onFile={setPhoto}
           />
-          <Field label="Or a photo URL" optional>
+          <Field label="Or link a photo from another site" optional>
             <TextInput type="url" placeholder="https://…" value={member.image_url} onChange={(event) => setMemberField('image_url', event.target.value)} />
           </Field>
+          <p className="text-sm text-ink-500">An uploaded photo is shown in place of a linked one.</p>
           <FormGrid columns={1}>
             <Field label="Biography" hint="What visitors read under the name.">
               <textarea className={controlClass} rows={5} value={member.bio} onChange={(event) => setMemberField('bio', event.target.value)} />
@@ -294,15 +317,15 @@ export default function WebsiteManager() {
               <textarea className={controlClass} rows={2} value={member.quote} onChange={(event) => setMemberField('quote', event.target.value)} />
             </Field>
           </FormGrid>
-          <FormGrid columns={3}>
-            <Field label="LinkedIn" optional><TextInput type="url" placeholder="https://…" value={member.linkedin_url} onChange={(event) => setMemberField('linkedin_url', event.target.value)} /></Field>
-            <Field label="Instagram" optional><TextInput type="url" placeholder="https://…" value={member.instagram_url} onChange={(event) => setMemberField('instagram_url', event.target.value)} /></Field>
-            <Field label="Personal website" optional><TextInput type="url" placeholder="https://…" value={member.website_url} onChange={(event) => setMemberField('website_url', event.target.value)} /></Field>
-          </FormGrid>
           <FormGrid>
             <Field label="Position on the page" hint="Lower numbers appear first.">
               <TextInput type="number" min="0" value={member.order} onChange={(event) => setMemberField('order', event.target.value)} />
             </Field>
+            <Field label="Personal website" optional>
+              <TextInput type="url" placeholder="https://…" value={member.website_url} onChange={(event) => setMemberField('website_url', event.target.value)} />
+            </Field>
+          </FormGrid>
+          <FormGrid columns={1}>
             <div className="grid gap-3">
               <CheckRow label="Show in “Meet the founder”" checked={member.is_founder} onChange={(event) => setMemberField('is_founder', event.target.checked)} />
               <CheckRow label="Publish on the About page" hint="An unpublished profile stays hidden from visitors." checked={member.is_published} onChange={(event) => setMemberField('is_published', event.target.checked)} />

@@ -50,7 +50,7 @@ export default function RefundPage() {
         {
           heading: 'How to request a refund',
           body: [
-            'Email info@vaceup.ng from your registered address with the subject “Refund Request”, including your full name, course and payment reference. We acknowledge within 2 business days and decide within 5. Approved refunds are processed back to your original payment method within 10 business days of approval.',
+            'Email vaceupacademy@gmail.com from your registered address with the subject “Refund Request”, including your full name, course and payment reference. We acknowledge within 2 business days and decide within 5. Approved refunds are processed back to your original payment method within 10 business days of approval.',
           ],
         },
       ]}

@@ -40,7 +40,7 @@ urlpatterns = [
     path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
 
-if not settings.AWS_STORAGE_BUCKET_NAME:
+if not settings.OBJECT_STORAGE_CONFIGURED:
     # Local fallback: only public assets are exposed; private media stays on disk.
     urlpatterns += [
         re_path(

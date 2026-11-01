@@ -15,15 +15,15 @@ from apps.website.sanitize import sanitize_html
 
 
 def _image_url(obj, field):
-    if obj.image_url:
-        return obj.image_url
+    # An uploaded image is the deliberate, most recent choice, so it wins over
+    # a pasted URL that may still point at an old picture.
     image = getattr(obj, field, None)
-    if not image:
-        return ""
-    try:
-        return image.url
-    except ValueError:
-        return ""
+    if image:
+        try:
+            return image.url
+        except ValueError:
+            pass
+    return obj.image_url
 
 
 class AcademyProfileSerializer(serializers.ModelSerializer):
@@ -31,9 +31,11 @@ class AcademyProfileSerializer(serializers.ModelSerializer):
         model = AcademyProfile
         fields = (
             "id", "name", "tagline", "mission", "story", "location",
-            "founded_year", "email", "phone", "linkedin_url",
+            "founded_year", "next_cohort_start",
+            "email", "phone", "linkedin_url",
             "instagram_url", "facebook_url", "website_url",
         )
+        extra_kwargs = {"next_cohort_start": {"required": False, "allow_null": True}}
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):

@@ -38,6 +38,10 @@ export default function BlogPage() {
 
   const featured = BLOG_POSTS.find((p) => p.featured) ?? BLOG_POSTS[0];
   const rest = filtered.filter((p) => p.slug !== featured.slug);
+  // The featured card now sits under the filter bar, so a search that excludes
+  // it has to hide it too — otherwise the result list opens with an article the
+  // reader never asked for.
+  const featuredVisible = filtered.some((p) => p.slug === featured.slug);
 
   const initials = (name: string) =>
     name
@@ -62,6 +66,42 @@ export default function BlogPage() {
               Insights, stories, and guides for your tech journey. Written by our faculty and
               community.
             </p>
+          </div>
+        </section>
+
+        {/* Search & Filter — directly under the hero, so it is the first thing
+            a reader reaches and it sits above every article on the page. */}
+        <section className="border-b border-gray-100 bg-gray-50 py-8" aria-label="Search and filter articles">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 lg:flex-row">
+            <div className="flex-1">
+              <label htmlFor="blog-search" className="sr-only">
+                Search articles
+              </label>
+              <Input
+                id="blog-search"
+                placeholder="Search articles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                leftIcon={<LordIconComponent src={LordIcons.search} size={20} />}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
+                    selectedCategory === cat
+                      ? 'bg-navy-950 text-white shadow-md'
+                      : 'border border-gray-100 bg-white text-gray-700 hover:bg-gray-100'
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -121,79 +161,54 @@ export default function BlogPage() {
           </section>
         )}
 
-        {/* Search & Filter */}
-        <section className="border-b border-gray-100 bg-gray-50 py-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 lg:flex-row">
-            <div className="flex-1">
-              <Input
-                placeholder="Search articles..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                leftIcon={<LordIconComponent src={LordIcons.search} size={20} />}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={cn(
-                    'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
-                    selectedCategory === cat
-                      ? 'bg-navy-950 text-white shadow-md'
-                      : 'border border-gray-100 bg-white text-gray-700 hover:bg-gray-100'
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* Featured Article */}
-        <section className="py-12">
-          <div className="mx-auto max-w-7xl px-6">
-            <Link href={`/blog/${featured.slug}`} className="group block">
-              <article className="grid overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-shadow group-hover:shadow-xl lg:grid-cols-2">
-                <div className="relative aspect-video overflow-hidden lg:aspect-auto">
-                  <img
-                    src={featured.image}
-                    alt={featured.title}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="flex flex-col justify-center p-8 lg:p-12">
-                  <span className="mb-3 w-fit rounded-full bg-navy-50 px-3 py-1 text-xs font-bold text-navy-900">
-                    {featured.category}
-                  </span>
-                  <h2 className="text-2xl font-black leading-tight text-navy-950 sm:text-3xl">
-                    {featured.title}
-                  </h2>
-                  <p className="mt-4 line-clamp-3 text-gray-600">{featured.excerpt}</p>
-                  <div className="mt-6 flex items-center gap-3 text-sm text-gray-500">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-950 text-[10px] font-black text-gold-brand">
-                      {initials(featured.author)}
-                    </span>
-                    <span className="font-bold text-navy-900">{featured.author}</span>
-                    <span aria-hidden="true">•</span>
-                    <span>{formatDate(featured.date)}</span>
-                    <span aria-hidden="true">•</span>
-                    <span>{featured.readTime}</span>
-                  </div>
-                  <span className="mt-6 inline-flex items-center gap-2 font-bold text-navy-900 group-hover:text-gold-brand">
-                    Read the guide
-                    <i
-                      className="bi bi-arrow-right transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
+        {featuredVisible && (
+          <section className="py-12">
+            <div className="mx-auto max-w-7xl px-6">
+              <Link href={`/blog/${featured.slug}`} className="group block">
+                <article className="grid overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-shadow group-hover:shadow-xl lg:grid-cols-2">
+                  <div className="relative aspect-video overflow-hidden lg:aspect-auto">
+                    <img
+                      src={featured.image}
+                      alt={featured.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                  </span>
-                </div>
-              </article>
-            </Link>
-          </div>
-        </section>
+                  </div>
+                  <div className="flex flex-col justify-center p-8 lg:p-12">
+                    <span className="mb-3 w-fit rounded-full bg-navy-50 px-3 py-1 text-xs font-bold text-navy-900">
+                      {featured.category}
+                    </span>
+                    <h2 className="text-2xl font-black leading-tight text-navy-950 sm:text-3xl">
+                      {featured.title}
+                    </h2>
+                    <p className="mt-4 line-clamp-3 text-gray-600">{featured.excerpt}</p>
+                    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-950 text-[10px] font-black text-gold-brand">
+                          {initials(featured.author)}
+                        </span>
+                        <span className="font-bold text-navy-900">{featured.author}</span>
+                      </span>
+                      <span aria-hidden="true">•</span>
+                      <span className="flex items-center gap-3">
+                        <span>{formatDate(featured.date)}</span>
+                        <span aria-hidden="true">•</span>
+                        <span>{featured.readTime}</span>
+                      </span>
+                    </div>
+                    <span className="mt-6 inline-flex items-center gap-2 font-bold text-navy-900 group-hover:text-gold-brand">
+                      Read the guide
+                      <i
+                        className="bi bi-arrow-right transition-transform group-hover:translate-x-1"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </div>
+                </article>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* All Articles */}
         <section className="border-t border-gray-100 bg-gray-50 py-12">

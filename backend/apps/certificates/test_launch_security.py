@@ -126,7 +126,11 @@ class CertificateLaunchTests(APITestCase):
     def test_html_endpoint_redirects_to_branded_frontend(self):
         response = self.client.get("/api/v1/verify/ABC123/page/")
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/verify?code=ABC123", response["Location"])
+        # The site is a static export served with a trailing slash; the
+        # redirectless form would cost the visitor a hop.
+        self.assertIn("/verify/?code=ABC123", response["Location"])
+        self.assertTrue(response["Location"].startswith("https://"),
+                        "An emailed or redirected link must be absolute.")
 
     def test_admin_sets_management_signature_and_award_uses_it(self):
         buffer = BytesIO()

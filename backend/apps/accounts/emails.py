@@ -5,6 +5,8 @@ transaction.on_commit so a rolled-back registration never emails a link.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
@@ -12,8 +14,17 @@ from apps.accounts import mail_delivery
 
 
 def _frontend(path: str) -> str:
-    base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
-    return f"{base}{path}"
+    """Absolute link for the static-export frontend.
+
+    The site is exported with a trailing slash, so a path without one costs
+    the reader a redirect hop — and the base is repaired in settings if the
+    environment points it somewhere that cannot serve these pages.
+    """
+    base = settings.FRONTEND_LINK_BASE.rstrip("/")
+    path, sep, query = path.partition("?")
+    if not path.endswith("/"):
+        path += "/"
+    return f"{base}{path}{sep}{query}"
 
 
 def _brand_shell(title: str, body_html: str, cta_label: str | None = None, cta_url: str | None = None) -> str:
@@ -40,7 +51,7 @@ def _brand_shell(title: str, body_html: str, cta_label: str | None = None, cta_u
         <tr><td style="padding:24px 40px 34px;color:#8a93a3;font-size:12px;line-height:1.6;">
           VaceUp Digital Academy &middot; 669 Abeokuta Expressway, Ahmadiya Bus-stop, Ijaiye Ojokoro, Lagos<br/>
           <a href="https://vaceup.ng" style="color:#008B8B;">vaceup.ng</a> &middot;
-          <a href="mailto:info@vaceup.ng" style="color:#008B8B;">info@vaceup.ng</a> &middot; +234 814 579 8943
+          <a href="mailto:vaceupacademy@gmail.com" style="color:#008B8B;">vaceupacademy@gmail.com</a> &middot; +234 814 579 8943
         </td></tr>
       </table>
     </td></tr>
@@ -117,9 +128,10 @@ def send_welcome_email(*, email: str, full_name: str = "") -> None:
 
 def send_password_reset_email(*, email: str, token: str) -> None:
     link = _frontend(f"/reset-password?token={token}")
+    minutes = max(1, int(getattr(settings, "PASSWORD_RESET_TTL", timedelta(hours=1)).total_seconds() // 60))
     text = (
         "We received a request to reset your VaceUp password.\n\n"
-        f"Reset it here (valid for 1 hour):\n{link}\n\n"
+        f"Reset it here (valid for {minutes} minutes):\n{link}\n\n"
         "If you didn't request this, you can safely ignore this email — "
         "your password will not change."
     )
@@ -127,7 +139,7 @@ def send_password_reset_email(*, email: str, token: str) -> None:
         "Reset your password",
         '<p style="color:#3d4452;font-size:15px;line-height:1.7;margin:0;">'
         "We received a request to reset your VaceUp password. The link below "
-        "is valid for <b>1 hour</b>.</p>",
+        f"is valid for <b>{minutes} minutes</b>.</p>",
         "Choose a New Password",
         link,
     )

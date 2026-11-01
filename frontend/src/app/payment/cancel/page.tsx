@@ -30,7 +30,7 @@ export default function PaymentCancelPage() {
           </Link>
         </div>
         <p className="mt-6 text-xs text-gray-400">
-        Questions? Reach us at info@vaceup.ng or on WhatsApp.
+        Questions? Reach us at vaceupacademy@gmail.com or on WhatsApp.
         </p>
       </div>
     </div>

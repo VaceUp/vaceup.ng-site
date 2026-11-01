@@ -59,6 +59,6 @@ class LocalPublicStorage(FileSystemStorage):
 
 def public_media_storage():
     """Storage for assets that must be readable without signed URLs."""
-    if settings.AWS_STORAGE_BUCKET_NAME:
+    if settings.OBJECT_STORAGE_CONFIGURED:
         return PublicMediaStorage()
     return LocalPublicStorage()

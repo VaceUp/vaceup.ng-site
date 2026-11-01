@@ -59,8 +59,8 @@ export function LegalPage({
 
         <div className="mt-12 rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
           Questions about this policy? Contact us at{' '}
-          <a href="mailto:info@vaceup.ng" className="font-bold text-navy-900 hover:text-gold-700">
-            info@vaceup.ng
+          <a href="mailto:vaceupacademy@gmail.com" className="font-bold text-navy-900 hover:text-gold-700">
+            vaceupacademy@gmail.com
           </a>{' '}
           or through our{' '}
           <Link href="/contact" className="font-bold text-navy-900 hover:text-gold-700">

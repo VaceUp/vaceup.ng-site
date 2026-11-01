@@ -15,17 +15,19 @@ DATABASES = {
 
 # [ci-diag] temporary: print the code path that marks the transaction broken.
 import sys  # noqa: E402
+import traceback  # noqa: E402
 from django.db.backends.base.base import BaseDatabaseWrapper  # noqa: E402
 
-_original_set_rollback = BaseDatabaseWrapper.set_rollback
+
+def _needs_rollback_get(self):
+    return self.__dict__.get("_needs_rollback", False)
 
 
-def _traced_set_rollback(self, rollback, *args, **kwargs):
-    if rollback:
-        import traceback
-        print("[ci-diag] set_rollback(True) from:", file=sys.stderr, flush=True)
+def _needs_rollback_set(self, value):
+    if value and not self.__dict__.get("_needs_rollback", False):
+        print("[ci-diag] needs_rollback=True from:", file=sys.stderr, flush=True)
         traceback.print_stack(file=sys.stderr)
-    return _original_set_rollback(self, rollback, *args, **kwargs)
+    self.__dict__["_needs_rollback"] = value
 
 
-BaseDatabaseWrapper.set_rollback = _traced_set_rollback
+BaseDatabaseWrapper.needs_rollback = property(_needs_rollback_get, _needs_rollback_set)

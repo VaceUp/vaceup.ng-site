@@ -184,7 +184,7 @@ class AssessmentWorkflowTests(APITestCase):
                 for key in ['student', 'tutor', 'admin']:
                     self.as_user(key)
                     download = self.client.get(path)
-                    self.assertEqual(download.status_code, 200)
+                    self.assertEqual(download.status_code, 200, getattr(download, "content", b""))
                     self.assertEqual(b''.join(download.streaming_content), b'Private learner work')
                     self.assertIn('no-store', download['Cache-Control'])
                     download.close()

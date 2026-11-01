@@ -4,6 +4,7 @@ Uses InnoDB row locks, not a cache read/modify/write race. Failure is closed:
 database failures do not disable throttling. Fixed windows can allow a burst
 at a boundary; edge-level request limits remain complementary protection.
 """
+import sys
 from datetime import timedelta
 from time import sleep
 
@@ -69,10 +70,20 @@ class DatabaseLimitMixin:
                 return self._consume(key)
             except OperationalError as exc:
                 exhausted = attempt == LOCK_RETRY_ATTEMPTS - 1
+                print(  # [ci-diag] temporary
+                    f"[ci-diag] operational in_atomic={caller_transaction} attempt={attempt} "
+                    f"type={type(exc).__name__} args={exc.args!r} cause={exc.__cause__!r}",
+                    file=sys.stderr, flush=True,
+                )
                 if not is_transient_lock_error(exc) or caller_transaction or exhausted:
                     raise RateLimitUnavailable() from exc
                 sleep(0.01 * (2 ** attempt))
             except DatabaseError as exc:
+                print(  # [ci-diag] temporary
+                    f"[ci-diag] database in_atomic={caller_transaction} "
+                    f"type={type(exc).__name__} args={exc.args!r} cause={exc.__cause__!r}",
+                    file=sys.stderr, flush=True,
+                )
                 raise RateLimitUnavailable() from exc
 
     def _consume(self, key):

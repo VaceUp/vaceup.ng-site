@@ -1,39 +1,49 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import EventDetail from '@/components/events/EventDetail';
+import RegisterButton from '@/components/events/RegisterButton';
 import { cn } from '@/lib/utils';
+import { downloadEventIcs } from '@/lib/calendar';
 import { SITE } from '@/lib/site-config';
-import { useAuth } from '@/lib/auth-context';
-import {
-  formatEventWindow,
-  getPublishedEvents,
-  registerForEvent,
-  type WebsiteEvent,
-} from '@/lib/website-api';
-
-type RsvpForm = { name: string; email: string; phone: string; note: string };
-
-const icsStamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+import { formatEventWindow, getPublishedEvents, type WebsiteEvent } from '@/lib/website-api';
 
 export default function EventsPage() {
-  const { user } = useAuth();
+  return (
+    // The detail view reads ?slug=, and a static export has no server render to
+    // fall back on, so the boundary is what keeps this page prerenderable.
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-5xl px-6 py-16">
+          <p role="status" className="text-sm text-gray-500">Loading events…</p>
+          <div className="mt-6 aspect-[16/9] w-full animate-pulse rounded-3xl bg-gray-100" />
+        </div>
+      }
+    >
+      <EventsRoute />
+    </Suspense>
+  );
+}
+
+function EventsRoute() {
+  const slug = useSearchParams().get('slug')?.trim() || '';
+  if (slug) return <EventDetail slug={slug} />;
+  return <EventsList />;
+}
+
+function EventsList() {
   const [upcoming, setUpcoming] = useState<WebsiteEvent[]>([]);
   const [past, setPast] = useState<WebsiteEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const [rsvpFor, setRsvpFor] = useState<WebsiteEvent | null>(null);
-  const [form, setForm] = useState<RsvpForm>({ name: '', email: '', phone: '', note: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [done, setDone] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -63,104 +73,9 @@ export default function EventsPage() {
   const featured = filteredUpcoming.find((event) => event.is_featured) || filteredUpcoming[0];
   const rest = featured ? filteredUpcoming.filter((event) => event.id !== featured.id) : [];
 
-  const openRsvp = (event: WebsiteEvent) => {
-    setRsvpFor(event);
-    setFormError('');
-    setDone('');
-    setForm({ name: user?.full_name || '', email: user?.email || '', phone: user?.phone_number || '', note: '' });
-  };
-
-  const submitRsvp = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!rsvpFor || submitting) return;
-    setSubmitting(true);
-    setFormError('');
-    try {
-      const result = await registerForEvent(rsvpFor.slug, {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        note: form.note.trim(),
-      });
-      setDone(result.detail);
-      setUpcoming((rows) =>
-        rows.map((row) =>
-          row.id === rsvpFor.id ? { ...row, seats_taken: result.seats_taken, is_full: result.is_full } : row,
-        ),
-      );
-    } catch (requestError) {
-      setFormError(requestError instanceof Error ? requestError.message : 'Your registration could not be saved.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const addToCalendar = (event: WebsiteEvent) => {
-    const start = new Date(event.starts_at);
-    if (!Number.isFinite(start.getTime())) return;
-    const end = event.ends_at && Number.isFinite(new Date(event.ends_at).getTime())
-      ? new Date(event.ends_at)
-      : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-    const ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//VaceUp Digital Academy//EN',
-      'BEGIN:VEVENT',
-      `UID:${event.slug}@vaceup.ng`,
-      `DTSTAMP:${icsStamp(new Date().toISOString())}`,
-      `DTSTART:${icsStamp(event.starts_at)}`,
-      `DTEND:${icsStamp(end.toISOString())}`,
-      `SUMMARY:${event.title}`,
-      `DESCRIPTION:${(event.summary || event.description).replace(/\r?\n/g, ' ')}`,
-      `LOCATION:${(event.is_online ? 'Online' : event.location).replace(/,/g, '\\,')}`,
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ].join('\r\n');
-    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${event.slug}.ics`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const registerAction = (event: WebsiteEvent, block = 'w-full') => {
-    if (event.registration_url) {
-      return (
-        <a
-          href={event.registration_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gold-brand px-5 font-bold text-navy-950 hover:bg-gold-hover transition-colors',
-            block,
-          )}
-        >
-          Register
-        </a>
-      );
-    }
-    if (event.is_past) {
-      return (
-        <Button variant="outline" disabled className={block}>
-          Already held
-        </Button>
-      );
-    }
-    if (event.is_full) {
-      return (
-        <Button variant="outline" disabled className={block}>
-          Fully booked
-        </Button>
-      );
-    }
-    return (
-      <Button
-        onClick={() => openRsvp(event)}
-        className={cn('bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold', block)}
-      >
-        Register
-      </Button>
+  const syncSeats = (id: number, seatsTaken: number, isFull: boolean) => {
+    setUpcoming((rows) =>
+      rows.map((row) => (row.id === id ? { ...row, seats_taken: seatsTaken, is_full: isFull } : row)),
     );
   };
 
@@ -238,7 +153,9 @@ export default function EventsPage() {
                           <Badge variant="secondary" className="text-sm">{featured.event_type_label}</Badge>
                           <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine(featured)}</Badge>
                         </div>
-                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4">{featured.title}</h2>
+                        <Link href={`/events/?slug=${featured.slug}`} className="block">
+                          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4 hover:text-gold-brand transition-colors">{featured.title}</h2>
+                        </Link>
                         <p className="text-navy-100 text-lg mb-8 max-w-2xl">{featured.summary || featured.description}</p>
                         <div className="flex flex-wrap gap-6 text-navy-200 mb-8">
                           <div className="flex items-center gap-2">
@@ -257,10 +174,14 @@ export default function EventsPage() {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-4">
-                          {registerAction(featured, '')}
+                          <RegisterButton
+                            event={featured}
+                            block=""
+                            onRegistered={(taken, full) => syncSeats(featured.id, taken, full)}
+                          />
                           <Button
                             variant="outline"
-                            onClick={() => addToCalendar(featured)}
+                            onClick={() => downloadEventIcs(featured)}
                             className="border-white/30 text-white hover:bg-white/10"
                           >
                             Add to Calendar
@@ -342,7 +263,11 @@ export default function EventsPage() {
                           </div>
                         </div>
                         <CardContent className="p-6">
-                          <h3 className="font-bold text-navy-950 mb-2 line-clamp-2">{event.title}</h3>
+                          <h3 className="font-bold text-navy-950 mb-2 line-clamp-2">
+                            <Link href={`/events/?slug=${event.slug}`} className="hover:text-gold-brand transition-colors">
+                              {event.title}
+                            </Link>
+                          </h3>
                           <p className="text-gray-600 mb-4 line-clamp-2">{event.summary || event.description}</p>
                           <div className="space-y-2 text-sm text-navy-700">
                             <div className="flex items-center gap-2">
@@ -356,7 +281,11 @@ export default function EventsPage() {
                           </div>
                           <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between gap-3">
                             <span className="font-medium text-navy-900 text-sm">{seatLine(event)}</span>
-                            {registerAction(event, '')}
+                            <RegisterButton
+                              event={event}
+                              block=""
+                              onRegistered={(taken, full) => syncSeats(event.id, taken, full)}
+                            />
                           </div>
                         </CardContent>
                       </Card>
@@ -378,7 +307,11 @@ export default function EventsPage() {
                                 </Badge>
                                 <Badge className="bg-gold-brand text-navy-950 text-xs">{seatLine(event)}</Badge>
                               </div>
-                              <h3 className="font-bold text-navy-950 mb-2">{event.title}</h3>
+                              <h3 className="font-bold text-navy-950 mb-2">
+                                <Link href={`/events/?slug=${event.slug}`} className="hover:text-gold-brand transition-colors">
+                                  {event.title}
+                                </Link>
+                              </h3>
                               <p className="text-gray-600 mb-4 line-clamp-2">{event.summary || event.description}</p>
                               <div className="flex flex-wrap gap-6 text-sm text-navy-700">
                                 <div className="flex items-center gap-2">
@@ -391,7 +324,12 @@ export default function EventsPage() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex-shrink-0 md:w-48">{registerAction(event)}</div>
+                            <div className="flex-shrink-0 md:w-48">
+                              <RegisterButton
+                                event={event}
+                                onRegistered={(taken, full) => syncSeats(event.id, taken, full)}
+                              />
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -419,7 +357,11 @@ export default function EventsPage() {
                   <Card key={event.id} className="bg-navy-900/50 border-navy-800 h-full">
                     <CardContent className="p-8">
                       <Badge variant="secondary" className="text-xs mb-4">{event.event_type_label}</Badge>
-                      <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{event.title}</h3>
+                      <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">
+                        <Link href={`/events/?slug=${event.slug}`} className="hover:text-gold-brand transition-colors">
+                          {event.title}
+                        </Link>
+                      </h3>
                       <p className="text-navy-200 text-sm mb-4 line-clamp-2">{event.summary || event.description}</p>
                       <div className="flex items-center gap-2 text-navy-300 text-sm">
                         <LordIconComponent src={LordIcons.calendar} size={16} />
@@ -434,69 +376,6 @@ export default function EventsPage() {
           </section>
         )}
       </main>
-
-      <Modal isOpen={!!rsvpFor} onClose={() => setRsvpFor(null)} title="Reserve your seat" size="sm">
-        {rsvpFor && (
-          done ? (
-            <div className="space-y-6">
-              <p role="status" className="rounded-xl bg-green-50 p-4 text-sm font-semibold text-green-800">{done}</p>
-              <p className="text-sm text-gray-600">{rsvpFor.title} — {formatEventWindow(rsvpFor)}</p>
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => addToCalendar(rsvpFor)} variant="outline">Add to calendar</Button>
-                <Button onClick={() => setRsvpFor(null)} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
-                  Done
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={submitRsvp} className="space-y-4">
-              <p className="text-sm text-gray-600">{formatEventWindow(rsvpFor)}</p>
-              <Input
-                label="Full name"
-                required
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                autoComplete="name"
-              />
-              <Input
-                label="Email"
-                type="email"
-                required
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-                autoComplete="email"
-              />
-              <Input
-                label="Phone (optional)"
-                type="tel"
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                autoComplete="tel"
-              />
-              <div>
-                <label htmlFor="event-note" className="block text-sm font-semibold text-navy-900 mb-2">
-                  Anything we should know? (optional)
-                </label>
-                <textarea
-                  id="event-note"
-                  rows={3}
-                  value={form.note}
-                  onChange={(event) => setForm({ ...form, note: event.target.value })}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900 transition-colors resize-y"
-                />
-              </div>
-              {formError && <p role="alert" className="text-sm font-semibold text-red-700">{formError}</p>}
-              <Button
-                type="submit"
-                loading={submitting}
-                className="w-full bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold"
-              >
-                Confirm registration
-              </Button>
-            </form>
-          )
-        )}
-      </Modal>
     </div>
   );
 }

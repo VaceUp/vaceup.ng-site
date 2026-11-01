@@ -27,6 +27,7 @@ LOCAL_SETTINGS = {
     "EMAIL_HOST_USER": "", "EMAIL_HOST_PASSWORD": "",
     "EMAIL_USE_TLS": False, "EMAIL_USE_SSL": False, "EMAIL_TIMEOUT": 5,
     "DEFAULT_FROM_EMAIL": "VaceUp <no-reply@example.org>",
+    "SERVER_EMAIL": "VaceUp <no-reply@example.org>",
     "FRONTEND_BASE_URL": "https://vaceup.ng", "ACCOUNT_EMAIL_DELIVERY_MODE": "database",
 }
 
@@ -128,6 +129,15 @@ class DeliveryDiagnosticTests(SimpleTestCase):
         smtp.assert_not_called()
         prompt.assert_not_called()
         self.assertIn("Local relay selected", output.getvalue())
+        self.assertIn("Mail leaves as the domain example.org", output.getvalue())
+        self.assertNotIn("no-reply@", output.getvalue())
+
+    @override_settings(SERVER_EMAIL="VaceUp Alerts <alerts@other-domain.example>")
+    def test_a_different_error_sender_domain_is_reported(self):
+        output = StringIO()
+        with patch("smtplib.SMTP"):
+            call_command("diagnose_email_delivery", stdout=output)
+        self.assertIn("SERVER_EMAIL uses a different domain", output.getvalue())
 
     def test_smtp_diagnostic_connects_but_never_sends(self):
         output = StringIO()

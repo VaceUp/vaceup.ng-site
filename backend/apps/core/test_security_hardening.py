@@ -1,10 +1,12 @@
 """Regression tests for the 2026-10-31 hardening pass."""
 from io import BytesIO
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from PIL import Image
 from rest_framework.test import APITestCase
 
@@ -18,6 +20,7 @@ from apps.core.middleware import (
 )
 from apps.courses.models import Category, Course
 from apps.payments.views import paystack_webhook
+from config.settings import _admin_url
 
 User = get_user_model()
 
@@ -127,3 +130,25 @@ class AccountTokenTests(APITestCase):
 class WebhookThrottleTests(TestCase):
     def test_the_webhook_uses_its_own_rate_limit_scope(self):
         self.assertEqual(paystack_webhook.throttle_scope, "payment_webhook")
+
+
+class StaffLoginRouteTests(TestCase):
+    """The configurable admin path shipped with a leading slash.
+
+    path() only ever matches a route without one, so the whole Django admin
+    404ed while every API route kept answering — the failure was invisible from
+    the app itself.
+    """
+
+    def test_the_default_path_mounts_the_admin_where_the_browser_is_sent(self):
+        self.assertEqual(settings.ADMIN_URL, "admin/")
+        # A leading slash in the route made reverse hand out a percent-encoded
+        # path and left every real request unmatched.
+        self.assertEqual(reverse("admin:index"), "/admin/")
+        self.assertEqual(self.client.get("/admin/").status_code, 302)
+
+    def test_a_slashed_or_blank_env_value_still_reaches_the_admin(self):
+        for raw in ("/secret-door/", " secret-door ", "secret-door/"):
+            with self.subTest(raw=raw):
+                self.assertEqual(_admin_url(raw), "secret-door/")
+        self.assertEqual(_admin_url(""), "admin/")

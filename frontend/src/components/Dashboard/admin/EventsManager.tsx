@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from 'react';
 import { api } from '@/lib/api';
+import { downloadApiFile } from '@/lib/api-pages';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
 import { failureMessage } from '@/lib/course-management';
 import { formatWorkspaceDate, type WorkspacePage } from '@/lib/workspace-api';
@@ -19,7 +20,10 @@ interface EventRow {
   is_published: boolean; seats_taken: number; registrations_count?: number;
 }
 
-interface Registration { id: number; name: string; email: string; phone: string; note: string; created_at: string; }
+interface Registration {
+  id: number; name: string; email: string; phone: string; note: string;
+  consent_marketing: boolean; created_at: string;
+}
 
 const EVENT_TYPES = [
   { value: 'open_day', label: 'Open Day' },
@@ -71,6 +75,7 @@ export default function EventsManager() {
   const [confirm, setConfirm] = useState<EventRow | null>(null);
   const [roster, setRoster] = useState<{ event: EventRow; rows: Registration[] } | null>(null);
   const [rosterBusy, setRosterBusy] = useState(false);
+  const [rosterDrop, setRosterDrop] = useState<Registration | null>(null);
 
   const rows = useMemo(() => resource.data?.results ?? [], [resource.data]);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -142,6 +147,29 @@ export default function EventsManager() {
     try {
       const result = await api.request<{ count: number; results: Registration[] }>(`/website/events/${row.slug}/registrations/`);
       setRoster({ event: row, rows: result.results });
+    } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
+  };
+
+  const exportRoster = async () => {
+    if (!roster) return;
+    setRosterBusy(true);
+    try {
+      await downloadApiFile(
+        `/website/events/${roster.event.slug}/registrations/export/`,
+        `${roster.event.slug}-registrations.csv`,
+      );
+    } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
+  };
+
+  const dropRegistration = async () => {
+    if (!roster || !rosterDrop) return;
+    setRosterBusy(true);
+    try {
+      await api.request(`/website/events/${roster.event.slug}/registrations/${rosterDrop.id}/`, { method: 'DELETE' });
+      setRoster({ ...roster, rows: roster.rows.filter((row) => row.id !== rosterDrop.id) });
+      toast.push(`${rosterDrop.name} was removed and their seat is free again.`, 'success');
+      setRosterDrop(null);
+      resource.refresh();
     } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
   };
 
@@ -324,7 +352,11 @@ export default function EventsManager() {
         open={!!roster}
         title={roster ? `Registrations: ${roster.event.title}` : 'Registrations'}
         description={roster ? `${roster.rows.length} ${roster.rows.length === 1 ? 'person' : 'people'}${roster.event.capacity === null ? '' : ` of ${roster.event.capacity} seats`} · ${whenOf(roster.event)}` : undefined}
-        onClose={() => setRoster(null)}
+        onClose={() => { setRoster(null); setRosterDrop(null); }}
+        footer={roster?.rows.length ? <>
+          <Action onClick={() => setRoster(null)}>Close</Action>
+          <Action intent="primary" loading={rosterBusy} onClick={() => void exportRoster()}>Export CSV</Action>
+        </> : undefined}
       >
         {roster && (roster.rows.length
           ? <AdminList label="Event registrations">
@@ -334,11 +366,21 @@ export default function EventsManager() {
                 placeholder="bi-person"
                 round
                 title={row.name}
+                badges={<>{row.consent_marketing && <Pill tone="muted">Open to event emails</Pill>}</>}
                 meta={<>
                   <a href={`mailto:${row.email}`} className="underline">{row.email}</a>
                   {row.phone ? ` · ${row.phone}` : ''} · signed up {formatWorkspaceDate(row.created_at, true)}
                 </>}
                 description={row.note}
+                actions={<>
+                  <Action
+                    intent="danger"
+                    disabled={rosterBusy}
+                    onClick={() => setRosterDrop(row)}
+                  >
+                    Remove
+                  </Action>
+                </>}
               />
             ))}
           </AdminList>
@@ -348,6 +390,15 @@ export default function EventsManager() {
             description="Registrations land here as soon as visitors sign up on the public Events page."
           />)}
       </Drawer>
+
+      {roster && rosterDrop && <ConfirmDelete
+        title="Remove registration"
+        description={`${rosterDrop.name} (${rosterDrop.email}) will be deleted from “${roster.event.title}” and one seat will be released.`}
+        error=""
+        busy={rosterBusy}
+        onCancel={() => setRosterDrop(null)}
+        onConfirm={() => void dropRegistration()}
+      />}
 
       {confirm && <ConfirmDelete
         title="Delete event"

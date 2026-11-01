@@ -165,6 +165,10 @@ class EventRegistration(TimeStampedModel):
     email = models.EmailField()
     phone = models.CharField(max_length=40, blank=True)
     note = models.TextField(blank=True)
+    consent_marketing = models.BooleanField(
+        default=False,
+        help_text="The visitor agreed to be emailed about future events.",
+    )
 
     class Meta:
         ordering = ("-created_at",)

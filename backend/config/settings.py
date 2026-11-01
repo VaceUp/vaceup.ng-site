@@ -8,7 +8,7 @@ present. Secrets are read from the environment (12-factor).
 from datetime import timedelta
 from pathlib import Path
 import ssl
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -208,6 +208,10 @@ ACCOUNT_EMAIL_DELIVERY_MODE = env(
 ).strip().lower()
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
+# Django's own error mail defaults to root@localhost, which a cPanel/TrueHost
+# relay rejects as an unauthorized sender. Account mail and server mail must
+# come from the same address the host authorizes.
+SERVER_EMAIL = env("SERVER_EMAIL", default="").strip() or DEFAULT_FROM_EMAIL
 # Base URL of the frontend that renders the emailed verify/reset links.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="https://vaceup.ng")
 MARKETING_PUBLIC_API_URL = env("MARKETING_PUBLIC_API_URL", default="https://api.vaceup.ng")
@@ -276,6 +280,9 @@ AWS_S3_ENDPOINT_URL = _endpoint_url(_AWS_S3_ENDPOINT_RAW) or None
 # Reported by apps.core.checks: a value that was set but unusable must not be
 # dropped in silence, or the operator keeps a bucket they are never using.
 AWS_S3_ENDPOINT_REJECTED = bool(_AWS_S3_ENDPOINT_RAW.strip()) and AWS_S3_ENDPOINT_URL is None
+# Delivery hostname for PUBLIC objects only (R2: media.vaceup.ng). Private
+# media ignores it — see config/storages.PrivateMediaStorage.
+AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="").strip() or None
 
 # A bucket name on its own is not a usable object store: without the access
 # keys every write becomes an anonymous S3 request that fails, and image
@@ -283,6 +290,48 @@ AWS_S3_ENDPOINT_REJECTED = bool(_AWS_S3_ENDPOINT_RAW.strip()) and AWS_S3_ENDPOIN
 # when the bucket AND both keys are present; anything else is local disk.
 OBJECT_STORAGE_CONFIGURED = bool(
     AWS_STORAGE_BUCKET_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+)
+
+# --- Public images: Cloudinary (optional, highest priority) ------------------
+# CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name> is the form
+# Cloudinary itself hands out; the three explicit variables are equivalent.
+# Credentials win over the URL when both are present.
+CLOUDINARY_URL = env("CLOUDINARY_URL", default="").strip()
+CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME", default="").strip()
+CLOUDINARY_API_KEY = env("CLOUDINARY_API_KEY", default="").strip()
+CLOUDINARY_API_SECRET = env("CLOUDINARY_API_SECRET", default="").strip()
+
+
+def _cloudinary_from_url(value):
+    """api_key, api_secret, cloud_name — or blanks when the URL is not usable.
+
+    A line pasted with its trailing note keeps the note, so a URL holding a
+    space is reported rather than guessed at, and a cloud name ending in
+    "  # from the dashboard" is never sent to the API.
+    """
+    if not value.startswith("cloudinary://"):
+        return ("", "", "", bool(value))
+    if any(character.isspace() for character in value):
+        return ("", "", "", True)
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return ("", "", "", True)
+    if not (parsed.username and parsed.password and parsed.hostname):
+        return ("", "", "", True)
+    return unquote(parsed.username), unquote(parsed.password), parsed.hostname, False
+
+
+_CLOUD_KEY, _CLOUD_SECRET, _CLOUD_NAME, CLOUDINARY_URL_REJECTED = _cloudinary_from_url(CLOUDINARY_URL)
+CLOUDINARY_API_KEY = CLOUDINARY_API_KEY or _CLOUD_KEY
+CLOUDINARY_API_SECRET = CLOUDINARY_API_SECRET or _CLOUD_SECRET
+CLOUDINARY_CLOUD_NAME = CLOUDINARY_CLOUD_NAME or _CLOUD_NAME
+# Prefix inside the account, so the bucket and Cloudinary keep the same layout.
+CLOUDINARY_FOLDER = env("CLOUDINARY_FOLDER", default="vaceup").strip().strip("/")
+# Optional own hostname (e.g. res.cloudinary.com replaced by a CNAME you own).
+CLOUDINARY_SECURE_DISTRIBUTION = env("CLOUDINARY_SECURE_DISTRIBUTION", default="").strip()
+CLOUDINARY_CONFIGURED = bool(
+    CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET
 )
 
 MEDIA_ROOT = BASE_DIR / "media"
@@ -473,7 +522,17 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default
 
 # --- Django admin --------------------------------------------------------
 # The staff login lives on a path the operator can change in .env.
-ADMIN_URL = "/" + env("ADMIN_URL", default="admin/").strip("/") + "/"
+def _admin_url(raw):
+    """A route for django.urls.path never carries a leading slash.
+
+    One that does can never match, so a value pasted as "/secret-door/" is
+    repaired here rather than shipping an admin that 404s at every address —
+    and a blank line keeps the default instead of mounting it at the site root.
+    """
+    return (str(raw).strip().strip("/") or "admin") + "/"
+
+
+ADMIN_URL = _admin_url(env("ADMIN_URL", default="admin"))
 
 # --- URLs ---
 ROOT_URLCONF = "config.urls"

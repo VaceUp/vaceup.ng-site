@@ -97,7 +97,7 @@ class EventAdminSerializer(EventPublicSerializer):
 class EventRegistrationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventRegistration
-        fields = ("name", "email", "phone", "note")
+        fields = ("name", "email", "phone", "note", "consent_marketing")
 
     def validate_email(self, value):
         return value.strip().lower()
@@ -108,11 +108,20 @@ class EventRegistrationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Enter your full name.")
         return value
 
+    def validate_note(self, value):
+        value = value.strip()
+        if len(value) > 1000:
+            raise serializers.ValidationError("Keep this under 1,000 characters.")
+        return value
+
 
 class EventRegistrationAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventRegistration
-        fields = ("id", "name", "email", "phone", "note", "created_at")
+        fields = (
+            "id", "name", "email", "phone", "note", "consent_marketing",
+            "created_at",
+        )
 
 
 class BlogPostListSerializer(serializers.ModelSerializer):

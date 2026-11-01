@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -118,6 +119,116 @@ class WebsiteApiTests(TestCase):
         response = self.client.get(f"/api/v1/website/events/{event.slug}/registrations/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
+
+    def test_rsvp_emails_a_confirmation(self):
+        event = self._event(title="Open Day", is_online=True,
+                            meeting_url="https://meet.google.com/abc-defg-hij")
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/v1/website/events/{event.slug}/register/",
+                {"name": "Ada Obi", "email": "ada@example.com", "consent_marketing": True},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertEqual(mail.outbox[0].to, ["ada@example.com"])
+        self.assertIn("Open Day", mail.outbox[0].subject)
+        self.assertIn("https://meet.google.com/abc-defg-hij", body)
+        self.assertIn("hear about our future events", body)
+        self.assertIn(f"/events/?slug={event.slug}", body)
+
+    def test_in_person_confirmation_names_the_venue_once(self):
+        event = self._event(location="669 Abeokuta Expressway")
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                f"/api/v1/website/events/{event.slug}/register/",
+                {"name": "Ada", "email": "ada@example.com"}, format="json",
+            )
+        self.assertEqual(mail.outbox[0].body.count("669 Abeokuta Expressway"), 1)
+
+    def test_rsvp_confirmation_survives_a_mail_outage(self):
+        event = self._event()
+        with patch("apps.website.emails.send_account_message",
+                   side_effect=RuntimeError("smtp down")):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    f"/api/v1/website/events/{event.slug}/register/",
+                    {"name": "Ada", "email": "ada@example.com"}, format="json",
+                )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(EventRegistration.objects.count(), 1)
+
+    def test_online_event_without_a_link_promises_one_later(self):
+        event = self._event(is_online=True)
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                f"/api/v1/website/events/{event.slug}/register/",
+                {"name": "Ada", "email": "ada@example.com"}, format="json",
+            )
+        self.assertIn("joining link before the event", mail.outbox[0].body)
+        self.assertIn("only email you about this event", mail.outbox[0].body)
+
+    def test_rsvp_rejects_an_overlong_note(self):
+        event = self._event()
+        response = self.client.post(
+            f"/api/v1/website/events/{event.slug}/register/",
+            {"name": "Ada", "email": "ada@example.com", "note": "x" * 1200},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_registrations_export_is_admin_only_and_formula_safe(self):
+        event = self._event()
+        EventRegistration.objects.create(
+            event=event, name="=HYLINK()", email="ada@example.com",
+            phone="+2348140000000", consent_marketing=True,
+        )
+        url = f"/api/v1/website/events/{event.slug}/registrations/export/"
+        self.assertEqual(self.client.get(url).status_code, 401)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response["Content-Type"])
+        self.assertIn("attachment", response["Content-Disposition"])
+        body = response.content.decode("utf-8-sig")
+        self.assertIn("'=HYLINK()", body)
+        self.assertIn("ada@example.com", body)
+        self.assertIn("yes", body)
+
+    def test_admin_can_remove_a_registration_and_frees_the_seat(self):
+        event = self._event(capacity=1)
+        self.client.post(
+            f"/api/v1/website/events/{event.slug}/register/",
+            {"name": "Ada", "email": "ada@example.com"}, format="json",
+        )
+        blocked = self.client.post(
+            f"/api/v1/website/events/{event.slug}/register/",
+            {"name": "Bola", "email": "bola@example.com"}, format="json",
+        )
+        self.assertEqual(blocked.status_code, 400)
+
+        registration = EventRegistration.objects.get(email="ada@example.com")
+        url = f"/api/v1/website/events/{event.slug}/registrations/{registration.pk}/"
+        self.assertEqual(self.client.delete(url).status_code, 401)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.delete(url).status_code, 403)
+
+        self.client.force_authenticate(self.admin)
+        removed = self.client.delete(url)
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(removed.data["seats_taken"], 0)
+        again = self.client.post(
+            f"/api/v1/website/events/{event.slug}/register/",
+            {"name": "Bola", "email": "bola@example.com"}, format="json",
+        )
+        self.assertEqual(again.status_code, 201)
 
     # --- profile and team ---
 

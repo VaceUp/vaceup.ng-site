@@ -1,4 +1,6 @@
 """Safe settings/SMTP checks: never print secrets, recipients or raw replies."""
+from email.utils import parseaddr
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage, get_connection
@@ -6,6 +8,11 @@ from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import validate_email
 
 from apps.accounts.mail_delivery import classify_delivery_failure, dispatch_configuration_errors, email_configuration_errors, send_account_message
+
+
+def _sender_domain(address):
+    """Domain part of a From header, for reporting which relay owns it."""
+    return parseaddr(address)[1].rpartition("@")[2].lower()
 
 
 class Command(BaseCommand):
@@ -24,6 +31,15 @@ class Command(BaseCommand):
         self.stdout.write("Email configuration checks passed. Inbox delivery is not yet proven.")
         if settings.EMAIL_BACKEND == "apps.accounts.local_smtp.EmailBackend":
             self.stdout.write("Local relay selected: loopback port 25 only; no SMTP authentication or TLS.")
+            # The relay hands mail to the hosting account, so a sender the
+            # account does not own is rejected before it ever leaves the box.
+            sender_domain = _sender_domain(settings.DEFAULT_FROM_EMAIL)
+            self.stdout.write(f"Mail leaves as the domain {sender_domain}.")
+            if sender_domain != _sender_domain(settings.SERVER_EMAIL):
+                self.stdout.write(
+                    "SERVER_EMAIL uses a different domain from DEFAULT_FROM_EMAIL, so server "
+                    "error mail may be rejected even though account mail is accepted."
+                )
         if options["send_test"]:
             try:
                 recipient = input("Send one test email to (an address you control): ").strip()

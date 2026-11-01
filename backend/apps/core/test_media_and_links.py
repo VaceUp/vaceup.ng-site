@@ -1,9 +1,11 @@
-"""Regression cover for the two configuration failures that broke live workflows.
+"""Regression cover for the configuration failures that broke live workflows.
 
 Image uploads died because a bucket name alone selected the S3 backend, and
 emailed links died because the frontend base could point somewhere that
-serves no pages. Both are decided at settings import, so the tests pin the
-decision functions rather than a machine's .env.
+serves no pages. Public-image destination is now Cloudinary, then the bucket,
+then disk, so the same kind of half-configuration is pinned here too. All of
+it is decided at settings import, so the tests pin the decision functions
+rather than a machine's .env.
 """
 from __future__ import annotations
 
@@ -16,8 +18,14 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
 from apps.accounts.emails import _frontend
-from config.settings import _endpoint_url, _frontend_link_base
-from config.storages import LocalPublicStorage, PublicMediaStorage, public_media_storage
+from config.settings import _cloudinary_from_url, _endpoint_url, _frontend_link_base
+from config.storages import (
+    CloudinaryStorage,
+    LocalPublicStorage,
+    PrivateMediaStorage,
+    PublicMediaStorage,
+    public_media_storage,
+)
 
 PNG_PIXEL = b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4"
@@ -60,13 +68,145 @@ class EmailedLinkTests(TestCase):
 
 
 class PublicMediaStorageSelectionTests(TestCase):
-    @override_settings(OBJECT_STORAGE_CONFIGURED=False)
+    @override_settings(CLOUDINARY_CONFIGURED=False, OBJECT_STORAGE_CONFIGURED=False)
     def test_partial_object_storage_configuration_keeps_media_on_disk(self):
         self.assertIsInstance(public_media_storage(), LocalPublicStorage)
 
-    @override_settings(OBJECT_STORAGE_CONFIGURED=True)
+    @override_settings(CLOUDINARY_CONFIGURED=False, OBJECT_STORAGE_CONFIGURED=True)
     def test_complete_object_storage_configuration_uses_the_bucket(self):
         self.assertIsInstance(public_media_storage(), PublicMediaStorage)
+
+    @override_settings(
+        CLOUDINARY_CONFIGURED=True, OBJECT_STORAGE_CONFIGURED=True,
+        CLOUDINARY_CLOUD_NAME="vaceup", CLOUDINARY_FOLDER="vaceup",
+    )
+    def test_cloudinary_takes_public_images_when_it_is_configured(self):
+        self.assertIsInstance(public_media_storage(), CloudinaryStorage)
+
+
+class CloudinaryUrlParsingTests(TestCase):
+    def test_the_dashboard_url_splits_into_credentials_and_cloud(self):
+        self.assertEqual(
+            _cloudinary_from_url("cloudinary://1234567890123:secretphrase@vaceup"),
+            ("1234567890123", "secretphrase", "vaceup", False),
+        )
+
+    def test_percent_encoding_in_a_secret_is_decoded(self):
+        key, secret, cloud, rejected = _cloudinary_from_url(
+            "cloudinary://key:a%2Fb@vaceup"
+        )
+        self.assertEqual((key, secret, cloud, rejected), ("key", "a/b", "vaceup", False))
+
+    def test_a_leftover_comment_is_reported_instead_of_used(self):
+        self.assertEqual(
+            _cloudinary_from_url("cloudinary://key:secret@vaceup  # from the dashboard"),
+            ("", "", "", True),
+        )
+        self.assertEqual(_cloudinary_from_url("https://example.org"), ("", "", "", True))
+        self.assertEqual(_cloudinary_from_url(""), ("", "", "", False))
+
+    def test_an_incomplete_url_is_reported(self):
+        self.assertEqual(_cloudinary_from_url("cloudinary://vaceup"), ("", "", "", True))
+
+
+class CloudinaryStorageLayoutTests(TestCase):
+    @override_settings(
+        CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
+        CLOUDINARY_API_KEY="key", CLOUDINARY_API_SECRET="secret",
+        CLOUDINARY_FOLDER="vaceup", CLOUDINARY_SECURE_DISTRIBUTION="",
+    )
+    def test_upload_to_paths_become_foldered_public_ids(self):
+        storage = CloudinaryStorage()
+        self.assertEqual(storage.public_id("course/thumbnails/cover.png"),
+                         "vaceup/course/thumbnails/cover.png")
+        url = storage.url("course/thumbnails/cover.png")
+        self.assertTrue(url.startswith("https://res.cloudinary.com/vaceup/image/upload/"), url)
+        self.assertIn("vaceup/course/thumbnails/cover.png", url)
+
+    @override_settings(
+        CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
+        CLOUDINARY_API_KEY="key", CLOUDINARY_API_SECRET="secret",
+        CLOUDINARY_FOLDER="", CLOUDINARY_SECURE_DISTRIBUTION="cdn.vaceup.ng",
+    )
+    def test_a_custom_distribution_and_no_folder_keep_the_key_untouched(self):
+        storage = CloudinaryStorage()
+        self.assertEqual(storage.public_id("website/team/ada.jpg"), "website/team/ada.jpg")
+        self.assertTrue(storage.url("website/team/ada.jpg").startswith("https://cdn.vaceup.ng/"))
+
+
+class PublicDeliveryDomainTests(TestCase):
+    """AWS_S3_CUSTOM_DOMAIN is documented in .env.example, so it must do something.
+
+    It belongs to public objects only: a pre-signed URL is signed for the host
+    it is opened against, so applying it to private media breaks every download.
+    """
+
+    BUCKET = {
+        "AWS_ACCESS_KEY_ID": "key", "AWS_SECRET_ACCESS_KEY": "secret",
+        "AWS_STORAGE_BUCKET_NAME": "vaceup-media", "AWS_S3_REGION_NAME": "auto",
+        "AWS_S3_ENDPOINT_URL": "https://123.r2.cloudflarestorage.com",
+        "AWS_S3_CUSTOM_DOMAIN": "media.vaceup.ng",
+    }
+
+    @override_settings(**BUCKET)
+    def test_public_images_are_served_from_the_custom_domain_unsigned(self):
+        url = PublicMediaStorage().url("course/thumbnails/cover.png")
+        self.assertEqual(url, "https://media.vaceup.ng/course/thumbnails/cover.png")
+
+    @override_settings(**BUCKET)
+    def test_the_domain_never_reaches_a_pre_signed_private_link(self):
+        self.assertIsNone(PrivateMediaStorage().custom_domain)
+
+
+class CloudinaryConfigCheckTests(TestCase):
+    def setUp(self):
+        self.media_root = Path(tempfile.mkdtemp(prefix="vaceup-media-"))
+        self.addCleanup(shutil.rmtree, self.media_root, True)
+
+    def _ids(self, **overrides):
+        from apps.core.checks import media_storage_check
+
+        base = {
+            "AWS_STORAGE_BUCKET_NAME": "", "OBJECT_STORAGE_CONFIGURED": False,
+            "AWS_S3_ENDPOINT_REJECTED": False, "MEDIA_ROOT": self.media_root,
+            "AWS_S3_CUSTOM_DOMAIN": None,
+            "CLOUDINARY_URL_REJECTED": False, "CLOUDINARY_CONFIGURED": True,
+            "CLOUDINARY_CLOUD_NAME": "vaceup", "CLOUDINARY_API_KEY": "key",
+            "CLOUDINARY_API_SECRET": "secret",
+        }
+        with override_settings(**{**base, **overrides}):
+            return [issue.id for issue in media_storage_check(None)]
+
+    def test_a_malformed_url_without_working_credentials_warns(self):
+        self.assertIn("core.W006", self._ids(CLOUDINARY_URL_REJECTED=True,
+                                             CLOUDINARY_CONFIGURED=False))
+
+    def test_partial_credentials_warn(self):
+        self.assertIn("core.W007", self._ids(
+            CLOUDINARY_CONFIGURED=False, CLOUDINARY_API_SECRET="",
+        ))
+
+    def test_a_complete_configuration_is_silent(self):
+        self.assertNotIn("core.W006", self._ids())
+        self.assertNotIn("core.W007", self._ids())
+
+    def test_a_missing_package_is_reported_before_the_first_upload(self):
+        import sys
+        from unittest import mock
+
+        with mock.patch.dict(sys.modules, {"cloudinary": None}):
+            self.assertIn("core.W008", self._ids())
+
+    def test_public_images_on_a_private_bucket_endpoint_are_reported(self):
+        on_bucket = {
+            "CLOUDINARY_CONFIGURED": False, "OBJECT_STORAGE_CONFIGURED": True,
+            "AWS_STORAGE_BUCKET_NAME": "vaceup-media",
+        }
+        self.assertIn("core.W009", self._ids(**on_bucket))
+        # A delivery hostname of its own, or Cloudinary, both fix it.
+        self.assertNotIn("core.W009", self._ids(**{**on_bucket,
+                                                  "AWS_S3_CUSTOM_DOMAIN": "media.vaceup.ng"}))
+        self.assertNotIn("core.W009", self._ids())
 
 
 class LocalImageUploadTests(TestCase):

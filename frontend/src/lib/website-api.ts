@@ -99,7 +99,10 @@ export async function getPublishedEvents(scope: 'upcoming' | 'past' | '') {
 
 export const getEvent = (slug: string) => publicGet<WebsiteEvent>(`/website/events/${encodeURIComponent(slug)}/`);
 
-export function registerForEvent(slug: string, values: { name: string; email: string; phone: string; note: string }) {
+export function registerForEvent(
+  slug: string,
+  values: { name: string; email: string; phone: string; note: string; consent_marketing: boolean },
+) {
   return api.request<{ detail: string; seats_taken: number; is_full: boolean }>(
     `/website/events/${encodeURIComponent(slug)}/register/`,
     { method: 'POST', body: JSON.stringify(values) },

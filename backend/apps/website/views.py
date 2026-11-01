@@ -2,6 +2,8 @@
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -10,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdmin, IsAdminOrReadOnly
+from apps.website.emails import send_rsvp_confirmation
 from apps.website.models import (
     AcademyProfile,
     BlogPost,
@@ -18,6 +21,7 @@ from apps.website.models import (
     EventRegistration,
     TeamMember,
 )
+from apps.website.roster import roster_csv
 from apps.website.serializers import (
     AcademyProfileSerializer,
     BloggerSourceSerializer,
@@ -121,7 +125,15 @@ class EventViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             with transaction.atomic():
-                EventRegistration.objects.create(
+                # Lock the event while the seats are counted, otherwise two
+                # sign-ups in the same instant can both take the last seat.
+                locked = Event.objects.select_for_update().get(pk=event.pk)
+                if locked.is_full:
+                    return Response(
+                        {"detail": "This event is fully booked."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                registration = EventRegistration.objects.create(
                     event=event,
                     user=request.user if request.user.is_authenticated else None,
                     **serializer.validated_data,
@@ -131,9 +143,12 @@ class EventViewSet(viewsets.ModelViewSet):
                 {"detail": "This email is already registered for the event."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        transaction.on_commit(
+            lambda: send_rsvp_confirmation(registration=registration)
+        )
         return Response(
             {
-                "detail": "You are registered. A confirmation will be sent before the event.",
+                "detail": "You are registered. A confirmation email is on its way.",
                 "seats_taken": event.seats_taken,
                 "is_full": event.is_full,
             },
@@ -151,6 +166,39 @@ class EventViewSet(viewsets.ModelViewSet):
                 "results": EventRegistrationAdminSerializer(
                     event.registrations.all(), many=True
                 ).data,
+            }
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        permission_classes=[IsAdmin],
+        url_path="registrations/export",
+    )
+    def export_registrations(self, request, slug=None):
+        event = self.get_object()
+        response = HttpResponse(
+            roster_csv(event), content_type="text/csv; charset=utf-8"
+        )
+        response["Content-Disposition"] = (
+            f'attachment; filename="{event.slug}-registrations.csv"'
+        )
+        return response
+
+    @action(
+        detail=True,
+        methods=["delete"],
+        permission_classes=[IsAdmin],
+        url_path="registrations/(?P<registration_id>[0-9]+)",
+    )
+    def delete_registration(self, request, slug=None, registration_id=None):
+        event = self.get_object()
+        registration = get_object_or_404(event.registrations, pk=registration_id)
+        registration.delete()
+        return Response(
+            {
+                "detail": f"{registration.name} was removed from the list.",
+                "seats_taken": event.seats_taken,
             }
         )
 

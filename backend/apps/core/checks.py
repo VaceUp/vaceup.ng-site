@@ -34,6 +34,52 @@ def media_storage_check(app_configs, **kwargs):
                  "bucket, or clear AWS_STORAGE_BUCKET_NAME to silence this.",
             id="core.W001",
         ))
+    if settings.CLOUDINARY_URL_REJECTED and not settings.CLOUDINARY_CONFIGURED:
+        issues.append(Warning(
+            "CLOUDINARY_URL is set but is not a "
+            "cloudinary://<api_key>:<api_secret>@<cloud_name> URL, so public "
+            "images are not going to Cloudinary.",
+            hint="Paste the value from the Cloudinary dashboard on one line with "
+                 "no trailing comment, or set CLOUDINARY_CLOUD_NAME, "
+                 "CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET instead.",
+            id="core.W006",
+        ))
+    partial_cloudinary = (
+        bool(settings.CLOUDINARY_CLOUD_NAME or settings.CLOUDINARY_API_KEY
+             or settings.CLOUDINARY_API_SECRET)
+        and not settings.CLOUDINARY_CONFIGURED
+    )
+    if partial_cloudinary:
+        issues.append(Warning(
+            "Cloudinary is partly configured, so public images stay on the "
+            "bucket or on local disk instead of Cloudinary.",
+            hint="Set all three of CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and "
+                 "CLOUDINARY_API_SECRET (or a complete CLOUDINARY_URL), or clear "
+                 "them.",
+            id="core.W007",
+        ))
+    if settings.CLOUDINARY_CONFIGURED:
+        try:
+            import cloudinary  # noqa: F401
+        except ImportError:
+            issues.append(Warning(
+                "Cloudinary is configured but the cloudinary package is not "
+                "installed in this environment, so public image uploads fail.",
+                hint="In the same virtualenv as the app run: "
+                     "pip install -r requirements.txt, then restart the Python app.",
+                id="core.W008",
+            ))
+    if (settings.OBJECT_STORAGE_CONFIGURED and not settings.CLOUDINARY_CONFIGURED
+            and not settings.AWS_S3_CUSTOM_DOMAIN):
+        issues.append(Warning(
+            "Public images are going to the bucket, whose URL points at the S3 "
+            "API endpoint. That endpoint refuses anonymous reads unless the "
+            "bucket is explicitly public, so covers can upload fine and still "
+            "show as broken images.",
+            hint="Configure Cloudinary for public images, or attach a custom "
+                 "domain to the bucket and set it as AWS_S3_CUSTOM_DOMAIN.",
+            id="core.W009",
+        ))
     if not settings.OBJECT_STORAGE_CONFIGURED and not os.access(
         _writable_media_dir(), os.W_OK
     ):

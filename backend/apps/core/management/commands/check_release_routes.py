@@ -24,6 +24,11 @@ REQUIRED_ROUTES = {
     "/api/v1/website/blog/source/": "PATCH",
     "/api/v1/website/events/1/register/": "POST",
     "/api/v1/certificates/templates/preview/": "GET",
+    # The staff login once carried a leading slash into path(), which can never
+    # match, so the admin 404ed at every address while the API stayed healthy.
+    # A GET here only resolves the route: rendering it needs a collected
+    # static manifest, which a source checkout does not have.
+    "/admin/login/": "GET",
 }
 
 
@@ -44,7 +49,14 @@ class Command(BaseCommand):
                 match = resolve(path)
                 actions = getattr(match.func, "actions", None)
                 view_class = getattr(match.func, "cls", None) or getattr(match.func, "view_class", None)
-                valid = method.lower() in actions if actions is not None else hasattr(view_class, method.lower())
+                if actions is not None:
+                    valid = method.lower() in actions
+                elif view_class is not None:
+                    valid = hasattr(view_class, method.lower())
+                else:
+                    # A plain Django view (the staff login) exposes neither, so
+                    # the route resolving at all is the whole check.
+                    valid = True
                 if path in expected_actions:
                     valid = valid and actions is not None and actions.get(method.lower()) == expected_actions[path]
             except Resolver404:

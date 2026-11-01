@@ -1,7 +1,7 @@
-"""Put the two staff profiles supplied on 2026-11-01 on the team page.
+"""Put the four staff profiles supplied on 2026-11-01 on the team page.
 
 Profiles live in the database and are normally edited in the admin's website
-manager. Shipping these two as a command keeps the photos and bios in one
+manager. Shipping these four as a command keeps the photos and bios in one
 reviewed place, and a profile the academy has since edited is never touched:
 a name that already exists is left exactly as it is.
 """

@@ -12,3 +12,20 @@ DATABASES = {
         "OPTIONS": {"charset": "utf8mb4", "init_command": "SET sql_mode='STRICT_TRANS_TABLES'"},
     },
 }
+
+# [ci-diag] temporary: print the code path that marks the transaction broken.
+import sys  # noqa: E402
+from django.db.backends.base.base import BaseDatabaseWrapper  # noqa: E402
+
+_original_set_rollback = BaseDatabaseWrapper.set_rollback
+
+
+def _traced_set_rollback(self, rollback, *args, **kwargs):
+    if rollback:
+        import traceback
+        print("[ci-diag] set_rollback(True) from:", file=sys.stderr, flush=True)
+        traceback.print_stack(file=sys.stderr)
+    return _original_set_rollback(self, rollback, *args, **kwargs)
+
+
+BaseDatabaseWrapper.set_rollback = _traced_set_rollback

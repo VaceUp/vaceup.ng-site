@@ -52,7 +52,7 @@ fixed here.
 | `config/settings.py` | Cloudinary block (`CLOUDINARY_URL` or the three explicit variables, `_cloudinary_from_url()` rejects a value holding whitespace instead of guessing), `AWS_S3_CUSTOM_DOMAIN`, `SERVER_EMAIL` now defaults to `DEFAULT_FROM_EMAIL`, `_admin_url()` builds the staff path without a leading slash. |
 | `config/storages.py` | **`CloudinaryStorage`** (public images, folder-prefixed public ids, real `exists()` so a repeated filename cannot overwrite another course), `public_media_storage()` chooses Cloudinary then bucket then disk, and `PrivateMediaStorage` pins `custom_domain` off so a public delivery hostname can never break a pre-signed link. |
 | `apps/core/checks.py` | `core.W006` malformed `CLOUDINARY_URL`, `core.W007` partly configured, `core.W008` configured but the package is not installed, `core.W009` public images landing on a bucket whose endpoint refuses anonymous reads. |
-| `apps/accounts/local_smtp.py` | The loopback relay backend: pins `127.0.0.1:25`, no TLS, no credentials, and re-checks before opening so `fail_silently` cannot hide a bad setting. |
+| `apps/accounts/local_smtp.py` | **Already on the server** (shipped 14 September, not re-sent here). The loopback relay backend: pins `127.0.0.1:25`, no TLS, no credentials, and re-checks before opening so `fail_silently` cannot hide a bad setting. Step 2 of the apply section proves it is present. |
 | `apps/accounts/management/commands/diagnose_email_delivery.py` | Reports which domain the mail leaves as, and warns when `SERVER_EMAIL` uses a different one from `DEFAULT_FROM_EMAIL`. |
 | `apps/core/management/commands/check_release_routes.py` | `GET /admin/login/` is now part of the pre-flight route check, so this class of regression is caught before a deploy instead of by the operator. |
 | `requirements.txt` | `cloudinary>=1.29,<2`. |
@@ -141,6 +141,17 @@ when you are ready.
 
    `python --version` should report Python 3.12.x. `pip install` adds the
    `cloudinary` package; without it `manage.py check` prints `core.W008`.
+
+   Then confirm the two mail files that came from **earlier** overlays are
+   actually present, because the server has been patched release by release:
+
+   ```bash
+   ls apps/accounts/local_smtp.py apps/accounts/management/commands/process_mail_queue.py
+   ```
+
+   If either is missing, the `.env` block in step 5 would select a backend the
+   server does not have and every send would raise. Stop and say so rather than
+   pasting it.
 
 3. Add the consent, phone and note columns:
 

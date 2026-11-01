@@ -17,12 +17,17 @@ way to tell which. The 503 now reads, for example,
 `Media storage is not configured on the server: AWS_SECRET_ACCESS_KEY is empty.`
 Only the setting names are printed, never a value.
 
-**2. `manage.py check` warns before the first upload fails.** `core.W001` used
+**2. `python manage.py storage_report` answers the question in one line.** It
+prints whether each AWS setting reached the running process, which endpoint is
+in use, and where private and public media are landing. It never prints a key,
+secret or bucket value.
+
+**3. `manage.py check` warns before the first upload fails.** `core.W001` used
 to fire only when the bucket name was set without both keys. It now fires for
 any half-finished object-storage block — keys without a bucket, a bucket
 without keys, or one key alone — and names all three settings to fix.
 
-**3. The four new team members can be published from one command.** The staff
+**4. The four new team members can be published from one command.** The staff
 profiles supplied on 2026-11-01 — Stevens Flourish Breakthrough (Project
 Manager), Mary Anieama (Content Writer), Marvellous Boluwatife Ogunleye (Graphic
 Designer) and Freeborn Udoekwere (Graphic Designer) — ship as a Django command
@@ -30,7 +35,7 @@ with their portraits. Run it in report mode first, then with `--apply`. A name
 that already exists is skipped, so running it twice creates nothing twice, and a
 profile the academy has since edited in the admin is never overwritten.
 
-**4. A rejected rate-limit write stays inside its own savepoint.** The database
+**5. A rejected rate-limit write stays inside its own savepoint.** The database
 counter behind every throttle now runs in its own `transaction.atomic()` block.
 On MySQL a failed statement otherwise marks the whole surrounding transaction as
 unusable, so one rejected counter update turned every later query in that
@@ -42,7 +47,8 @@ request into a 503.
 | --- | --- |
 | `apps/core/storage.py` | The 503 names every empty setting instead of printing one generic line. |
 | `apps/core/checks.py` | `core.W001` covers any partial object-storage configuration, not just a missing key pair. |
-| `apps/core/test_media_and_links.py` | Five new tests: the message names the empty settings, and `core.W001` fires for a bucket-only, keys-only and complete configuration. |
+| `apps/core/management/commands/storage_report.py` | **New.** Reports which AWS settings reached the process and where media lands, printing no values. |
+| `apps/core/test_media_and_links.py` | Eight new tests: the message names the empty settings, `core.W001` covers bucket-only, keys-only and complete configurations, and the report never prints a credential. |
 | `apps/website/management/commands/seed_team_members.py` | **New.** Publishes the four profiles. Reports what it would do unless `--apply` is given; skips any name that already exists. |
 | `apps/website/management/commands/team_photos/*.jpg` | **New.** Four 800x800 face-centred portraits, 75-98 KB each. |
 | `apps/website/test_team_seed.py` | **New.** Three tests: nothing is written without `--apply`; `--apply` publishes all four in order with photos; an edited profile is left alone on a re-run. |
@@ -52,13 +58,15 @@ request into a 503.
 ## Apply
 
 Upload the zip into the application root and extract it there, then run the
-three `ls` lines. Each must print the file; if one is missing, stop — the upload
+`ls` line. It must print all four files; if one is missing, stop — the upload
 did not finish.
 
 ```bash
 cd /home/coqrpund/vaceup_api
 unzip -o vaceup-backend-2026-11-01-team-and-storage.zip
-ls apps/core/storage.py apps/core/checks.py apps/website/management/commands/seed_team_members.py
+ls apps/core/storage.py apps/core/checks.py \
+   apps/core/management/commands/storage_report.py \
+   apps/website/management/commands/seed_team_members.py
 
 source /home/coqrpund/virtualenv/vaceup_api/3.12/bin/activate
 python manage.py check
@@ -101,12 +109,25 @@ AWS_STORAGE_BUCKET_NAME
 ```
 
 Run this to see which ones the running application actually receives. It prints
-booleans and hosts only — never a key or a secret:
+`set` / `EMPTY` and a destination — never a key, a secret or a bucket name:
 
 ```bash
 cd /home/coqrpund/vaceup_api
 source /home/coqrpund/virtualenv/vaceup_api/3.12/bin/activate
-python manage.py shell -c "from django.conf import settings as s; print('id set:', bool(s.AWS_ACCESS_KEY_ID)); print('secret set:', bool(s.AWS_SECRET_ACCESS_KEY)); print('bucket set:', bool(s.AWS_STORAGE_BUCKET_NAME)); print('region:', s.AWS_S3_REGION_NAME); print('r2 endpoint set:', bool(s.AWS_S3_ENDPOINT_URL)); print('uses r2 host:', (s.AWS_S3_ENDPOINT_URL or '').endswith('r2.cloudflarestorage.com')); print('OBJECT_STORAGE_CONFIGURED:', s.OBJECT_STORAGE_CONFIGURED)"
+python manage.py storage_report
+```
+
+A healthy server prints:
+
+```
+AWS_ACCESS_KEY_ID           set  (access key id)
+AWS_SECRET_ACCESS_KEY       set  (secret access key)
+AWS_STORAGE_BUCKET_NAME     set  (bucket name)
+AWS_S3_ENDPOINT_URL         set (Cloudflare R2)
+AWS_S3_REGION_NAME          auto
+
+Private media               bucket
+Public images               Cloudinary
 ```
 
 Then read the result against these four causes, most common first:
@@ -143,13 +164,15 @@ AWS_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
 
 If the bucket is on AWS S3 instead, leave `AWS_S3_ENDPOINT_URL` blank and set
 `AWS_S3_REGION_NAME` to the bucket's real region (for example `eu-west-1`).
-After editing `.env`, restart the application again, then re-run the probe: it
-must print `OBJECT_STORAGE_CONFIGURED: True`.
+After editing `.env`, restart the application again, then re-run
+`python manage.py storage_report`: it must show `Private media  bucket` and no
+`ACTION:` line.
 
 ## Verify
 
 ```bash
-# Storage: after the restart, an upload should succeed. The probe above must say True.
+# Storage: after the restart, an upload should succeed. The report must show "bucket".
+python manage.py storage_report
 curl -s -o /dev/null -w "%{http_code}\n" https://api.vaceup.ng/api/v1/lessons/1/video-upload-url/
 # 401 without a staff token is correct: the route exists and is protected.
 

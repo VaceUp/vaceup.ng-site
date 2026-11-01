@@ -232,6 +232,49 @@ class StorageConfigurationMessageTests(TestCase):
         self.assertNotIn("AWS_ACCESS_KEY_ID", str(caught.exception))
 
 
+class StorageReportTests(TestCase):
+    """The operator sees which setting is empty, and never a value."""
+
+    def _report(self, **overrides):
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        with override_settings(**{
+            "AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "",
+            "AWS_STORAGE_BUCKET_NAME": "", "OBJECT_STORAGE_CONFIGURED": False,
+            "AWS_S3_ENDPOINT_URL": None, "CLOUDINARY_CONFIGURED": True,
+            **overrides,
+        }):
+            call_command("storage_report", stdout=out)
+        return out.getvalue()
+
+    def test_it_names_the_empty_setting_and_calls_for_action(self):
+        report = self._report(AWS_STORAGE_BUCKET_NAME="")
+        self.assertIn("AWS_STORAGE_BUCKET_NAME", report)
+        self.assertIn("EMPTY", report)
+        self.assertIn("ACTION:", report)
+        self.assertIn("local disk", report)
+
+    def test_it_never_prints_a_credential(self):
+        report = self._report(
+            AWS_ACCESS_KEY_ID="key-should-not-appear",
+            AWS_SECRET_ACCESS_KEY="secret-should-not-appear",
+            AWS_STORAGE_BUCKET_NAME="bucket-should-not-appear",
+        )
+        for value in ("key-should-not-appear", "secret-should-not-appear",
+                      "bucket-should-not-appear"):
+            self.assertNotIn(value, report)
+
+    def test_a_complete_configuration_needs_no_action(self):
+        report = self._report(
+            AWS_ACCESS_KEY_ID="key", AWS_SECRET_ACCESS_KEY="secret",
+            AWS_STORAGE_BUCKET_NAME="vaceup-media", OBJECT_STORAGE_CONFIGURED=True,
+        )
+        self.assertNotIn("ACTION:", report)
+        self.assertIn("bucket", report)
+
+
 class LocalImageUploadTests(TestCase):
     """Writes a cover image through the same storage class the live server uses."""
 

@@ -19,12 +19,22 @@ class StorageNotConfigured(DomainError):
 
 
 def _client():
-    if not (
-        settings.AWS_ACCESS_KEY_ID
-        and settings.AWS_SECRET_ACCESS_KEY
-        and settings.AWS_STORAGE_BUCKET_NAME
-    ):
-        raise StorageNotConfigured()
+    missing = [
+        name
+        for name, value in (
+            ("AWS_ACCESS_KEY_ID", settings.AWS_ACCESS_KEY_ID),
+            ("AWS_SECRET_ACCESS_KEY", settings.AWS_SECRET_ACCESS_KEY),
+            ("AWS_STORAGE_BUCKET_NAME", settings.AWS_STORAGE_BUCKET_NAME),
+        )
+        if not value
+    ]
+    if missing:
+        # Naming the empty settings turns a support ticket into a one-line fix;
+        # the names are configuration, never the values.
+        raise StorageNotConfigured(
+            f"Media storage is not configured on the server: {', '.join(missing)} "
+            f"{'is' if len(missing) == 1 else 'are'} empty."
+        )
     # Imported lazily so the app boots even if boto3 isn't installed.
     import boto3
     from botocore.client import Config

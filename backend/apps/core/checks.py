@@ -26,12 +26,13 @@ def media_storage_check(app_configs, **kwargs):
                  "the line out entirely: an inline comment is read as the value.",
             id="core.W005",
         ))
-    if settings.AWS_STORAGE_BUCKET_NAME and not settings.OBJECT_STORAGE_CONFIGURED:
+    if (settings.AWS_STORAGE_BUCKET_NAME or settings.AWS_ACCESS_KEY_ID
+            or settings.AWS_SECRET_ACCESS_KEY) and not settings.OBJECT_STORAGE_CONFIGURED:
         issues.append(Warning(
-            "AWS_STORAGE_BUCKET_NAME is set but the access keys are not, so "
-            "object storage is disabled and media is kept on local disk.",
-            hint="Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to use the "
-                 "bucket, or clear AWS_STORAGE_BUCKET_NAME to silence this.",
+            "Object storage is only partly configured, so media is kept on local "
+            "disk and uploaded videos cannot be stored.",
+            hint="Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and "
+                 "AWS_STORAGE_BUCKET_NAME together, or clear all three.",
             id="core.W001",
         ))
     if settings.CLOUDINARY_URL_REJECTED and not settings.CLOUDINARY_CONFIGURED:

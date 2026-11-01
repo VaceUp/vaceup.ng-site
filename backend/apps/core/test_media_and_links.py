@@ -209,6 +209,29 @@ class CloudinaryConfigCheckTests(TestCase):
         self.assertNotIn("core.W009", self._ids())
 
 
+class StorageConfigurationMessageTests(TestCase):
+    """The 503 names the setting to fix, so an operator is not left guessing."""
+
+    @override_settings(AWS_ACCESS_KEY_ID="", AWS_SECRET_ACCESS_KEY="", AWS_STORAGE_BUCKET_NAME="")
+    def test_every_empty_setting_is_named(self):
+        from apps.core.storage import StorageNotConfigured, presigned_upload_url
+
+        with self.assertRaises(StorageNotConfigured) as caught:
+            presigned_upload_url("lessons/1/clip.mp4", "video/mp4")
+        for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_STORAGE_BUCKET_NAME"):
+            self.assertIn(name, str(caught.exception))
+        self.assertEqual(caught.exception.status_code, 503)
+
+    @override_settings(AWS_ACCESS_KEY_ID="key", AWS_SECRET_ACCESS_KEY="secret", AWS_STORAGE_BUCKET_NAME="")
+    def test_only_the_setting_that_is_empty_is_named(self):
+        from apps.core.storage import StorageNotConfigured, presigned_upload_url
+
+        with self.assertRaises(StorageNotConfigured) as caught:
+            presigned_upload_url("lessons/1/clip.mp4", "video/mp4")
+        self.assertIn("AWS_STORAGE_BUCKET_NAME is empty", str(caught.exception))
+        self.assertNotIn("AWS_ACCESS_KEY_ID", str(caught.exception))
+
+
 class LocalImageUploadTests(TestCase):
     """Writes a cover image through the same storage class the live server uses."""
 
@@ -251,3 +274,30 @@ class EndpointGuardTests(TestCase):
                                OBJECT_STORAGE_CONFIGURED=False, MEDIA_ROOT=self.media_root):
             ids = [issue.id for issue in media_storage_check(None)]
         self.assertIn("core.W005", ids)
+
+    def _ids(self, **overrides):
+        from apps.core.checks import media_storage_check
+
+        base = {
+            "AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "",
+            "AWS_STORAGE_BUCKET_NAME": "", "OBJECT_STORAGE_CONFIGURED": False,
+            "AWS_S3_ENDPOINT_REJECTED": False, "MEDIA_ROOT": self.media_root,
+            "CLOUDINARY_CONFIGURED": True,
+        }
+        with override_settings(**{**base, **overrides}):
+            return [issue.id for issue in media_storage_check(None)]
+
+    def test_a_bucket_name_without_keys_is_reported(self):
+        self.assertIn("core.W001", self._ids(AWS_STORAGE_BUCKET_NAME="vaceup-media"))
+
+    def test_keys_without_a_bucket_name_are_reported(self):
+        self.assertIn("core.W001", self._ids(
+            AWS_ACCESS_KEY_ID="key", AWS_SECRET_ACCESS_KEY="secret",
+        ))
+
+    def test_a_complete_object_storage_configuration_is_silent(self):
+        self.assertNotIn("core.W001", self._ids(
+            AWS_ACCESS_KEY_ID="key", AWS_SECRET_ACCESS_KEY="secret",
+            AWS_STORAGE_BUCKET_NAME="vaceup-media", OBJECT_STORAGE_CONFIGURED=True,
+        ))
+        self.assertNotIn("core.W001", self._ids())

@@ -143,6 +143,32 @@ blank and set `AWS_S3_REGION_NAME` to the bucket's real region.
 
 `storage_report` must end with `Private media  bucket` and no `ACTION:` line.
 
+### The bucket needs a CORS rule for browser uploads
+
+The admin uploads a video straight from the browser to the bucket with a signed
+PUT, so the bucket must allow that origin. R2 has no CORS rule by default, and
+the browser then rejects the PUT before it is sent — the form shows "the server
+could not be reached", even though the API answered normally.
+
+Cloudflare dashboard → R2 → the bucket → **Settings** → **CORS Policy** → Edit →
+paste:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://vaceup.ng", "https://www.vaceup.ng"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+No restart is needed; the rule applies to the next upload. A signed URL that is
+issued but answers 403 on PUT instead means the R2 API token lacks Object Read &
+Write on that bucket.
+
 ## Verify
 
 ```bash

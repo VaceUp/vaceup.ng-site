@@ -79,8 +79,8 @@ Look first, change nothing:
 python manage.py repair_image_public_ids
 ```
 
-Expect a `RENAME` line for each team portrait and the event banner, a `LOADS`
-line for anything already correct, and a `MISSING` line for the course
+Expect a `RENAME` line for each team portrait and both event banners, a `LOADS`
+line for anything already correct, and one `MISSING` line for the course
 thumbnail. When the list looks right, do it:
 
 ```
@@ -92,6 +92,39 @@ the site uses now returns the picture.
 
 This is the step that closes the long-standing "the team photos are gone"
 report. They were never gone.
+
+### The first version of that command reported all eight as missing
+
+If you ran it before this correction, its output said
+`absent from Cloudinary: 8`. That was the command being wrong, not the account.
+
+`splitext()` returns an extension **with its leading dot** (`.jpg`), and the
+Cloudinary builder adds its own dot before the format, so the command asked for
+`mary-anieama.jpg..jpg` — two dots — got a 404, and called a healthy file
+absent. The probe URL is now built from the extension without the dot.
+
+Re-checked against the live account after the correction, from this machine:
+
+```
+200   1.68 MB   .../vaceup/website/team/file_000000007bdc8211ab505748e6d46fa0.png.png   (Mercy)
+200     88 KB   .../vaceup/website/team/stevens-flourish-breakthrough.jpg.jpg
+200     97 KB   .../vaceup/website/team/mary-anieama.jpg.jpg
+200     86 KB   .../vaceup/website/team/marvellous-ogunleye.jpg.jpg
+200     75 KB   .../vaceup/website/team/freeborn-udoekwere.jpg.jpg
+200    1.67 MB  .../vaceup/website/events/Free_3-Day_Excel_Training_Banner.png.png
+200    1.67 MB  .../vaceup/website/events/Free_3-Day_Excel_Training_Banner_D33S6Pw.png.png
+404        0 KB  .../vaceup/course/thumbnails/Virtual-Assistant.jpeg.jpeg
+```
+
+Seven of the eight are in the account and will be moved. The eighth, the
+Virtual Assistant course thumbnail, is genuinely absent and needs re-uploading
+from the admin panel — it predates Cloudinary, so no rename can recover it.
+
+The command now also refuses to guess. It probes the CDN once before reading
+any row, and if the server cannot reach Cloudinary it stops with the reason
+instead of reporting every picture as missing. A connection failure and a 404
+are no longer the same line of output.
+
 
 ## Getting the About page back to the wording you showed me
 
@@ -153,13 +186,20 @@ undo works for every change to the About page.
   extension, a delivered address never repeats it, and an extension-free key
   still builds an address. Two older tests that had pinned the buggy name were
   corrected.
-* The repair command's detection was run against the real Cloudinary account
-  from this machine: it classified the three reachable pictures as rename
-  candidates and the course thumbnail as absent, matching the four HTTP checks
-  quoted at the top. The renames themselves need the account credentials, so
-  they run on the server with `--apply`.
+* The delivered address is unchanged by the storage fix — both the old and the
+  new code build `.../mary-anieama.jpg`. Only the name the file is stored under
+  changes, which is exactly why the repair command has to run.
+* The corrected command was dry-run from this machine against the real
+  account: it reported `waiting for --apply: 4` for the four team portraits its
+  rows know about, and `absent from Cloudinary` only for two local test
+  artefacts that genuinely are not in the account. Before the dot correction
+  the same run wrongly reported all six as absent, which is how the bug was
+  found.
+* The seven live images were each fetched at the doubled name and returned
+  200 with real byte counts, listed above.
 * The live API was read to confirm the change history endpoints are present
   and guarded (401 without credentials) and that `hero_title` is empty, which
   is why the headline already matches your screenshot.
 * Not verified yet: the team page with the pictures actually showing. That
-  needs `--apply` on the server; run it and send me the command's output.
+  needs `--apply` on the server; run it and send the command's output.
+

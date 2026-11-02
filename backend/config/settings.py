@@ -260,6 +260,10 @@ LIVEKIT_WS_URL = env("LIVEKIT_WS_URL", default="")
 LIVE_CLASS_JOIN_EARLY_MINUTES = env.int("LIVE_CLASS_JOIN_EARLY_MINUTES", default=10)
 LIVE_CLASS_JOIN_GRACE_MINUTES = env.int("LIVE_CLASS_JOIN_GRACE_MINUTES", default=15)
 
+# --- Event live rooms (website events; the seat token is the attendee's key) ---
+EVENT_JOIN_EARLY_MINUTES = env.int("EVENT_JOIN_EARLY_MINUTES", default=15)
+EVENT_JOIN_GRACE_MINUTES = env.int("EVENT_JOIN_GRACE_MINUTES", default=30)
+
 # --- Media storage: private S3 via django-storages (see config/storages.py) ---
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")

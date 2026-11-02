@@ -6,7 +6,7 @@ from django.utils import timezone
 
 COLUMNS = (
     "Name", "Email", "Phone", "Note", "Open to event emails",
-    "Joining link sent", "Registered at",
+    "Joining link sent", "Registered at", "Academy note sent",
 )
 
 
@@ -29,6 +29,13 @@ def _link_sent(event, row):
     return timezone.localtime(row.join_link_sent_at).strftime("%Y-%m-%d %H:%M")
 
 
+def _stamp(value):
+    """When the academy's own note reached this address, or "not sent"."""
+    if value is None:
+        return "not sent"
+    return timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
+
+
 def roster_csv(event):
     buffer = StringIO()
     writer = csv.writer(buffer)
@@ -42,6 +49,7 @@ def roster_csv(event):
             "yes" if row.consent_marketing else "no",
             _link_sent(event, row),
             timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M") if row.created_at else "",
+            _stamp(row.broadcast_sent_at),
         ])
     # Excel on Windows reads UTF-8 only with the byte-order mark.
     return "﻿" + buffer.getvalue()

@@ -14,7 +14,11 @@ from rest_framework.views import APIView
 from apps.core.permissions import IsAdmin, IsAdminOrReadOnly
 from apps.core.throttling import DatabaseAnonRateThrottle
 from apps.website import revisions
-from apps.website.emails import send_join_link_email, send_rsvp_confirmation
+from apps.website.emails import (
+    send_event_broadcast,
+    send_join_link_email,
+    send_rsvp_confirmation,
+)
 from apps.website.join import JoinDenied, join_access, room_is_ready
 from apps.website.models import (
     AcademyProfile,
@@ -44,6 +48,17 @@ from apps.website.services import BloggerSyncError, sync_blogger
 def _is_admin(request):
     user = request.user
     return bool(user and user.is_authenticated and user.is_admin)
+
+
+# Registrant notes go out in batches: the relay takes a fresh session per
+# message, and a roster the size of a workshop must not outlast the request.
+BROADCAST_BATCH = 25
+BROADCAST_MAX_BATCH = 50
+
+
+def _clean_header(value):
+    """A subject becomes a mail header, so a newline there is a second header."""
+    return " ".join(str(value or "").split())
 
 
 class AcademyProfileView(APIView):
@@ -357,6 +372,94 @@ class EventViewSet(viewsets.ModelViewSet):
             detail += f" {failed} could not be sent, so the mail setup needs a look."
         return Response({"detail": detail, "sent": sent, "failed": failed,
                          "total": len(registrations)})
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAdmin],
+        url_path="broadcast",
+    )
+    def broadcast(self, request, slug=None):
+        """Mail the academy's own note to this event's registrants.
+
+        The relay starts a fresh session per message, so the roster is walked in
+        bounded batches and the panel asks for the next batch until none is
+        left. One request per roster would outlive the server's timeout and
+        leave the admin guessing whether it went out at all.
+        """
+        event = self.get_object()
+        subject = _clean_header(request.data.get("subject"))
+        note = str(request.data.get("message") or "").strip()
+        errors = {}
+        if not subject:
+            errors["subject"] = "Write a subject line."
+        elif len(subject) > 150:
+            errors["subject"] = "Keep the subject under 150 characters."
+        if not note:
+            errors["message"] = "Write the message your registrants will read."
+        elif len(note) > 4000:
+            errors["message"] = "Keep the message under 4,000 characters."
+        try:
+            batch = int(request.data.get("batch") or BROADCAST_BATCH)
+        except (TypeError, ValueError):
+            errors["batch"] = "Choose a batch size between 1 and 50."
+        else:
+            batch = min(max(batch, 1), BROADCAST_MAX_BATCH)
+        only_unmailed = str(request.data.get("only_unmailed", "true")).lower() not in {
+            "false", "0", "no",
+        }
+        include_link = str(request.data.get("include_link", "true")).lower() not in {
+            "false", "0", "no",
+        }
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        pending = event.registrations.order_by("pk")
+        if only_unmailed:
+            pending = pending.filter(broadcast_sent_at__isnull=True)
+        total = event.registrations.count()
+        if not total:
+            return Response(
+                {"detail": "Nobody has registered for this event yet.",
+                 "sent": 0, "failed": 0, "remaining": 0, "total": 0},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        rows = list(pending[:batch])
+        if not rows:
+            return Response({
+                "detail": "Everyone in this group has already been mailed from here.",
+                "sent": 0, "failed": 0, "remaining": 0, "total": total, "done": True,
+            })
+        sent = 0
+        now = timezone.now()
+        for registration in rows:
+            if send_event_broadcast(
+                registration=registration, subject=subject, note=note,
+                include_link=include_link,
+            ):
+                # The marker moves even on a refused address: it records that the
+                # note was handed to the relay, which is all this screen can know.
+                EventRegistration.objects.filter(pk=registration.pk).update(
+                    broadcast_sent_at=now
+                )
+                sent += 1
+        failed = len(rows) - sent
+        if only_unmailed:
+            # A refused address keeps its empty marker, so it is reached again on
+            # the next batch instead of silently dropping out of the roster.
+            remaining = event.registrations.filter(broadcast_sent_at__isnull=True).count()
+        else:
+            remaining = event.registrations.filter(pk__gt=rows[-1].pk).count()
+        detail = (
+            f"{sent} of {len(rows)} in this batch were emailed"
+            + (f", {failed} were not." if failed else ".")
+        )
+        if remaining:
+            detail += f" {remaining} still to send."
+        return Response({
+            "detail": detail, "sent": sent, "failed": failed,
+            "remaining": remaining, "total": total, "done": not remaining,
+        })
 
     @action(detail=True, methods=["get"], permission_classes=[IsAdmin], url_path="registrations")
     def registrations(self, request, slug=None):

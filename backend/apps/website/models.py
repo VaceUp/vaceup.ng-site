@@ -26,6 +26,9 @@ def _join_token():
     return secrets.token_urlsafe(24)
 
 
+def _room_secret():
+    return secrets.token_urlsafe(18)
+
 
 def _unique_slug(model, value, max_length=200):
     base = slugify(value)[:max_length] or "item"
@@ -145,7 +148,8 @@ class Event(TimeStampedModel):
 
     class LivePlatform(models.TextChoices):
         EXTERNAL = "external", "External link (Google Meet, Zoom, ...)"
-        VACEUP_ROOM = "livekit", "VaceUp Live Room (built in)"
+        VACEUP_ROOM = "livekit", "VaceUp Live Room (LiveKit)"
+        JITSI = "jitsi", "VaceUp Live Room (Jitsi)"
 
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
@@ -171,6 +175,15 @@ class Event(TimeStampedModel):
         max_length=120,
         blank=True,
         help_text="VaceUp Live Room name. Left blank, the event slug names the room.",
+    )
+    # A Jitsi room is guarded by its name alone, so the public event slug can
+    # never be the whole address. This code is what makes the name unguessable.
+    room_secret = models.CharField(
+        max_length=64,
+        blank=True,
+        default=_room_secret,
+        editable=False,
+        help_text="Private code baked into a Jitsi room name. Never shown to attendees.",
     )
     registration_url = models.CharField(
         max_length=500,
@@ -198,7 +211,8 @@ class Event(TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = _unique_slug(Event, self.title, max_length=220)
-        if self.live_platform == self.LivePlatform.VACEUP_ROOM and not self.room_name:
+        built_in_rooms = {self.LivePlatform.VACEUP_ROOM, self.LivePlatform.JITSI}
+        if self.live_platform in built_in_rooms and not self.room_name:
             # A room the academy did not bother to name is still a room the site
             # can open, so the choice alone never leaves attendees with nothing.
             self.room_name = f"event-{self.slug}"[:120]
@@ -259,6 +273,9 @@ class EventRegistration(TimeStampedModel):
         max_length=64, unique=True, default=_join_token, editable=False
     )
     join_link_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # Set when the academy's own note about this event reaches the address, so a
+    # bulk send can be continued in batches and a re-run can skip the mailed.
+    broadcast_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ("-created_at",)

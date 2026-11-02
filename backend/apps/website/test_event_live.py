@@ -9,6 +9,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.website.join import jitsi_domain, jitsi_room_name, room_is_ready
 from apps.website.models import Event, EventRegistration
 from apps.website.roster import roster_csv
 
@@ -45,6 +46,54 @@ class SeatTokenTests(TestCase):
         self.assertEqual(named.room_name, "cohort-7")
         blank = self._event(title="Blank Room", live_platform="livekit")
         self.assertEqual(blank.room_name, f"event-{blank.slug}")
+
+
+class JitsiRoomTests(TestCase):
+    """Jitsi guards a room by its name alone, so the name has to be unguessable."""
+
+    def _event(self, **overrides):
+        defaults = {
+            "title": "Jitsi Workshop", "event_type": Event.EventType.WORKSHOP,
+            "starts_at": timezone.now() + timezone.timedelta(minutes=5),
+            "is_published": True, "is_online": True, "live_platform": "jitsi",
+        }
+        return Event.objects.create(**{**defaults, **overrides})
+
+    def test_two_events_never_share_a_room_code(self):
+        first = self._event(title="First Cohort")
+        second = self._event(title="Second Cohort")
+        self.assertTrue(first.room_secret)
+        self.assertNotEqual(first.room_secret, second.room_secret)
+
+    def test_the_public_slug_is_never_the_whole_room_address(self):
+        event = self._event()
+        room = jitsi_room_name(event)
+        self.assertIn(event.room_secret, room)
+        self.assertNotEqual(room, f"event-{event.slug}")
+        self.assertTrue(event.room_name.startswith("event-"))
+
+    def test_a_label_the_academy_typed_survives_with_the_code_appended(self):
+        event = self._event(room_name="Cohort 7 Open Day")
+        room = jitsi_room_name(event)
+        self.assertTrue(room.startswith("vaceup-Cohort-7-Open-Day-"))
+        self.assertIn(event.room_secret, room)
+        self.assertNotIn(" ", room)
+
+    def test_a_pasted_server_address_still_names_the_same_server(self):
+        cases = {
+            "meet.jit.si": "meet.jit.si",
+            "https://meet.jit.si/": "meet.jit.si",
+            "  meet.jit.si  ": "meet.jit.si",
+            "meet.jit.si/some/path": "meet.jit.si",
+            "": "meet.jit.si",
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value), override_settings(JITSI_DOMAIN=value):
+                self.assertEqual(jitsi_domain(), expected)
+
+    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
+    def test_a_jitsi_event_needs_nothing_from_the_livekit_account(self):
+        self.assertTrue(room_is_ready(self._event()))
 
 
 class EventJoinTests(TestCase):
@@ -159,6 +208,40 @@ class EventJoinTests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertIn("LiveKit keys", response.data["detail"])
 
+    @override_settings(JITSI_DOMAIN="meet.jit.si",
+                       LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
+    def test_a_jitsi_seat_is_handed_the_room_and_their_own_name(self):
+        event = self._event(live_platform="jitsi", meeting_url="")
+        registration = self._registration(event)
+        response = self._join(event, token=registration.join_token)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["provider"], "jitsi")
+        self.assertIn(event.room_secret, response.data["room"])
+        self.assertEqual(
+            response.data["url"], f"https://meet.jit.si/{response.data['room']}"
+        )
+        self.assertEqual(response.data["display_name"], "Ada Obi")
+        self.assertFalse(response.data["is_host"])
+
+    @override_settings(JITSI_DOMAIN="meet.jit.si")
+    def test_a_host_entering_a_jitsi_room_is_marked_as_one_of_ours(self):
+        event = self._event(live_platform="jitsi", meeting_url="",
+                            starts_at=self.now + timezone.timedelta(days=1))
+        self.client.force_authenticate(self.admin)
+        host = self._join(event, token="")
+        self.assertEqual(host.status_code, 200, host.data)
+        self.assertTrue(host.data["is_host"])
+        self.assertEqual(host.data["display_name"], "Amara Host")
+
+    @override_settings(JITSI_DOMAIN="meet.jit.si")
+    def test_the_public_payload_never_carries_the_jitsi_address(self):
+        event = self._event(live_platform="jitsi", meeting_url="")
+        response = self.client.get(f"/api/v1/website/events/{event.slug}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["join_ready"])
+        for key in ("room", "room_secret", "url", "domain", "room_name"):
+            self.assertNotIn(key, response.data)
+
     def test_a_host_may_rehearse_before_the_room_opens(self):
         event = self._event(starts_at=self.now + timezone.timedelta(days=1))
         registration = self._registration(event)
@@ -256,6 +339,17 @@ class EventSendLinkTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("VaceUp Live Room", response.data["detail"])
         self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
+    def test_a_jitsi_roster_can_be_mailed_straight_away(self):
+        event = self._event(live_platform="jitsi", meeting_url="")
+        self._roster(event, "ada@example.com")
+        mail.outbox.clear()
+
+        response = self._send(event)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["sent"], 1)
+        self.assertIn("Join here:", mail.outbox[0].body)
 
     def test_an_empty_roster_is_reported_not_sent(self):
         event = self._event()
@@ -371,7 +465,11 @@ class RosterLinkColumnTests(TestCase):
         EventRegistration.objects.create(event=event, name="Ada", email="ada@example.com")
         body = roster_csv(event)
         self.assertIn("Joining link sent", body.splitlines()[0])
-        self.assertNotIn("not sent", body)
+        rows = {
+            r[0]: r[5]
+            for r in csv.reader(body.lstrip("﻿").splitlines())
+        }
+        self.assertEqual(rows["Ada"], "")
 
     def test_an_online_roster_shares_who_was_emailed(self):
         event = Event.objects.create(
@@ -392,3 +490,171 @@ class RosterLinkColumnTests(TestCase):
         self.assertEqual(rows["Ada"], timezone.localtime(
             emailed.join_link_sent_at).strftime("%Y-%m-%d %H:%M"))
         self.assertEqual(rows["Bola"], "not sent")
+
+    def test_the_list_also_says_who_got_the_academy_note(self):
+        event = Event.objects.create(
+            title="Open Day", starts_at=timezone.now(), is_online=False,
+        )
+        mailed = EventRegistration.objects.create(
+            event=event, name="Ada", email="ada@example.com"
+        )
+        EventRegistration.objects.create(event=event, name="Bola", email="bola@example.com")
+        mailed.broadcast_sent_at = timezone.now()
+        mailed.save(update_fields=["broadcast_sent_at"])
+
+        rows = {
+            r[0]: r[7]
+            for r in csv.reader(roster_csv(event).lstrip("﻿").splitlines())
+        }
+        self.assertEqual(rows["Ada"], timezone.localtime(
+            mailed.broadcast_sent_at).strftime("%Y-%m-%d %H:%M"))
+        self.assertEqual(rows["Bola"], "not sent")
+
+
+class EventBroadcastTests(TestCase):
+    """Bulk mail from the event panel: one note, one message per registrant."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="admin@vaceup.ng", password="x", full_name="Amara Host",
+            role=User.Role.ADMIN, is_active=True,
+        )
+        self.event = Event.objects.create(
+            title="Excel Bootcamp", event_type=Event.EventType.WORKSHOP,
+            starts_at=timezone.now() + timezone.timedelta(days=1),
+            is_published=True, is_online=True,
+            meeting_url="https://meet.google.com/abc-defg-hij",
+        )
+
+    def _roster(self, *emails):
+        return [
+            EventRegistration.objects.create(
+                event=self.event, name=email.split("@")[0].title(), email=email
+            )
+            for email in emails
+        ]
+
+    def _send(self, **payload):
+        body = {"subject": "The classroom opens early",
+                "message": "The room opens at 19:30, not 20:00."}
+        body.update(payload)
+        self.client.force_authenticate(self.admin)
+        return self.client.post(
+            f"/api/v1/website/events/{self.event.slug}/broadcast/", body, format="json"
+        )
+
+    def test_only_an_admin_can_send_a_note(self):
+        self._roster("ada@example.com")
+        mail.outbox.clear()
+        response = self.client.post(
+            f"/api/v1/website/events/{self.event.slug}/broadcast/",
+            {"subject": "Hello", "message": "The room is ready."}, format="json",
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_an_empty_roster_is_refused_before_anything_is_written(self):
+        response = self._send()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["total"], 0)
+
+    def test_every_registrant_gets_their_own_message(self):
+        self._roster("ada@example.com", "bola@example.com", "chidi@example.com")
+        mail.outbox.clear()
+
+        response = self._send()
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["sent"], 3)
+        self.assertEqual(response.data["remaining"], 0)
+        self.assertEqual(len(mail.outbox), 3)
+        for message in mail.outbox:
+            self.assertEqual(len(message.to), 1)
+            self.assertEqual(message.subject, "The classroom opens early")
+            self.assertIn("The room opens at 19:30", message.body)
+            self.assertIn("Excel Bootcamp", message.body)
+            self.assertIn("You are receiving this because you registered", message.body)
+
+    def test_a_roster_is_walked_in_batches_without_repeating_anyone(self):
+        self._roster("ada@example.com", "bola@example.com", "chidi@example.com")
+        mail.outbox.clear()
+
+        first = self._send(batch=2)
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(first.data["sent"], 2)
+        self.assertEqual(first.data["remaining"], 1)
+        self.assertIs(first.data["done"], False)
+
+        second = self._send(batch=2)
+        self.assertEqual(second.data["sent"], 1)
+        self.assertEqual(second.data["remaining"], 0)
+        self.assertIs(second.data["done"], True)
+
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(
+            sorted(address for message in mail.outbox for address in message.to),
+            ["ada@example.com", "bola@example.com", "chidi@example.com"],
+        )
+
+    def test_send_again_to_everyone_includes_the_already_mailed(self):
+        self._roster("ada@example.com", "bola@example.com")
+        mail.outbox.clear()
+        self.assertEqual(self._send(batch=5).data["sent"], 2)
+
+        response = self._send(batch=5, only_unmailed="false")
+        self.assertEqual(response.data["sent"], 2)
+        self.assertEqual(len(mail.outbox), 4)
+
+    def test_a_blank_subject_or_message_is_answered_with_the_field_to_fix(self):
+        self._roster("ada@example.com")
+        response = self._send(subject=" ", message="")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("subject", response.data)
+        self.assertIn("message", response.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_a_subject_cannot_smuggle_a_second_header(self):
+        self._roster("ada@example.com")
+        mail.outbox.clear()
+
+        response = self._send(subject="Moved\r\nBcc: someone@example.com")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(mail.outbox[0].subject, "Moved Bcc: someone@example.com")
+        self.assertNotIn("\r", mail.outbox[0].subject)
+        self.assertNotIn("\n", mail.outbox[0].subject)
+        self.assertEqual(mail.outbox[0].to, ["ada@example.com"])
+
+    def test_the_joining_link_rides_along_only_when_asked(self):
+        registration = self._roster("ada@example.com")[0]
+        mail.outbox.clear()
+        self._send()
+        self.assertIn(registration.join_link(), mail.outbox[0].body)
+
+        mail.outbox.clear()
+        self._send(subject="Certificate collection", include_link="false", only_unmailed="false")
+        self.assertNotIn("Join here:", mail.outbox[0].body)
+
+    def test_a_refused_address_is_left_unstamped_for_the_next_batch(self):
+        self._roster("ada@example.com", "bola@example.com", "chidi@example.com")
+        mail.outbox.clear()
+
+        def relay(message):
+            if message.to == ["bola@example.com"]:
+                raise RuntimeError("relay refused the sender")
+
+        with patch("apps.website.emails.send_account_message", side_effect=relay):
+            first = self._send(batch=2)
+        self.assertEqual(first.data["sent"], 1)
+        self.assertEqual(first.data["failed"], 1)
+        self.assertEqual(first.data["remaining"], 2)
+        self.assertEqual(
+            {row.email for row in self.event.registrations.filter(broadcast_sent_at__isnull=True)},
+            {"bola@example.com", "chidi@example.com"},
+        )
+
+    def test_an_overlong_message_is_refused_rather_than_truncated(self):
+        self._roster("ada@example.com")
+        response = self._send(message="x" * 4001)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("message", response.data)
+        self.assertEqual(len(mail.outbox), 0)

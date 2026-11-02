@@ -161,7 +161,7 @@ class EventRegistrationAdminSerializer(serializers.ModelSerializer):
         model = EventRegistration
         fields = (
             "id", "name", "email", "phone", "note", "consent_marketing",
-            "join_link_sent_at", "created_at",
+            "join_link_sent_at", "broadcast_sent_at", "created_at",
         )
 
 

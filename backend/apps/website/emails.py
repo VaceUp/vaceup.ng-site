@@ -32,6 +32,48 @@ def event_page_link(event):
     return f"{base}/events/?slug={event.slug}"
 
 
+def send_event_broadcast(*, registration, subject, note, include_link=True):
+    """Send the academy's own note about this event to one registrant.
+
+    One recipient per message, so an address never appears beside another
+    attendee's, and the relay sees the same plain-text shape it already accepts.
+    """
+    event = registration.event
+    lines = [f"Hi {registration.name.split(' ')[0] or 'there'},", ""]
+    lines += [paragraph for paragraph in note.strip().split("\n\n")]
+    lines += [
+        "",
+        f"About: “{event.title}” — {_window(event)}",
+        f"Where: {'Online' if event.is_online else (event.location or 'Venue to be confirmed')}",
+    ]
+    if include_link and event.is_online and room_is_ready(event):
+        lines += ["", f"Join here: {registration.join_link()}"]
+    lines += [
+        "",
+        f"You are receiving this because you registered on our website: "
+        f"{event_page_link(event)}",
+        "",
+        "VaceUp Digital Academy",
+    ]
+    message = EmailMessage(
+        subject=subject,
+        body="\n".join(lines),
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[registration.email],
+    )
+    try:
+        send_account_message(message)
+    except Exception as exc:
+        failure = classify_delivery_failure(exc)
+        logger.error(
+            "event_email kind=broadcast stage=delivery code=%s action=%s",
+            failure.code, failure.action,
+        )
+        return False
+    logger.info("event_email kind=broadcast stage=delivery status=accepted")
+    return True
+
+
 def send_rsvp_confirmation(*, registration):
     """Email the attendee their seat details.
 

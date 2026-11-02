@@ -263,6 +263,8 @@ LIVE_CLASS_JOIN_GRACE_MINUTES = env.int("LIVE_CLASS_JOIN_GRACE_MINUTES", default
 # --- Event live rooms (website events; the seat token is the attendee's key) ---
 EVENT_JOIN_EARLY_MINUTES = env.int("EVENT_JOIN_EARLY_MINUTES", default=15)
 EVENT_JOIN_GRACE_MINUTES = env.int("EVENT_JOIN_GRACE_MINUTES", default=30)
+# Host name only, e.g. meet.jit.si, or your own Jitsi server once you have one.
+JITSI_DOMAIN = env("JITSI_DOMAIN", default="meet.jit.si")
 
 # --- Media storage: private S3 via django-storages (see config/storages.py) ---
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")

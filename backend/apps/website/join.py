@@ -6,6 +6,8 @@ room address is never published to people who did not register.
 """
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 from django.utils import timezone
 
@@ -14,6 +16,8 @@ from apps.website.models import Event
 
 MIN_TOKEN_TTL = 3600
 MAX_TOKEN_TTL = 24 * 3600
+DEFAULT_JITSI_DOMAIN = "meet.jit.si"
+JITSI_UNSAFE = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 class JoinDenied(Exception):
@@ -41,10 +45,35 @@ def _moment(value):
     return f"{local:%A %d %B %Y} at {local.strftime('%I:%M %p').lstrip('0')}"
 
 
+def jitsi_domain():
+    """The bare host that serves Jitsi rooms, however the .env line was written.
+
+    A pasted "https://meet.jit.si/" is the same server as "meet.jit.si", and the
+    embed script is fetched by host name, so the value is trimmed here rather
+    than trusted to be typed correctly.
+    """
+    raw = str(getattr(settings, "JITSI_DOMAIN", "") or DEFAULT_JITSI_DOMAIN)
+    return raw.split("//", 1)[-1].split("/", 1)[0].strip().lower() or DEFAULT_JITSI_DOMAIN
+
+
+def jitsi_room_name(event):
+    """The full Jitsi room address for an event, with its private code appended.
+
+    Jitsi checks no credentials at all — whoever knows the name is in the room —
+    so the readable label the academy typed is never the whole address.
+    """
+    label = JITSI_UNSAFE.sub("-", event.room_name or f"event-{event.slug}").strip("-")
+    return f"vaceup-{label[:60] or 'event'}-{event.room_secret}"
+
+
 def room_is_ready(event):
     """Whether clicking Join right now would actually take someone somewhere."""
     if event.live_platform == Event.LivePlatform.EXTERNAL:
         return bool(event.meeting_url)
+    if event.live_platform == Event.LivePlatform.JITSI:
+        # The public Jitsi server needs nothing from this one, so choosing it is
+        # enough to have somewhere to send people.
+        return True
     return livekit_configured()
 
 
@@ -86,6 +115,18 @@ def join_access(*, event, registration=None, user=None):
             "provider": "external",
             "url": event.meeting_url,
             "display_name": (registration.name if registration else user.full_name),
+        }
+
+    if event.live_platform == Event.LivePlatform.JITSI:
+        room = jitsi_room_name(event)
+        domain = jitsi_domain()
+        return {
+            "provider": "jitsi",
+            "room": room,
+            "domain": domain,
+            "url": f"https://{domain}/{room}",
+            "display_name": (registration.name if registration else user.full_name),
+            "is_host": is_host,
         }
 
     if not livekit_configured():

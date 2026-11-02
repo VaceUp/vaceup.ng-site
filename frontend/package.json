@@ -32,6 +32,7 @@
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
     "framer-motion": "^13.2.0",
+    "livekit-client": "^2.23.0",
     "lottie-web": "^5.13.0",
     "lucide-react": "^1.39.0",
     "next": "15.5.24",

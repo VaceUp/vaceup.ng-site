@@ -16,13 +16,14 @@ interface EventRow {
   id: number; title: string; slug: string; summary: string; description: string;
   event_type: string; event_type_label: string; starts_at: string; ends_at: string | null;
   location: string; is_online: boolean; meeting_url: string; registration_url: string;
+  live_platform: 'external' | 'livekit'; room_name: string; join_ready?: boolean;
   capacity: number | null; image_url: string; image: string; is_featured: boolean;
   is_published: boolean; seats_taken: number; registrations_count?: number;
 }
 
 interface Registration {
   id: number; name: string; email: string; phone: string; note: string;
-  consent_marketing: boolean; created_at: string;
+  consent_marketing: boolean; join_link_sent_at: string | null; created_at: string;
 }
 
 const EVENT_TYPES = [
@@ -43,14 +44,21 @@ const toLocalInput = (iso: string | null) => {
 
 const emptyDraft = () => ({
   title: '', summary: '', description: '', event_type: 'workshop',
-  starts_at: '', ends_at: '', location: '', is_online: false, meeting_url: '',
+  starts_at: '', ends_at: '', location: '', is_online: false,
+  live_platform: 'external' as 'external' | 'livekit', meeting_url: '', room_name: '',
   registration_url: '', capacity: '', image_url: '', is_featured: false, is_published: false,
 });
 
 type Draft = ReturnType<typeof emptyDraft>;
 type FieldErrors = Partial<Record<'title' | 'starts_at' | 'ends_at', string>>;
 
-const venueOf = (row: EventRow) => (row.is_online ? 'Online' : row.location || 'Venue not set');
+const venueOf = (row: EventRow) => {
+  if (!row.is_online) return row.location || 'Venue not set';
+  return row.live_platform === 'livekit' ? 'Online · VaceUp Live Room' : 'Online';
+};
+
+const isOver = (row: Pick<EventRow, 'starts_at' | 'ends_at'>) =>
+  new Date(row.ends_at || row.starts_at).getTime() < Date.now();
 
 const whenOf = (row: EventRow) =>
   `${formatWorkspaceDate(row.starts_at, true)}${row.ends_at ? ` to ${formatWorkspaceDate(row.ends_at, true)}` : ''}`;
@@ -91,6 +99,7 @@ export default function EventsManager() {
       title: row.title, summary: row.summary, description: row.description, event_type: row.event_type,
       starts_at: toLocalInput(row.starts_at), ends_at: toLocalInput(row.ends_at), location: row.location,
       is_online: row.is_online, meeting_url: row.meeting_url || '', registration_url: row.registration_url,
+      live_platform: row.live_platform || 'external', room_name: row.room_name || '',
       capacity: row.capacity === null ? '' : String(row.capacity), image_url: '',
       is_featured: row.is_featured, is_published: row.is_published,
     });
@@ -117,8 +126,13 @@ export default function EventsManager() {
     };
     if (draft.image_url) fields.image_url = draft.image_url.trim();
     Object.entries(fields).forEach(([key, value]) => body.append(key, String(value)));
+    const builtInRoom = draft.is_online && draft.live_platform === 'livekit';
+    body.append('live_platform', draft.is_online ? draft.live_platform : 'external');
+    // A blank room name is not a mistake here: the server names the room after
+    // the event slug, so choosing the built-in room never leaves a dead link.
+    body.append('room_name', builtInRoom ? draft.room_name.trim() : '');
     // Draft events keep no meeting link so it cannot leak before publication.
-    body.append('meeting_url', draft.is_published ? draft.meeting_url.trim() : '');
+    body.append('meeting_url', !builtInRoom && draft.is_published ? draft.meeting_url.trim() : '');
     if (cover) body.append('cover_image', cover);
     try {
       if (editing) await api.request(`/website/events/${editing.slug}/`, { method: 'PATCH', body });
@@ -158,6 +172,19 @@ export default function EventsManager() {
         `/website/events/${roster.event.slug}/registrations/export/`,
         `${roster.event.slug}-registrations.csv`,
       );
+    } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
+  };
+
+  const sendLinks = async () => {
+    if (!roster) return;
+    setRosterBusy(true);
+    try {
+      const result = await api.request<{ detail: string }>(
+        `/website/events/${roster.event.slug}/send-link/`, { method: 'POST', body: '{}' },
+      );
+      toast.push(result.detail, 'success');
+      await openRoster(roster.event);
+      resource.refresh();
     } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
   };
 
@@ -223,7 +250,9 @@ export default function EventsManager() {
                 badges={<>
                   <Pill tone={row.is_published ? 'live' : 'draft'}>{row.is_published ? 'Published' : 'Draft'}</Pill>
                   {row.is_featured && <Pill tone="muted">Featured</Pill>}
-                  {row.is_online && <Pill tone="muted">Online</Pill>}
+                  {row.is_online && <Pill tone={row.join_ready ? 'muted' : 'danger'}>
+                    {row.join_ready ? (row.live_platform === 'livekit' ? 'Live Room' : 'Online') : 'Nothing to join yet'}
+                  </Pill>}
                 </>}
                 meta={<>
                   <span>{row.event_type_label} · {whenOf(row)} · {venueOf(row)}</span>
@@ -328,7 +357,7 @@ export default function EventsManager() {
             <TextInput type="url" placeholder="https://…" value={draft.image_url} onChange={(event) => set('image_url', event.target.value)} />
           </Field>
           <FormGrid columns={1}>
-            <CheckRow label="Online event" hint="Hides the venue and unlocks the joining link." checked={draft.is_online} onChange={(event) => set('is_online', event.target.checked)} />
+            <CheckRow label="Online event" hint="Hides the venue and lets you choose where attendees join." checked={draft.is_online} onChange={(event) => set('is_online', event.target.checked)} />
             <CheckRow label="Feature at the top of the Events page" checked={draft.is_featured} onChange={(event) => set('is_featured', event.target.checked)} />
             <CheckRow
               label="Publish on the website"
@@ -338,9 +367,30 @@ export default function EventsManager() {
             />
           </FormGrid>
           {draft.is_online && (
-            <Field label="Joining link" optional hint="Sent to visitors once the event is published.">
-              <TextInput type="url" value={draft.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} placeholder="https://meet.google.com/…" />
-            </Field>
+            <FormGrid columns={1}>
+              <Field label="Where attendees join" hint={draft.live_platform === 'livekit'
+                ? 'Attendees click Join on the event page and land in our own room. No other account needed.'
+                : 'Attendees click Join on the event page and are sent to this link.'}>
+                <select
+                  className={controlClass}
+                  value={draft.live_platform}
+                  onChange={(event) => set('live_platform', event.target.value as Draft['live_platform'])}
+                >
+                  <option value="external">External link (Google Meet / Zoom)</option>
+                  <option value="livekit">VaceUp Live Room (built in)</option>
+                </select>
+              </Field>
+              {draft.live_platform === 'external' && (
+                <Field label="Joining link" optional hint="Everyone who registered is sent the same link.">
+                  <TextInput type="url" value={draft.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} placeholder="https://meet.google.com/…" />
+                </Field>
+              )}
+              {draft.live_platform === 'livekit' && (
+                <Field label="Room name" optional hint={`Blank uses ${editing ? `“event-${editing.slug}”` : 'the event slug'} — one room per event, shared by every attendee.`}>
+                  <TextInput value={draft.room_name} onChange={(event) => set('room_name', event.target.value)} maxLength={120} placeholder="event-open-day" />
+                </Field>
+              )}
+            </FormGrid>
           )}
           <Field label="External sign-up link" optional hint="Leave blank to collect registrations here and read them under Registrations.">
             <TextInput type="url" value={draft.registration_url} onChange={(event) => set('registration_url', event.target.value)} placeholder="https://…" />
@@ -355,11 +405,23 @@ export default function EventsManager() {
         onClose={() => { setRoster(null); setRosterDrop(null); }}
         footer={roster?.rows.length ? <>
           <Action onClick={() => setRoster(null)}>Close</Action>
-          <Action intent="primary" loading={rosterBusy} onClick={() => void exportRoster()}>Export CSV</Action>
+          <Action loading={rosterBusy} onClick={() => void exportRoster()}>Export CSV</Action>
+          {roster.event.is_online && !isOver(roster.event) && (
+            <Action intent="primary" loading={rosterBusy} disabled={rosterBusy} onClick={() => void sendLinks()}>
+              Send joining link
+            </Action>
+          )}
         </> : undefined}
       >
         {roster && (roster.rows.length
-          ? <AdminList label="Event registrations">
+          ? <>
+            {roster.event.is_online && !roster.event.join_ready && (
+              <StatusNote tone="error">
+                There is nothing behind the joining link yet. Set the link, or switch the
+                event to the VaceUp Live Room, before sending it.
+              </StatusNote>
+            )}
+            <AdminList label="Event registrations">
             {roster.rows.map((row) => (
               <AdminRow
                 key={row.id}
@@ -370,6 +432,13 @@ export default function EventsManager() {
                 meta={<>
                   <a href={`mailto:${row.email}`} className="underline">{row.email}</a>
                   {row.phone ? ` · ${row.phone}` : ''} · signed up {formatWorkspaceDate(row.created_at, true)}
+                  {roster.event.is_online && (
+                    <span className="block">
+                      {row.join_link_sent_at
+                        ? `Joining link emailed ${formatWorkspaceDate(row.join_link_sent_at, true)}`
+                        : 'No joining link has reached them yet'}
+                    </span>
+                  )}
                 </>}
                 description={row.note}
                 actions={<>
@@ -383,7 +452,8 @@ export default function EventsManager() {
                 </>}
               />
             ))}
-          </AdminList>
+            </AdminList>
+          </>
           : <EmptyState
             icon="bi-person-x"
             title="Nobody has registered yet"

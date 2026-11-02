@@ -12,8 +12,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdmin, IsAdminOrReadOnly
+from apps.core.throttling import DatabaseAnonRateThrottle
 from apps.website import revisions
-from apps.website.emails import send_rsvp_confirmation
+from apps.website.emails import send_join_link_email, send_rsvp_confirmation
+from apps.website.join import JoinDenied, join_access, room_is_ready
 from apps.website.models import (
     AcademyProfile,
     BlogPost,
@@ -156,6 +158,17 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         return queryset.filter(is_published=True)
 
 
+class ResendSeatThrottle(DatabaseAnonRateThrottle):
+    """Re-issuing a seat is unauthenticated, so it runs slower than a page view.
+
+    A scoped throttle would need ``throttle_scope`` on the whole viewset, which
+    would then apply to every event route; its own scope keeps the limit on the
+    one action that can send mail.
+    """
+
+    scope = "event_resend"
+
+
 class EventViewSet(viewsets.ModelViewSet):
     """Published events for the website; admins manage drafts."""
 
@@ -225,17 +238,125 @@ class EventViewSet(viewsets.ModelViewSet):
                 {"detail": "This email is already registered for the event."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        transaction.on_commit(
-            lambda: send_rsvp_confirmation(registration=registration)
+        def confirm():
+            # The confirmation already carries the personal joining link, so a
+            # delivered one counts as a sent link.
+            if send_rsvp_confirmation(registration=registration):
+                EventRegistration.objects.filter(pk=registration.pk).update(
+                    join_link_sent_at=timezone.now()
+                )
+
+        transaction.on_commit(confirm)
+        payload = {
+            "detail": "You are registered. A confirmation email is on its way.",
+            "seats_taken": event.seats_taken,
+            "is_full": event.is_full,
+        }
+        if event.is_online:
+            # The success screen can hand over the seat immediately instead of
+            # telling people to wait for an email that may take a moment.
+            payload["join_link"] = registration.join_link()
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], permission_classes=[AllowAny], url_path="join")
+    def join(self, request, slug=None):
+        """Open the room for whoever holds this event's personal join link."""
+        event = self.get_object()
+        token = str(request.data.get("token") or "").strip()
+        registration = (
+            event.registrations.filter(join_token=token).first() if token else None
         )
-        return Response(
-            {
-                "detail": "You are registered. A confirmation email is on its way.",
-                "seats_taken": event.seats_taken,
-                "is_full": event.is_full,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        try:
+            access = join_access(event=event, registration=registration, user=request.user)
+        except JoinDenied as denied:
+            return Response({"detail": denied.detail}, status=denied.status_code)
+        return Response(access)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[AllowAny],
+        throttle_classes=[ResendSeatThrottle],
+        url_path="resend-link",
+    )
+    def resend_link(self, request, slug=None):
+        """Re-send a seat's joining link to the email that booked it.
+
+        The confirmation can sit in spam or be deleted while the attendee
+        hunts for it, and an event ticket should not require an account to
+        recover. The answer is the same whether or not the email is on the
+        list, so this is not a way to test who registered.
+        """
+        event = self.get_object()
+        email = str(request.data.get("email") or "").strip().lower()
+        if not event.is_online:
+            return Response(
+                {"detail": "This event is not online, so there is no link to send."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sent = 0
+        if email:
+            registration = event.registrations.filter(email__iexact=email).first()
+            if registration and send_join_link_email(registration=registration):
+                EventRegistration.objects.filter(pk=registration.pk).update(
+                    join_link_sent_at=timezone.now()
+                )
+                sent = 1
+        return Response({
+            "detail": (
+                "Your joining link is on its way. Check the inbox for that address."
+                if sent else
+                "If that email registered for this event, the joining link is on its way."
+            ),
+        })
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAdmin],
+        url_path="send-link",
+    )
+    def send_join_link(self, request, slug=None):
+        """Email every registrant the link that opens the room.
+
+        Confirmations go out before the academy has set the meeting details,
+        which is usually days later, so this is how that promise gets kept.
+        """
+        event = self.get_object()
+        if not event.is_online:
+            return Response(
+                {"detail": "This event is not online, so there is no link to send."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not room_is_ready(event):
+            return Response(
+                {
+                    "detail": "Set the joining link, or choose the VaceUp Live Room, "
+                              "before sending it."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        registrations = list(event.registrations.order_by("pk"))
+        if not registrations:
+            return Response(
+                {"detail": "Nobody has registered for this event yet.",
+                 "sent": 0, "failed": 0, "total": 0},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sent = 0
+        now = timezone.now()
+        for registration in registrations:
+            if send_join_link_email(registration=registration):
+                EventRegistration.objects.filter(pk=registration.pk).update(
+                    join_link_sent_at=now
+                )
+                sent += 1
+        failed = len(registrations) - sent
+        detail = f"{sent} of {len(registrations)} registrants were emailed their joining link."
+        if failed:
+            detail += f" {failed} could not be sent, so the mail setup needs a look."
+        return Response({"detail": detail, "sent": sent, "failed": failed,
+                         "total": len(registrations)})
 
     @action(detail=True, methods=["get"], permission_classes=[IsAdmin], url_path="registrations")
     def registrations(self, request, slug=None):

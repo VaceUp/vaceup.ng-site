@@ -3,6 +3,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.website.join import room_is_ready
 from apps.website.models import (
     AcademyProfile,
     BlogPost,
@@ -93,6 +94,10 @@ class EventPublicSerializer(serializers.ModelSerializer):
     is_full = serializers.BooleanField(read_only=True)
     is_past = serializers.BooleanField(read_only=True)
     rsvp_enabled = serializers.SerializerMethodField()
+    join_opens_at = serializers.DateTimeField(read_only=True)
+    join_closes_at = serializers.DateTimeField(read_only=True)
+    is_joinable = serializers.SerializerMethodField()
+    join_ready = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -101,6 +106,8 @@ class EventPublicSerializer(serializers.ModelSerializer):
             "event_type_label", "starts_at", "ends_at", "location", "is_online",
             "registration_url", "capacity", "seats_taken", "is_full",
             "is_past", "image", "is_featured", "rsvp_enabled",
+            "live_platform", "join_opens_at", "join_closes_at", "is_joinable",
+            "join_ready",
         )
 
     def get_image(self, obj):
@@ -109,14 +116,21 @@ class EventPublicSerializer(serializers.ModelSerializer):
     def get_rsvp_enabled(self, obj):
         return not obj.is_past and not obj.is_full and not obj.registration_url
 
+    def get_is_joinable(self, obj):
+        return obj.is_joinable()
+
+    def get_join_ready(self, obj):
+        """Whether there is anything behind Join yet — never the address itself."""
+        return room_is_ready(obj)
+
 
 class EventAdminSerializer(EventPublicSerializer):
     registrations_count = serializers.IntegerField(source="seats_taken", read_only=True)
 
     class Meta(EventPublicSerializer.Meta):
         fields = EventPublicSerializer.Meta.fields + (
-            "meeting_url", "cover_image", "is_published", "registrations_count",
-            "created_at", "updated_at",
+            "meeting_url", "room_name", "cover_image", "is_published",
+            "registrations_count", "created_at", "updated_at",
         )
         extra_kwargs = {"cover_image": {"write_only": True, "required": False}}
 
@@ -147,7 +161,7 @@ class EventRegistrationAdminSerializer(serializers.ModelSerializer):
         model = EventRegistration
         fields = (
             "id", "name", "email", "phone", "note", "consent_marketing",
-            "created_at",
+            "join_link_sent_at", "created_at",
         )
 
 

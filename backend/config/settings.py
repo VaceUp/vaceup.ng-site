@@ -119,6 +119,8 @@ REST_FRAMEWORK = {
         "auth_password_reset": "5/min",
         # Paystack retries a webhook at most a few times per event.
         "payment_webhook": "600/min",
+        # Re-issuing an event seat is unauthenticated, so keep it slow.
+        "event_resend": "3/min",
     },
     # OpenAPI/Swagger
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",

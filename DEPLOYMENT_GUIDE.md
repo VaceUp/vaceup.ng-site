@@ -139,6 +139,8 @@ kubectl logs -n vaceup -l app=vaceup-app --tail=100
 | `LIVE_CLASS_REMINDER_LEAD_MINUTES` | Reminder lead time | `30` |
 | `LIVE_CLASS_JOIN_EARLY_MINUTES` | Early join window | `10` |
 | `LIVE_CLASS_JOIN_GRACE_MINUTES` | Grace period | `15` |
+| `EVENT_JOIN_EARLY_MINUTES` | How early an event's VaceUp Live Room opens | `15` |
+| `EVENT_JOIN_GRACE_MINUTES` | How long an event's VaceUp Live Room stays open after it ends | `30` |
 
 ## Monitoring & Observability
 

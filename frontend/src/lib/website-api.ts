@@ -74,9 +74,28 @@ export interface WebsiteEvent {
   image: string;
   is_featured: boolean;
   rsvp_enabled: boolean;
+  live_platform?: 'external' | 'livekit';
+  join_opens_at?: string | null;
+  join_closes_at?: string | null;
+  is_joinable?: boolean;
+  join_ready?: boolean;
   meeting_url?: string;
   is_published?: boolean;
 }
+
+/** What the server hands the attendee who holds a valid seat link. */
+export type EventAccess =
+  | { provider: 'external'; url: string; display_name: string }
+  | {
+      provider: 'livekit';
+      room: string;
+      token: string;
+      ws_url: string;
+      identity: string;
+      display_name: string;
+      can_publish: boolean;
+      is_host: boolean;
+    };
 
 export interface BlogPost {
   id: number;
@@ -123,12 +142,30 @@ export function registerForEvent(
   slug: string,
   values: { name: string; email: string; phone: string; note: string; consent_marketing: boolean },
 ) {
-  return api.request<{ detail: string; seats_taken: number; is_full: boolean }>(
+  return api.request<{ detail: string; seats_taken: number; is_full: boolean; join_link?: string }>(
     `/website/events/${encodeURIComponent(slug)}/register/`,
     { method: 'POST', body: JSON.stringify(values) },
     false,
   );
 }
+
+/**
+ * Open the room behind one seat. The token is the string from the attendee's
+ * confirmation email, so a signed-in admin may also use this to rehearse.
+ */
+export const joinEvent = (slug: string, token: string) =>
+  api.request<EventAccess>(`/website/events/${encodeURIComponent(slug)}/join/`, {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+
+/** Re-issue a lost seat link. Never says whether the email is on the list. */
+export const resendJoinLink = (slug: string, email: string) =>
+  api.request<{ detail: string }>(
+    `/website/events/${encodeURIComponent(slug)}/resend-link/`,
+    { method: 'POST', body: JSON.stringify({ email }) },
+    false,
+  );
 
 export const getBlogPosts = () => walkPages<BlogPost>('/website/posts/', 100);
 

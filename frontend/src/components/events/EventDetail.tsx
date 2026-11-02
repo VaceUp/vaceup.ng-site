@@ -8,6 +8,7 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { downloadEventIcs } from '@/lib/calendar';
 import { formatEventWindow, getEvent, type WebsiteEvent } from '@/lib/website-api';
 import RegisterButton from './RegisterButton';
+import JoinBand from './JoinBand';
 
 export default function EventDetail({ slug }: { slug: string }) {
   const [event, setEvent] = useState<WebsiteEvent | null>(null);
@@ -121,12 +122,7 @@ export default function EventDetail({ slug }: { slug: string }) {
                     </p>
                   )}
 
-                  {shown.is_online && !shown.is_past && (
-                    <p className="mt-6 rounded-2xl border border-navy-100 bg-navy-50 p-4 text-sm text-navy-900">
-                      This event is online. We email your joining link with the
-                      registration confirmation, or as soon as the academy sets it.
-                    </p>
-                  )}
+                  {shown.is_online && !shown.is_past && <JoinBand event={shown} />}
 
                   {shown.is_past && (
                     <p className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">

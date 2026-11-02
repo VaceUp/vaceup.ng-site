@@ -1,5 +1,8 @@
 """Public website content: academy profile, team, events and blog posts."""
 
+import secrets
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -11,6 +14,17 @@ from config.storages import public_media_storage
 
 # Only real image types may be written to public media.
 IMAGE_UPLOAD_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
+
+# The room opens before the advertised start so people can settle in, and stays
+# open a while after the end so a late arrival is not locked out of a session
+# that overran its schedule.
+JOIN_EARLY = timedelta(minutes=getattr(settings, "EVENT_JOIN_EARLY_MINUTES", 15))
+JOIN_GRACE = timedelta(minutes=getattr(settings, "EVENT_JOIN_GRACE_MINUTES", 30))
+
+
+def _join_token():
+    return secrets.token_urlsafe(24)
+
 
 
 def _unique_slug(model, value, max_length=200):
@@ -129,6 +143,10 @@ class Event(TimeStampedModel):
         HACKATHON = "hackathon", "Hackathon"
         OTHER = "other", "Other"
 
+    class LivePlatform(models.TextChoices):
+        EXTERNAL = "external", "External link (Google Meet, Zoom, ...)"
+        VACEUP_ROOM = "livekit", "VaceUp Live Room (built in)"
+
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     summary = models.CharField(max_length=300, blank=True)
@@ -142,6 +160,17 @@ class Event(TimeStampedModel):
     is_online = models.BooleanField(default=False)
     meeting_url = models.URLField(
         blank=True, help_text="Online meeting link (Google Meet, Zoom, ...)."
+    )
+    live_platform = models.CharField(
+        max_length=20,
+        choices=LivePlatform.choices,
+        default=LivePlatform.EXTERNAL,
+        help_text="Where attendees actually go when they click Join.",
+    )
+    room_name = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="VaceUp Live Room name. Left blank, the event slug names the room.",
     )
     registration_url = models.CharField(
         max_length=500,
@@ -169,12 +198,29 @@ class Event(TimeStampedModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = _unique_slug(Event, self.title, max_length=220)
+        if self.live_platform == self.LivePlatform.VACEUP_ROOM and not self.room_name:
+            # A room the academy did not bother to name is still a room the site
+            # can open, so the choice alone never leaves attendees with nothing.
+            self.room_name = f"event-{self.slug}"[:120]
         super().save(*args, **kwargs)
 
     @property
     def is_past(self):
         end = self.ends_at or self.starts_at
         return end < timezone.now()
+
+    @property
+    def join_opens_at(self):
+        return self.starts_at - JOIN_EARLY
+
+    @property
+    def join_closes_at(self):
+        return (self.ends_at or self.starts_at) + JOIN_GRACE
+
+    def is_joinable(self, now=None):
+        """Whether the room may be entered right now."""
+        now = now or timezone.now()
+        return self.is_online and self.join_opens_at <= now <= self.join_closes_at
 
     @property
     def seats_taken(self):
@@ -206,6 +252,13 @@ class EventRegistration(TimeStampedModel):
         default=False,
         help_text="The visitor agreed to be emailed about future events.",
     )
+    # The attendee's own proof of a seat. It goes in the confirmation email so
+    # they can reach the room without an account, and it is what the join
+    # endpoint checks instead of trusting a typed-in email address.
+    join_token = models.CharField(
+        max_length=64, unique=True, default=_join_token, editable=False
+    )
+    join_link_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -217,6 +270,11 @@ class EventRegistration(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} -> {self.event.title}"
+
+    def join_link(self):
+        """The personal URL that opens this attendee's seat on the site."""
+        base = settings.FRONTEND_LINK_BASE.rstrip("/")
+        return f"{base}/live/?event={self.event.slug}&token={self.join_token}"
 
 
 class BloggerSource(TimeStampedModel):

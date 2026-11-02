@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -135,7 +135,7 @@ class WebsiteApiTests(TestCase):
         body = mail.outbox[0].body
         self.assertEqual(mail.outbox[0].to, ["ada@example.com"])
         self.assertIn("Open Day", mail.outbox[0].subject)
-        self.assertIn("https://meet.google.com/abc-defg-hij", body)
+        self.assertIn(f"/live/?event={event.slug}&token=", body)
         self.assertIn("hear about our future events", body)
         self.assertIn(f"/events/?slug={event.slug}", body)
 
@@ -161,7 +161,7 @@ class WebsiteApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(EventRegistration.objects.count(), 1)
 
-    def test_online_event_without_a_link_promises_one_later(self):
+    def test_online_event_without_a_link_still_sends_the_seat(self):
         event = self._event(is_online=True)
         mail.outbox.clear()
         with self.captureOnCommitCallbacks(execute=True):
@@ -169,8 +169,10 @@ class WebsiteApiTests(TestCase):
                 f"/api/v1/website/events/{event.slug}/register/",
                 {"name": "Ada", "email": "ada@example.com"}, format="json",
             )
-        self.assertIn("joining link before the event", mail.outbox[0].body)
-        self.assertIn("only email you about this event", mail.outbox[0].body)
+        body = mail.outbox[0].body
+        self.assertIn(f"/live/?event={event.slug}&token=", body)
+        self.assertIn("moment they are added", body)
+        self.assertIn("only email you about this event", body)
 
     def test_rsvp_rejects_an_overlong_note(self):
         event = self._event()

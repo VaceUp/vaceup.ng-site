@@ -26,6 +26,7 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [done, setDone] = useState('');
+  const [seatLink, setSeatLink] = useState('');
 
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -44,6 +45,7 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
         consent_marketing: form.consent_marketing,
       });
       setDone(result.detail);
+      setSeatLink(result.join_link || '');
       onRegistered(result.seats_taken, result.is_full);
     } catch (requestError) {
       setFormError(requestError instanceof Error ? requestError.message : 'Your registration could not be saved.');
@@ -65,11 +67,25 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
             <p>{event.is_online ? 'Online' : event.location || 'Venue to be confirmed'}</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            {seatLink && (
+              <a
+                href={seatLink}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gold-brand px-5 font-bold text-navy-950 hover:bg-gold-hover"
+              >
+                Open my joining link
+              </a>
+            )}
             <Button onClick={() => downloadEventIcs(event)} variant="outline">Add to calendar</Button>
             <Button onClick={onClose} className="bg-gold-brand text-navy-950 hover:bg-gold-hover font-bold">
               Done
             </Button>
           </div>
+          {seatLink && event.is_online && (
+            <p className="text-sm text-gray-600">
+              We have emailed this link to you as well. It is your seat, so please do
+              not pass it on — everyone coming should register for their own.
+            </p>
+          )}
         </div>
       ) : (
         <form onSubmit={(event_) => void submit(event_)} className="space-y-4">

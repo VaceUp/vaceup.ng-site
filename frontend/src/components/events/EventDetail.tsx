@@ -33,6 +33,11 @@ export default function EventDetail({ slug }: { slug: string }) {
       ? `${shown.seats_taken} of ${shown.capacity} seats taken`
       : `${shown.seats_taken} registered`
     : '';
+  const seatCount = shown
+    ? shown.capacity
+      ? `${shown.seats_taken} of ${shown.capacity}`
+      : `${shown.seats_taken}`
+    : '';
 
   const copyLink = async () => {
     try {
@@ -69,28 +74,37 @@ export default function EventDetail({ slug }: { slug: string }) {
         </section>
       ) : (
         <>
-          <section className="pb-8">
+          <section className="pb-6">
             <div className="mx-auto max-w-5xl px-6">
-              <div className="relative overflow-hidden rounded-3xl">
-                <div className="relative aspect-[16/9] lg:aspect-[21/9]">
-                  {shown.image ? (
-                    <img src={shown.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-navy-900" aria-hidden="true" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-r from-navy-950/90 via-navy-900/50 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-12">
-                    <div className="flex flex-wrap gap-3 mb-4">
-                      <Badge variant="secondary" className="text-sm">{shown.event_type_label}</Badge>
-                      <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine}</Badge>
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4 break-words">{shown.title}</h1>
-                    {shown.summary && (
-                      <p className="text-navy-100 text-lg max-w-2xl">{shown.summary}</p>
-                    )}
-                  </div>
-                </div>
+              <div className="flex flex-wrap gap-3 mb-4">
+                <Badge variant="secondary" className="text-sm">{shown.event_type_label}</Badge>
+                <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine}</Badge>
               </div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 mb-4 break-words">{shown.title}</h1>
+              {shown.summary && (
+                <p className="text-navy-800 text-lg max-w-2xl">{shown.summary}</p>
+              )}
+            </div>
+          </section>
+
+          <section className="pb-6">
+            <div className="mx-auto max-w-5xl px-6">
+              {/* An event flyer already carries its own headline and details,
+                  so it is shown whole in its own band rather than cropped
+                  behind the page's text. */}
+              <figure className="rounded-3xl border border-gray-200 bg-navy-50 p-3 sm:p-4">
+                {shown.image ? (
+                  <img
+                    src={shown.image}
+                    alt={`${shown.title} — event flyer`}
+                    className="mx-auto max-h-[70vh] max-w-full rounded-2xl object-contain"
+                  />
+                ) : (
+                  <div className="flex aspect-[16/9] w-full items-center justify-center rounded-2xl bg-navy-900 px-6 text-center text-sm text-navy-200">
+                    The academy has not added a flyer for this event yet.
+                  </div>
+                )}
+              </figure>
             </div>
           </section>
 
@@ -143,7 +157,7 @@ export default function EventDetail({ slug }: { slug: string }) {
                       <LordIconComponent src={LordIcons.userGroup} size={20} className="flex-shrink-0 text-navy-700" />
                       <div className="min-w-0">
                         <p className="text-sm text-gray-500">Seats</p>
-                        <p className="font-medium text-navy-950">{seatLine}</p>
+                        <p className="font-medium text-navy-950">{seatCount}</p>
                       </div>
                     </div>
                   </div>

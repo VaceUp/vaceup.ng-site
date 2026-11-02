@@ -139,55 +139,62 @@ function EventsList() {
           <>
             <section className="py-12 bg-white">
               <div className="mx-auto max-w-7xl px-6">
-                <article className="relative rounded-3xl overflow-hidden">
-                  <div className="relative aspect-[16/9] lg:aspect-[21/9]">
+                <article className="overflow-hidden rounded-3xl border border-gray-200 bg-white">
+                  {/* The flyer carries its own headline and details, so it gets a
+                      band of its own and the page text never sits on top of it. */}
+                  <div className="flex items-center justify-center bg-navy-50 p-4 sm:p-6">
                     {featured.image ? (
-                      <img src={featured.image} alt="" className="w-full h-full object-cover" />
+                      <img
+                        src={featured.image}
+                        alt={`${featured.title} — event flyer`}
+                        className="mx-auto max-h-[60vh] max-w-full rounded-2xl object-contain"
+                      />
                     ) : (
-                      <div className="w-full h-full bg-navy-900" aria-hidden="true" />
+                      <div className="flex aspect-[16/9] w-full items-center justify-center rounded-2xl bg-navy-900 px-6 text-center text-sm text-navy-200">
+                        The academy has not added a flyer for this event yet.
+                      </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-r from-navy-950/90 via-navy-900/50 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-8 lg:p-12">
-                      <div className="max-w-3xl">
-                        <div className="flex flex-wrap gap-3 mb-4">
-                          <Badge variant="secondary" className="text-sm">{featured.event_type_label}</Badge>
-                          <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine(featured)}</Badge>
-                        </div>
-                        <Link href={`/events/?slug=${featured.slug}`} className="block">
-                          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4 hover:text-gold-brand transition-colors">{featured.title}</h2>
-                        </Link>
-                        <p className="text-navy-100 text-lg mb-8 max-w-2xl">{featured.summary || featured.description}</p>
-                        <div className="flex flex-wrap gap-6 text-navy-200 mb-8">
-                          <div className="flex items-center gap-2">
-                            <LordIconComponent src={LordIcons.calendar} size={20} />
-                            <div>
-                              <p className="text-sm">When</p>
-                              <p className="font-medium">{formatEventWindow(featured)}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <LordIconComponent src={LordIcons.location} size={20} />
-                            <div>
-                              <p className="text-sm">Where</p>
-                              <p className="font-medium">{featured.is_online ? 'Online' : featured.location || 'Venue to be confirmed'}</p>
-                            </div>
+                  </div>
+
+                  <div className="min-w-0 p-8 lg:p-10">
+                    <div className="max-w-3xl">
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        <Badge variant="secondary" className="text-sm">{featured.event_type_label}</Badge>
+                        <Badge className="bg-gold-brand text-navy-950 text-sm">{seatLine(featured)}</Badge>
+                      </div>
+                      <Link href={`/events/?slug=${featured.slug}`} className="inline-block">
+                        <h2 className="text-3xl sm:text-4xl font-black text-navy-950 mb-4 hover:text-gold-brand transition-colors">{featured.title}</h2>
+                      </Link>
+                      <p className="text-gray-700 text-lg mb-8">{featured.summary || featured.description}</p>
+                      <div className="flex flex-wrap gap-6 text-navy-700 mb-8">
+                        <div className="flex items-center gap-2">
+                          <LordIconComponent src={LordIcons.calendar} size={20} />
+                          <div>
+                            <p className="text-sm text-gray-500">When</p>
+                            <p className="font-medium">{formatEventWindow(featured)}</p>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-4">
-                          <RegisterButton
-                            event={featured}
-                            block=""
-                            onRegistered={(taken, full) => syncSeats(featured.id, taken, full)}
-                          />
-                          <Button
-                            variant="outline"
-                            onClick={() => downloadEventIcs(featured)}
-                            className="border-white/30 text-white hover:bg-white/10"
-                          >
-                            Add to Calendar
-                            <LordIconComponent src={LordIcons.calendar} size={20} className="ml-2" />
-                          </Button>
+                        <div className="flex items-center gap-2">
+                          <LordIconComponent src={LordIcons.location} size={20} />
+                          <div>
+                            <p className="text-sm text-gray-500">Where</p>
+                            <p className="font-medium">{featured.is_online ? 'Online' : featured.location || 'Venue to be confirmed'}</p>
+                          </div>
                         </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4">
+                        <RegisterButton
+                          event={featured}
+                          block=""
+                          onRegistered={(taken, full) => syncSeats(featured.id, taken, full)}
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => downloadEventIcs(featured)}
+                        >
+                          Add to Calendar
+                          <LordIconComponent src={LordIcons.calendar} size={20} className="ml-2" />
+                        </Button>
                       </div>
                     </div>
                   </div>

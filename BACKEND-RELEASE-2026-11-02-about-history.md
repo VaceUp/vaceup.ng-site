@@ -114,26 +114,30 @@ bucket-refused message, even though the credentials are correct.
 
 ## Files in the zip
 
+Paths are relative to `/home/coqrpund/vaceup_api/`, which is where the archive
+extracts.
+
 ```
-backend/apps/accounts/models.py
-backend/apps/accounts/serializers.py
-backend/apps/accounts/urls.py
-backend/apps/accounts/views.py
-backend/apps/accounts/migrations/0005_user_avatar_user_avatar_updated_at.py
-backend/apps/core/management/commands/storage_probe.py
-backend/apps/website/admin.py
-backend/apps/website/models.py
-backend/apps/website/revisions.py
-backend/apps/website/serializers.py
-backend/apps/website/urls.py
-backend/apps/website/views.py
-backend/apps/website/migrations/0006_academyprofile_hero_title_contentrevision.py
-backend/apps/website/management/commands/restore_team_photos.py
+apps/accounts/models.py
+apps/accounts/serializers.py
+apps/accounts/urls.py
+apps/accounts/views.py
+apps/accounts/migrations/0005_user_avatar_user_avatar_updated_at.py
+apps/core/management/commands/storage_probe.py
+apps/website/admin.py
+apps/website/models.py
+apps/website/revisions.py
+apps/website/serializers.py
+apps/website/urls.py
+apps/website/views.py
+apps/website/migrations/0006_academyprofile_hero_title_contentrevision.py
+apps/website/management/commands/restore_team_photos.py
 ```
 
-Test files ship with the repository but are not needed on the server:
-`apps/accounts/tests/test_avatar.py`, `apps/website/test_revisions.py`,
-`apps/website/test_team_seed.py`, `apps/core/test_media_and_links.py`.
+The four test modules the same commit touched — `apps/accounts/tests/test_avatar.py`,
+`apps/website/test_revisions.py`, `apps/website/test_team_seed.py` and
+`apps/core/test_media_and_links.py` — ride along in the archive. They are never
+imported by the running site, so leaving them is harmless.
 
 ## What was verified
 

@@ -248,6 +248,7 @@ export function MemberCertificates() {
 
 const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AVATAR_LIMIT = 5 * 1024 * 1024;
+const ROLE_LABELS: Record<string, string> = { instructor: 'Tutor', admin: 'Administrator', student: 'Student' };
 
 function ProfilePictureCard() {
   const { user, uploadAvatar, removeAvatar } = useAuth();
@@ -318,7 +319,9 @@ function ProfilePictureCard() {
   </WorkspacePanel>;
 }
 
-export function MemberAccount() {
+// The same screen serves staff, who have no workspace theme to switch and are
+// not learners, so the caller says which of the two it is.
+export function MemberAccount({ staff = false }: { staff?: boolean }) {
   const { user, updateProfile } = useAuth();
   const { theme, toggle } = useWorkspaceTheme();
   const [name, setName] = useState(user?.full_name ?? '');
@@ -354,14 +357,16 @@ export function MemberAccount() {
       setPasswordError(error instanceof Error ? error.message : 'Your password could not be changed. Try again.');
     } finally { setPasswordBusy(false); }
   };
-  return <><WorkspaceHeading title="Account & appearance" description="Your account details, security and workspace preferences." /><div className={styles.split}>
+  return <><WorkspaceHeading title={staff ? 'Your account' : 'Account & appearance'} description={staff ? 'How you appear to learners and tutors, and how you sign in.' : 'Your account details, security and workspace preferences.'} /><div className={styles.split}>
     <div className={styles.stack}>
       <ProfilePictureCard />
-      <WorkspacePanel><h2>Your account</h2><dl className={styles.list}><div><dt>Email address</dt><dd>{user?.email}</dd></div><div><dt>Account type</dt><dd>{user?.role === 'instructor' ? 'Tutor' : 'Student'}</dd></div></dl>
+      <WorkspacePanel><h2>Name and sign-in</h2><dl className={styles.list}><div><dt>Email address</dt><dd>{user?.email}</dd></div><div><dt>Account type</dt><dd>{ROLE_LABELS[user?.role ?? 'student'] || 'Student'}</dd></div></dl>
         <form className={styles.stack} onSubmit={event => void saveProfile(event)} aria-label="Update your display name"><label className={styles.field}>Full name<input value={name} onChange={event => setName(event.target.value)} maxLength={150} required /></label>
           {profileError && <p role="alert" className={styles.error}>{profileError}</p>}{profileMessage && <p role="status">{profileMessage}</p>}
           <div><WorkspaceButton type="submit" loading={profileBusy} disabled={!name.trim() || name.trim() === user?.full_name}>Save display name</WorkspaceButton></div></form>
-        <p className={styles.footer}>Contact the academy to correct your email address. Email changes are staff-controlled so account recovery stays secure.</p>
+        <p className={styles.footer}>{staff
+          ? 'Your email address is how you sign in. Only the academy can change it, so account recovery stays secure.'
+          : 'Contact the academy to correct your email address. Email changes are staff-controlled so account recovery stays secure.'}</p>
       </WorkspacePanel>
       <WorkspacePanel><h2>Change password</h2><p className={styles.footer}>Use at least eight characters. Changing your password signs every session, including this one, out once its access token expires.</p>
         <form className={styles.stack} onSubmit={event => void savePassword(event)} aria-label="Change your password">
@@ -373,6 +378,6 @@ export function MemberAccount() {
         </form>
       </WorkspacePanel>
     </div>
-    <WorkspacePanel><h2>Workspace appearance</h2><p className={styles.footer}>This preference applies to the student and tutor workspace and is saved on this device when browser storage is available.</p><WorkspaceButton aria-pressed={theme === 'dark'} onClick={toggle}>Dark theme: {theme === 'dark' ? 'on' : 'off'}</WorkspaceButton></WorkspacePanel>
+    {!staff && <WorkspacePanel><h2>Workspace appearance</h2><p className={styles.footer}>This preference applies to the student and tutor workspace and is saved on this device when browser storage is available.</p><WorkspaceButton aria-pressed={theme === 'dark'} onClick={toggle}>Dark theme: {theme === 'dark' ? 'on' : 'off'}</WorkspaceButton></WorkspacePanel>}
   </div></>;
 }

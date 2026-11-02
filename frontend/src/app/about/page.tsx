@@ -140,15 +140,15 @@ export default function AboutPage() {
         <div className="mx-auto max-w-4xl px-6 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Talk to the academy</h2>
           <p className="text-navy-200 mb-8">
-            {profile?.location || SITE.address}
+            {SITE.address}
             {profile?.founded_year ? ` · teaching since ${profile.founded_year}` : ''}
           </p>
           <div className="flex flex-wrap justify-center gap-4 mb-8">
-            <a href={`mailto:${profile?.email || SITE.email}`} className="rounded-xl bg-gold-brand px-6 py-3 font-bold text-navy-950 hover:bg-gold-hover transition-colors">
-              {profile?.email || SITE.email}
+            <a href={`mailto:${SITE.email}`} className="rounded-xl bg-gold-brand px-6 py-3 font-bold text-navy-950 hover:bg-gold-hover transition-colors">
+              {SITE.email}
             </a>
             <a href={SITE.phoneHref} className="rounded-xl border border-navy-700 px-6 py-3 font-bold text-white hover:bg-navy-900 transition-colors">
-              {profile?.phone || SITE.phone}
+              {SITE.phone}
             </a>
             <Link href="/contact" className="rounded-xl border border-navy-700 px-6 py-3 font-bold text-white hover:bg-navy-900 transition-colors">
               Send a message

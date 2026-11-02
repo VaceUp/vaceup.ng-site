@@ -74,7 +74,7 @@ export interface WebsiteEvent {
   image: string;
   is_featured: boolean;
   rsvp_enabled: boolean;
-  live_platform?: 'external' | 'livekit';
+  live_platform?: 'external' | 'livekit' | 'jitsi';
   join_opens_at?: string | null;
   join_closes_at?: string | null;
   is_joinable?: boolean;
@@ -86,6 +86,14 @@ export interface WebsiteEvent {
 /** What the server hands the attendee who holds a valid seat link. */
 export type EventAccess =
   | { provider: 'external'; url: string; display_name: string }
+  | {
+      provider: 'jitsi';
+      room: string;
+      domain: string;
+      url: string;
+      display_name: string;
+      is_host: boolean;
+    }
   | {
       provider: 'livekit';
       room: string;

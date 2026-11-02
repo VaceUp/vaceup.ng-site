@@ -253,7 +253,7 @@ export default function WebsiteManager() {
     <>
       <AdminSection
         title="Academy profile"
-        description="Written on the About page hero and contact strip. Leave a field empty to fall back to the details configured elsewhere on the site."
+        description="Written on the About page headline, story and banner. Contact details are not set here — the site publishes the ones in the footer."
         actions={<>
           <Action type="submit" form="academy-profile-form" intent="primary" loading={profileBusy} disabled={!profileLoaded || !dirty}>Save profile</Action>
           <Action
@@ -300,10 +300,6 @@ export default function WebsiteManager() {
                 </Field>
               </FormGrid>
               <p className="mt-4 text-sm text-ink-500">
-                Contact details published on the site: {[profile.location, profile.email, profile.phone].filter(Boolean).join(' · ') || 'none set yet'}.
-                {' '}They are fixed, so this screen shows them but cannot change them.
-              </p>
-              <p className="mt-2 text-sm text-ink-500">
                 {profileHistory.length
                   ? dirty
                     ? 'Save this form first — undo goes back to the wording before your last save, not before these unsaved edits.'

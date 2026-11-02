@@ -18,6 +18,8 @@ import UsersTab from '@/components/Dashboard/admin/UsersTab';
 import ApplicationsTab from '@/components/Dashboard/admin/ApplicationsTab';
 import PaymentsTab from '@/components/Dashboard/admin/PaymentsTab';
 import AnnouncementsManager from '@/components/Dashboard/admin/AnnouncementsManager';
+import { MessagingWorkspace } from '@/components/Dashboard/MessagingWorkspace';
+import { MemberAccount } from '@/components/Dashboard/MemberPages';
 import WebsiteManager from '@/components/Dashboard/admin/WebsiteManager';
 import EventsManager from '@/components/Dashboard/admin/EventsManager';
 import BlogManager from '@/components/Dashboard/admin/BlogManager';
@@ -61,6 +63,10 @@ export function AdminHome() {
 
       {/* ═══ Announcements ═══ */}
       {tab === 'announcements' && <AnnouncementsManager />}
+
+      {/* ═══ Messages and the admin's own account ═══ */}
+      {tab === 'messages' && <MessagingWorkspace />}
+      {tab === 'account' && <MemberAccount staff />}
 
       {/* ═══ Public website ═══ */}
       {tab === 'website' && <WebsiteManager />}

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { joinEvent, resendJoinLink, type EventAccess } from '@/lib/website-api';
@@ -12,6 +13,11 @@ import { webUrl } from '@/lib/workspace-api';
 
 // The room pulls in the WebRTC client, which only exists in a browser.
 const LiveRoom = dynamic(() => import('@/components/live/LiveRoom'), {
+  ssr: false,
+  loading: () => <p role="status" className="p-6 text-sm text-gray-500">Loading the live room…</p>,
+});
+// Jitsi is mounted by its own embed script, which also only exists in a browser.
+const JitsiRoom = dynamic(() => import('@/components/live/JitsiRoom'), {
   ssr: false,
   loading: () => <p role="status" className="p-6 text-sm text-gray-500">Loading the live room…</p>,
 });
@@ -29,6 +35,8 @@ function LiveRoute() {
   const params = useSearchParams();
   const slug = params.get('event')?.trim() || '';
   const token = params.get('token')?.trim() || '';
+  const { user, isLoading } = useAuth();
+  const isStaff = user?.role === 'admin';
   const [access, setAccess] = useState<EventAccess | null>(null);
   const [message, setMessage] = useState('');
   const [state, setState] = useState<'checking' | 'blocked' | 'waiting' | 'open'>('checking');
@@ -39,7 +47,13 @@ function LiveRoute() {
       setMessage('This link does not name an event. Open the Events page and use the link in your confirmation email.');
       return;
     }
-    if (!token) {
+    // The academy runs the room from the Events screen, so a signed-in admin
+    // needs no seat link; everyone else proves the seat with their token.
+    if (isLoading) {
+      setState('checking');
+      return;
+    }
+    if (!token && !isStaff) {
       setState('blocked');
       setMessage('Use the personal link in your confirmation email — it is what holds your seat. We can send it to you again below.');
       return;
@@ -51,7 +65,7 @@ function LiveRoute() {
       .then((result) => {
         if (cancelled) return;
         setAccess(result);
-        setState(result.provider === 'livekit' ? 'open' : 'waiting');
+        setState(result.provider === 'external' ? 'waiting' : 'open');
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -62,7 +76,7 @@ function LiveRoute() {
           : 'The room could not be opened right now. Try again in a moment.');
       });
     return () => { cancelled = true; };
-  }, [slug, token]);
+  }, [slug, token, isLoading, isStaff]);
 
   const externalUrl = access?.provider === 'external' ? webUrl(access.url) : null;
 
@@ -74,6 +88,10 @@ function LiveRoute() {
 
   if (access?.provider === 'livekit') {
     return <LiveRoom access={access} eventSlug={slug} />;
+  }
+
+  if (access?.provider === 'jitsi') {
+    return <JitsiRoom access={access} eventSlug={slug} />;
   }
 
   return (

@@ -1,4 +1,4 @@
-@reference "../globals.css";
+@reference "../../app/globals.css";
 .layout { display: grid; gap: calc(var(--spacing) * 6); align-items: start; }
 .threadTitle { font-size: var(--text-2xl); font-weight: var(--font-weight-semibold); }
 .body { white-space: pre-wrap; overflow-wrap: anywhere; padding-block: calc(var(--spacing) * 3); }

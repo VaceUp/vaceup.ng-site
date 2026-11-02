@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { api } from '@/lib/api';
 import { downloadApiFile } from '@/lib/api-pages';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
@@ -16,15 +16,25 @@ interface EventRow {
   id: number; title: string; slug: string; summary: string; description: string;
   event_type: string; event_type_label: string; starts_at: string; ends_at: string | null;
   location: string; is_online: boolean; meeting_url: string; registration_url: string;
-  live_platform: 'external' | 'livekit'; room_name: string; join_ready?: boolean;
+  live_platform: 'external' | 'livekit' | 'jitsi'; room_name: string; join_ready?: boolean;
   capacity: number | null; image_url: string; image: string; is_featured: boolean;
   is_published: boolean; seats_taken: number; registrations_count?: number;
 }
 
 interface Registration {
   id: number; name: string; email: string; phone: string; note: string;
-  consent_marketing: boolean; join_link_sent_at: string | null; created_at: string;
+  consent_marketing: boolean; join_link_sent_at: string | null;
+  broadcast_sent_at: string | null; created_at: string;
 }
+
+interface BroadcastResult {
+  detail: string; sent: number; failed: number; remaining: number;
+  total: number; done: boolean;
+}
+
+// The server mails in bounded batches so one request cannot outlive the
+// server's timeout; the panel asks for the next batch until it reports done.
+const MAIL_BATCH = 25;
 
 const EVENT_TYPES = [
   { value: 'open_day', label: 'Open Day' },
@@ -45,16 +55,30 @@ const toLocalInput = (iso: string | null) => {
 const emptyDraft = () => ({
   title: '', summary: '', description: '', event_type: 'workshop',
   starts_at: '', ends_at: '', location: '', is_online: false,
-  live_platform: 'external' as 'external' | 'livekit', meeting_url: '', room_name: '',
+  live_platform: 'external' as 'external' | 'livekit' | 'jitsi', meeting_url: '', room_name: '',
   registration_url: '', capacity: '', image_url: '', is_featured: false, is_published: false,
 });
 
 type Draft = ReturnType<typeof emptyDraft>;
 type FieldErrors = Partial<Record<'title' | 'starts_at' | 'ends_at', string>>;
 
+type Platform = EventRow['live_platform'];
+
+// Both built-in rooms are "our own room" to the academy; only the server behind
+// them differs, so every label the staff reads treats them as one family.
+const isBuiltInRoom = (platform: Platform) => platform === 'livekit' || platform === 'jitsi';
+
+const JOIN_HINTS: Record<Platform, string> = {
+  external: 'Attendees click Join on the event page and are sent to this link.',
+  jitsi: 'Attendees click Join and land in our own room, run on the free Jitsi server. '
+    + 'Nothing to set up, but that server now cuts a meeting off at 95 minutes.',
+  livekit: 'Attendees click Join and land in our own room, run on our LiveKit project. '
+    + 'Needs the LiveKit keys on the server.',
+};
+
 const venueOf = (row: EventRow) => {
   if (!row.is_online) return row.location || 'Venue not set';
-  return row.live_platform === 'livekit' ? 'Online · VaceUp Live Room' : 'Online';
+  return isBuiltInRoom(row.live_platform) ? 'Online · VaceUp Live Room' : 'Online';
 };
 
 const isOver = (row: Pick<EventRow, 'starts_at' | 'ends_at'>) =>
@@ -84,6 +108,9 @@ export default function EventsManager() {
   const [roster, setRoster] = useState<{ event: EventRow; rows: Registration[] } | null>(null);
   const [rosterBusy, setRosterBusy] = useState(false);
   const [rosterDrop, setRosterDrop] = useState<Registration | null>(null);
+  const [mail, setMail] = useState<{ subject: string; message: string; include_link: boolean } | null>(null);
+  const [mailRun, setMailRun] = useState<{ sent: number; failed: number; total: number; running: boolean; error: string } | null>(null);
+  const mailHalt = useRef(false);
 
   const rows = useMemo(() => resource.data?.results ?? [], [resource.data]);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -126,7 +153,7 @@ export default function EventsManager() {
     };
     if (draft.image_url) fields.image_url = draft.image_url.trim();
     Object.entries(fields).forEach(([key, value]) => body.append(key, String(value)));
-    const builtInRoom = draft.is_online && draft.live_platform === 'livekit';
+    const builtInRoom = draft.is_online && isBuiltInRoom(draft.live_platform);
     body.append('live_platform', draft.is_online ? draft.live_platform : 'external');
     // A blank room name is not a mistake here: the server names the room after
     // the event slug, so choosing the built-in room never leaves a dead link.
@@ -188,6 +215,78 @@ export default function EventsManager() {
     } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setRosterBusy(false); }
   };
 
+  const closeRoster = () => {
+    mailHalt.current = true;
+    setRoster(null); setRosterDrop(null); setMail(null); setMailRun(null);
+  };
+
+  const startMail = () => {
+    if (!roster) return;
+    setMail({ subject: '', message: '', include_link: !!roster.event.join_ready });
+    setMailRun(null);
+  };
+
+  const sendMail = async () => {
+    if (!roster || !mail) return;
+    const subject = mail.subject.trim();
+    const message = mail.message.trim();
+    const total = roster.rows.filter((row) => !row.broadcast_sent_at).length;
+    if (!subject || !message) {
+      setMailRun({ sent: 0, failed: 0, total, running: false, error: 'Write both a subject and a message.' });
+      return;
+    }
+    mailHalt.current = false;
+    setMailRun({ sent: 0, failed: 0, total, running: true, error: '' });
+    const passes = Math.ceil(total / MAIL_BATCH);
+    let sent = 0;
+    let failed = 0;
+    let problem = '';
+    try {
+      // One pass per batch, then the loop gives up rather than spinning on a
+      // relay that keeps answering with the same unstamped rows.
+      for (let pass = 1; pass <= passes; pass += 1) {
+        if (mailHalt.current) {
+          problem = 'Stopped. Everyone already emailed is marked, so sending again continues from here.';
+          break;
+        }
+        const result = await api.request<BroadcastResult>(
+          `/website/events/${roster.event.slug}/broadcast/`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ subject, message, include_link: mail.include_link, batch: MAIL_BATCH }),
+          },
+        );
+        sent += result.sent;
+        failed += result.failed;
+        setMailRun({ sent, failed, total, running: !result.done, error: '' });
+        if (result.done) break;
+        if (!result.sent && result.failed) {
+          problem = 'The mail server refused these, so the rest were left unsent. Fix the email setup, '
+            + 'then send again: the addresses that already received it are not mailed twice.';
+          break;
+        }
+        if (pass === passes) problem = 'This run reached its limit. Send again to finish the roster.';
+      }
+      if (problem) {
+        setMailRun({ sent, failed, total, running: false, error: problem });
+        toast.push(problem, 'error');
+      } else {
+        const note = `${sent} ${sent === 1 ? 'registrant' : 'registrants'} were emailed`
+          + (failed ? `, ${failed} could not be reached` : '');
+        toast.push(note, failed ? 'error' : 'success');
+        setMail(null);
+      }
+      await openRoster(roster.event);
+      resource.refresh();
+    } catch (err) {
+      const detail = failureMessage(err);
+      setMailRun({ sent, failed, total, running: false, error: detail });
+      toast.push(detail, 'error');
+    } finally {
+      setMailRun((current) => (current ? { ...current, running: false } : current));
+    }
+  };
+
   const dropRegistration = async () => {
     if (!roster || !rosterDrop) return;
     setRosterBusy(true);
@@ -213,6 +312,10 @@ export default function EventsManager() {
   };
 
   const submitLabel = editing ? 'Save event' : draft.is_published ? 'Create and publish' : 'Save as draft';
+
+  // The server never mails an address this panel has already reached, so the
+  // button counts only the people this click will actually send to.
+  const mailPending = roster?.rows.filter((row) => !row.broadcast_sent_at).length ?? 0;
 
   return (
     <>
@@ -251,7 +354,7 @@ export default function EventsManager() {
                   <Pill tone={row.is_published ? 'live' : 'draft'}>{row.is_published ? 'Published' : 'Draft'}</Pill>
                   {row.is_featured && <Pill tone="muted">Featured</Pill>}
                   {row.is_online && <Pill tone={row.join_ready ? 'muted' : 'danger'}>
-                    {row.join_ready ? (row.live_platform === 'livekit' ? 'Live Room' : 'Online') : 'Nothing to join yet'}
+                    {row.join_ready ? (isBuiltInRoom(row.live_platform) ? 'Live Room' : 'Online') : 'Nothing to join yet'}
                   </Pill>}
                 </>}
                 meta={<>
@@ -260,6 +363,18 @@ export default function EventsManager() {
                     {seatsOf(row)}
                     {row.registration_url ? ' · sign-ups go to an external page' : ''}
                   </span>
+                  {row.is_online && row.join_ready && isBuiltInRoom(row.live_platform) && (
+                    // The room is opened from here rather than from a seat link,
+                    // because the academy's own host has no registration.
+                    <a
+                      href={`/live/?event=${encodeURIComponent(row.slug)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block font-semibold text-navy-700 underline hover:text-navy-900"
+                    >
+                      Open the live room
+                    </a>
+                  )}
                 </>}
                 description={row.summary}
                 actions={<>
@@ -368,16 +483,15 @@ export default function EventsManager() {
           </FormGrid>
           {draft.is_online && (
             <FormGrid columns={1}>
-              <Field label="Where attendees join" hint={draft.live_platform === 'livekit'
-                ? 'Attendees click Join on the event page and land in our own room. No other account needed.'
-                : 'Attendees click Join on the event page and are sent to this link.'}>
+              <Field label="Where attendees join" hint={JOIN_HINTS[draft.live_platform]}>
                 <select
                   className={controlClass}
                   value={draft.live_platform}
                   onChange={(event) => set('live_platform', event.target.value as Draft['live_platform'])}
                 >
                   <option value="external">External link (Google Meet / Zoom)</option>
-                  <option value="livekit">VaceUp Live Room (built in)</option>
+                  <option value="jitsi">VaceUp Live Room — Jitsi (nothing to set up)</option>
+                  <option value="livekit">VaceUp Live Room — LiveKit (needs our keys)</option>
                 </select>
               </Field>
               {draft.live_platform === 'external' && (
@@ -385,8 +499,14 @@ export default function EventsManager() {
                   <TextInput type="url" value={draft.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} placeholder="https://meet.google.com/…" />
                 </Field>
               )}
-              {draft.live_platform === 'livekit' && (
-                <Field label="Room name" optional hint={`Blank uses ${editing ? `“event-${editing.slug}”` : 'the event slug'} — one room per event, shared by every attendee.`}>
+              {isBuiltInRoom(draft.live_platform) && (
+                <Field
+                  label="Room name"
+                  optional
+                  hint={draft.live_platform === 'jitsi'
+                    ? `Blank uses ${editing ? `“event-${editing.slug}”` : 'the event slug'}. Jitsi guards a room by its name alone, so a private code this event keeps is always added to it.`
+                    : `Blank uses ${editing ? `“event-${editing.slug}”` : 'the event slug'} — one room per event, shared by every attendee.`}
+                >
                   <TextInput value={draft.room_name} onChange={(event) => set('room_name', event.target.value)} maxLength={120} placeholder="event-open-day" />
                 </Field>
               )}
@@ -402,11 +522,14 @@ export default function EventsManager() {
         open={!!roster}
         title={roster ? `Registrations: ${roster.event.title}` : 'Registrations'}
         description={roster ? `${roster.rows.length} ${roster.rows.length === 1 ? 'person' : 'people'}${roster.event.capacity === null ? '' : ` of ${roster.event.capacity} seats`} · ${whenOf(roster.event)}` : undefined}
-        onClose={() => { setRoster(null); setRosterDrop(null); }}
+        onClose={closeRoster}
         footer={roster?.rows.length ? <>
-          <Action onClick={() => setRoster(null)}>Close</Action>
+          <Action onClick={closeRoster}>Close</Action>
           <Action loading={rosterBusy} onClick={() => void exportRoster()}>Export CSV</Action>
-          {roster.event.is_online && !isOver(roster.event) && (
+          <Action disabled={rosterBusy || !!mailRun?.running} onClick={() => (mail ? setMail(null) : startMail())}>
+            {mail ? 'Cancel mail' : 'Mail everyone'}
+          </Action>
+          {roster.event.is_online && !isOver(roster.event) && !mail && (
             <Action intent="primary" loading={rosterBusy} disabled={rosterBusy} onClick={() => void sendLinks()}>
               Send joining link
             </Action>
@@ -415,6 +538,58 @@ export default function EventsManager() {
       >
         {roster && (roster.rows.length
           ? <>
+            {mail && (
+              <form
+                className="mb-4 space-y-3 rounded-xl border border-ink-200 p-4"
+                onSubmit={(event) => { event.preventDefault(); void sendMail(); }}
+              >
+                <Field label="Subject" required>
+                  <TextInput
+                    value={mail.subject}
+                    onChange={(event) => setMail({ ...mail, subject: event.target.value })}
+                    maxLength={150}
+                    placeholder="What the attendees need to know"
+                  />
+                </Field>
+                <Field label="Message" required hint="Each person gets their own email, greeted by name. An empty line starts a new paragraph.">
+                  <textarea
+                    className={controlClass}
+                    rows={5}
+                    maxLength={4000}
+                    value={mail.message}
+                    onChange={(event) => setMail({ ...mail, message: event.target.value })}
+                    placeholder="The session starts 30 minutes earlier than planned…"
+                  />
+                </Field>
+                {roster.event.is_online && roster.event.join_ready && (
+                  <CheckRow
+                    label="Add each person's own joining link"
+                    checked={mail.include_link}
+                    onChange={(event) => setMail({ ...mail, include_link: event.target.checked })}
+                  />
+                )}
+                {mailRun && (
+                  <StatusNote tone={mailRun.error ? 'error' : 'info'}>
+                    {mailRun.error
+                      || `${mailRun.sent} of ${mailRun.total} emailed${mailRun.failed ? `, ${mailRun.failed} refused` : ''}.`}
+                  </StatusNote>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {mailRun?.running ? (
+                    <Action onClick={() => { mailHalt.current = true; }}>Stop after this batch</Action>
+                  ) : mailPending === 0 ? (
+                    <StatusNote tone="ok">Everyone on this list has already been mailed from here.</StatusNote>
+                  ) : (
+                    <Action type="submit" intent="primary" disabled={rosterBusy}>
+                      {mailPending === roster.rows.length
+                        ? `Send to ${mailPending} registrant${mailPending === 1 ? '' : 's'}`
+                        : `Send to the ${mailPending} not yet emailed`}
+                    </Action>
+                  )}
+                  <Action onClick={() => setMail(null)}>Discard the draft</Action>
+                </div>
+              </form>
+            )}
             {roster.event.is_online && !roster.event.join_ready && (
               <StatusNote tone="error">
                 There is nothing behind the joining link yet. Set the link, or switch the
@@ -437,6 +612,11 @@ export default function EventsManager() {
                       {row.join_link_sent_at
                         ? `Joining link emailed ${formatWorkspaceDate(row.join_link_sent_at, true)}`
                         : 'No joining link has reached them yet'}
+                    </span>
+                  )}
+                  {row.broadcast_sent_at && (
+                    <span className="block">
+                      Academy note emailed {formatWorkspaceDate(row.broadcast_sent_at, true)}
                     </span>
                   )}
                 </>}

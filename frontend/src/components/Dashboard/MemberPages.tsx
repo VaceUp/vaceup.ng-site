@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { ArrowRight, BookOpen, CalendarDays, ClipboardList, ListChecks, Search, Video } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -10,6 +10,7 @@ import { formatWorkspaceDate, type WorkspaceAgendaItem, type WorkspaceApplicatio
 import { formatPrice, getCategories, type CatalogCategory, type CatalogCourse } from '@/lib/public-catalog';
 import { getTutorSignature, removeTutorSignature, saveTutorSignature, signatureFileError, signatureUpdatedLabel, SIGNATURE_ACCEPT, type TutorSignature } from '@/lib/certificate-api';
 import { downloadApiFile } from '@/lib/api-pages';
+import { Avatar } from '@/components/ui/Avatar';
 import { useWorkspaceTheme } from './MemberShell';
 import { WorkspaceHeading, WorkspacePanel, WorkspaceEmpty, WorkspaceFeedback, WorkspaceRefresh, WorkspaceLink, WorkspaceButton, WorkspaceCourseCard, WorkspacePagination, WorkspaceProgress, styles } from './WorkspaceUI';
 
@@ -245,6 +246,78 @@ export function MemberCertificates() {
   </>;
 }
 
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const AVATAR_LIMIT = 5 * 1024 * 1024;
+
+function ProfilePictureCard() {
+  const { user, uploadAvatar, removeAvatar } = useAuth();
+  const [busy, setBusy] = useState<'uploading' | 'removing' | ''>('');
+  const [percent, setPercent] = useState(0);
+  const [preview, setPreview] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+
+  // Revoke only after the picture is no longer on screen: revoking a blob the
+  // browser is still displaying makes the image fail and fall back to initials.
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  const choose = async (picked: File | null) => {
+    if (!picked) return;
+    setMessage(''); setError('');
+    if (!AVATAR_TYPES.includes(picked.type)) { setError('Choose a JPEG, PNG or WebP picture.'); return; }
+    if (picked.size > AVATAR_LIMIT) { setError('Choose a picture smaller than 5 MB.'); return; }
+    // Show the chosen picture straight away, so the learner sees exactly what is being sent.
+    const local = URL.createObjectURL(picked);
+    setPreview(local); setBusy('uploading'); setPercent(0);
+    try {
+      await uploadAvatar(picked, setPercent);
+      setMessage('Your picture is saved. It now appears beside your name.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your picture could not be saved. Try again.');
+    } finally {
+      setPreview(''); setBusy('');
+      if (input.current) input.current.value = '';
+    }
+  };
+
+  const remove = async () => {
+    setMessage(''); setError(''); setBusy('removing');
+    try {
+      await removeAvatar();
+      setMessage('Your picture has been removed. Your initials are shown instead.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your picture could not be removed. Try again.');
+    } finally { setBusy(''); }
+  };
+
+  return <WorkspacePanel>
+    <p className={styles.eyebrow}>PROFILE PICTURE</p>
+    <h2>How you appear</h2>
+    <p className={styles.muted}>Your picture appears beside your name in your workspace, on messages and on certificates. A square picture at least 400 pixels wide works best.</p>
+    <div className={styles.avatarRow}>
+      <Avatar src={preview || user?.avatar} name={user?.full_name} size="2xl" aria-hidden="true" />
+      <div className={`${styles.stack} ${styles.avatarForm}`} aria-live="polite">
+        <label className={styles.field}>Choose a picture<input ref={input} type="file" accept={AVATAR_TYPES.join(',')} disabled={!!busy} onChange={event => void choose(event.target.files?.[0] ?? null)} /></label>
+        <p className={styles.muted}>JPEG, PNG or WebP, up to 5 MB.</p>
+        {busy === 'uploading' && <div className={styles.progressWrap}>
+          <progress value={percent} max={100} aria-label="Picture upload progress" />
+          <span>{percent}%</span>
+        </div>}
+        {busy === 'uploading' && <p role="status">{percent < 100 ? `Sending your picture to the academy (${percent}%).` : 'Saving your picture to your account...'}</p>}
+      </div>
+    </div>
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {message && <p role="status">{message}</p>}
+    {user?.avatar && busy !== 'uploading' && <div className={styles.row}>
+      <WorkspaceButton type="button" disabled={!!busy} loading={busy === 'removing'} onClick={() => void remove()}>Remove picture</WorkspaceButton>
+    </div>}
+  </WorkspacePanel>;
+}
+
 export function MemberAccount() {
   const { user, updateProfile } = useAuth();
   const { theme, toggle } = useWorkspaceTheme();
@@ -283,6 +356,7 @@ export function MemberAccount() {
   };
   return <><WorkspaceHeading title="Account & appearance" description="Your account details, security and workspace preferences." /><div className={styles.split}>
     <div className={styles.stack}>
+      <ProfilePictureCard />
       <WorkspacePanel><h2>Your account</h2><dl className={styles.list}><div><dt>Email address</dt><dd>{user?.email}</dd></div><div><dt>Account type</dt><dd>{user?.role === 'instructor' ? 'Tutor' : 'Student'}</dd></div></dl>
         <form className={styles.stack} onSubmit={event => void saveProfile(event)} aria-label="Update your display name"><label className={styles.field}>Full name<input value={name} onChange={event => setName(event.target.value)} maxLength={150} required /></label>
           {profileError && <p role="alert" className={styles.error}>{profileError}</p>}{profileMessage && <p role="status">{profileMessage}</p>}

@@ -7,6 +7,7 @@ from apps.website.models import (
     AcademyProfile,
     BlogPost,
     BloggerSource,
+    ContentRevision,
     Event,
     EventRegistration,
     TeamMember,
@@ -14,15 +15,21 @@ from apps.website.models import (
 from apps.website.sanitize import sanitize_html
 
 
-def _image_url(obj, field):
+def _image_url(obj, field, request=None):
     # An uploaded image is the deliberate, most recent choice, so it wins over
     # a pasted URL that may still point at an old picture.
     image = getattr(obj, field, None)
     if image:
         try:
-            return image.url
+            url = image.url
         except ValueError:
-            pass
+            url = ""
+        if url:
+            # The site is a static export on a different origin, so a storage
+            # fallback path such as "/media/public/..." would load nothing.
+            if request is not None and url.startswith("/"):
+                return request.build_absolute_uri(url)
+            return url
     return obj.image_url
 
 
@@ -30,12 +37,32 @@ class AcademyProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = AcademyProfile
         fields = (
-            "id", "name", "tagline", "mission", "story", "location",
+            "id", "name", "tagline", "mission", "story", "hero_title", "location",
             "founded_year", "next_cohort_start",
             "email", "phone", "linkedin_url",
             "instagram_url", "facebook_url", "website_url",
         )
         extra_kwargs = {"next_cohort_start": {"required": False, "allow_null": True}}
+
+
+class ContentRevisionSerializer(serializers.ModelSerializer):
+    """One entry in the About-page edit history."""
+
+    changed_by_name = serializers.SerializerMethodField()
+    created_at_label = serializers.DateTimeField(source="created_at", read_only=True, format="%d %B %Y at %H:%M")
+
+    class Meta:
+        model = ContentRevision
+        fields = (
+            "id", "target", "object_id", "label", "changed_fields",
+            "changed_by_name", "created_at", "created_at_label",
+        )
+        read_only_fields = fields
+
+    def get_changed_by_name(self, obj):
+        if not obj.changed_by:
+            return ""
+        return obj.changed_by.full_name or obj.changed_by.email
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -51,7 +78,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         extra_kwargs = {"photo": {"write_only": True, "required": False}}
 
     def get_image(self, obj):
-        return _image_url(obj, "photo")
+        return _image_url(obj, "photo", self.context.get("request"))
 
     def validate_photo(self, image):
         if image and image.size > 5 * 1024 * 1024:
@@ -77,7 +104,7 @@ class EventPublicSerializer(serializers.ModelSerializer):
         )
 
     def get_image(self, obj):
-        return _image_url(obj, "cover_image")
+        return _image_url(obj, "cover_image", self.context.get("request"))
 
     def get_rsvp_enabled(self, obj):
         return not obj.is_past and not obj.is_full and not obj.registration_url

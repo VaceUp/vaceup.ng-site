@@ -3,6 +3,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenBlacklistView, TokenRefreshView
 
 from apps.accounts.views import (
+    AvatarView,
     ChangePasswordView,
     LoginView,
     MeView,
@@ -39,5 +40,6 @@ urlpatterns = [
     path("logout/", TokenBlacklistView.as_view(), name="token_blacklist"),
     # Current user
     path("me/", MeView.as_view(), name="me"),
+    path("me/avatar/", AvatarView.as_view(), name="avatar"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 ]

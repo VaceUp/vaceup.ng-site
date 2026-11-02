@@ -1,0 +1,124 @@
+/* Team portraits: one large frame per person, with a monogram that stands in
+   for a picture the store cannot deliver. Motion is decorative and always
+   switches off under prefers-reduced-motion. */
+
+.portrait {
+  position: relative;
+  margin: 0;
+  opacity: 1;
+  transform: none;
+  transition: opacity 640ms cubic-bezier(0.22, 0.7, 0.3, 1),
+    transform 640ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+.portrait[data-reveal="false"] {
+  opacity: 0;
+  transform: translateY(calc(var(--spacing) * 6));
+}
+
+.frame {
+  position: relative;
+  display: block;
+  block-size: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: radial-gradient(circle at 30% 20%, var(--color-navy-800), var(--color-navy-950) 70%);
+  container-type: inline-size;
+  isolation: isolate;
+}
+
+.frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: thin solid color-mix(in srgb, var(--color-gold-brand) 40%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* The gold edge grows across the frame on hover: a slow, single line, not a glow. */
+.frame::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  block-size: calc(var(--spacing) / 2);
+  inline-size: 0;
+  background: var(--color-gold-brand);
+  transition: inline-size 320ms ease-out;
+}
+
+.portrait:hover .frame::before,
+.portrait:focus-within .frame::before {
+  inline-size: 100%;
+}
+
+.photo {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  transition: transform 900ms cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+
+.portrait:hover .photo,
+.portrait:focus-within .photo {
+  transform: scale(1.04);
+}
+
+.monogram {
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--color-gold-brand);
+  font-size: clamp(var(--text-3xl), 14cqw, var(--text-6xl));
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--tracking-tight);
+  text-align: center;
+  padding: var(--spacing);
+}
+
+/* Size presets: the frame owns the ratio, so every portrait lines up. */
+.lead {
+  aspect-ratio: 4 / 5;
+  max-inline-size: calc(var(--spacing) * 80);
+}
+
+.card {
+  aspect-ratio: 1 / 1;
+}
+
+/* A slow drift behind the hero, so the page breathes without moving content. */
+.orb {
+  animation: drift 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-6%, 8%, 0) scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb { animation: none; }
+  .portrait,
+  .portrait[data-reveal="false"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .photo,
+  .portrait:hover .photo,
+  .portrait:focus-within .photo {
+    transform: none;
+    transition: none;
+  }
+
+  .frame::before {
+    display: none;
+  }
+}

@@ -5,7 +5,9 @@ No business logic here. All endpoints are public except ``MeView``; login is
 a hardened wrapper around simplejwt's token endpoint.
 """
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -17,6 +19,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from apps.accounts import services
 from apps.accounts.serializers import (
     AdminGuidePreferenceSerializer,
+    AvatarUploadSerializer,
     ChangePasswordSerializer,
     EmailVerificationSerializer,
     PasswordResetConfirmSerializer,
@@ -136,7 +139,7 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return Response(UserSerializer(request.user, context={"request": request}).data)
 
     def patch(self, request):
         if "admin_guide_dismissed" in request.data:
@@ -151,7 +154,44 @@ class MeView(APIView):
             serializer.is_valid(raise_exception=True)
             request.user.full_name = serializer.validated_data["full_name"]
             request.user.save(update_fields=["full_name"])
-        return Response(UserSerializer(request.user).data)
+        return Response(UserSerializer(request.user, context={"request": request}).data)
+
+
+class AvatarView(APIView):
+    """POST a profile picture, DELETE it. Both answer with the updated user.
+
+    The picture is shown beside the learner's name, so it belongs in the public
+    image store (Cloudinary, or the bucket when Cloudinary is off) — never the
+    private bucket that lesson videos use.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        serializer = AvatarUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        previous = user.avatar
+        user.avatar = serializer.validated_data["avatar"]
+        user.avatar_updated_at = timezone.now()
+        user.save(update_fields=["avatar", "avatar_updated_at"])
+        # Only after the new picture is stored: a failed save must not leave
+        # the account with no picture at all. The file is removed through the
+        # storage, because FieldFile.delete() clears the field on the user
+        # instance and would report the new picture as missing.
+        if previous and previous.name != user.avatar.name:
+            previous.storage.delete(previous.name)
+        return Response(UserSerializer(user, context={"request": request}).data)
+
+    def delete(self, request):
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=False)
+            user.avatar = None
+            user.avatar_updated_at = None
+            user.save(update_fields=["avatar", "avatar_updated_at"])
+        return Response(UserSerializer(user, context={"request": request}).data)
 
 
 class ChangePasswordView(APIView):
@@ -203,7 +243,9 @@ class _LoginSerializer(TokenObtainPairSerializer):
                 )
             raise  # genuine bad credentials
 
-        data["user"] = UserSerializer(self.user).data
+        data["user"] = UserSerializer(self.user, context={
+            "request": self.context["request"]
+        }).data
         return data
 
 

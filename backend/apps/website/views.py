@@ -12,11 +12,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdmin, IsAdminOrReadOnly
+from apps.website import revisions
 from apps.website.emails import send_rsvp_confirmation
 from apps.website.models import (
     AcademyProfile,
     BlogPost,
     BloggerSource,
+    ContentRevision,
     Event,
     EventRegistration,
     TeamMember,
@@ -27,6 +29,7 @@ from apps.website.serializers import (
     BloggerSourceSerializer,
     BlogPostDetailSerializer,
     BlogPostListSerializer,
+    ContentRevisionSerializer,
     EventAdminSerializer,
     EventPublicSerializer,
     EventRegistrationAdminSerializer,
@@ -54,11 +57,80 @@ class AcademyProfileView(APIView):
         return Response(AcademyProfileSerializer(profile).data)
 
     def patch(self, request):
-        profile = AcademyProfile.load()
-        serializer = AcademyProfileSerializer(profile, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer = revisions.save_and_record(
+            ContentRevision.Target.PROFILE,
+            instance=AcademyProfile.load(),
+            data=request.data,
+            changed_by=request.user,
+        )
         return Response(serializer.data)
+
+
+class ContentRevisionListView(APIView):
+    """GET the About-page edit history (admins only)."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        queryset = ContentRevision.objects.select_related("changed_by")
+        target = request.query_params.get("target")
+        if target in ContentRevision.Target.values:
+            queryset = queryset.filter(target=target)
+        return Response(ContentRevisionSerializer(queryset[:200], many=True).data)
+
+
+class ContentRevisionRestoreView(APIView):
+    """POST: put one stored revision back on the About page."""
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        revision = get_object_or_404(ContentRevision, pk=pk)
+        try:
+            serializer = revisions.restore(revision, changed_by=request.user)
+        except revisions.RevisionError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
+        return Response({
+            "detail": f"{revision.label} was restored to the wording before "
+                      f"{revision.created_at:%d %B %Y} at {revision.created_at:%H:%M}.",
+            "restored": ContentRevisionSerializer(revision).data,
+            "profile": serializer.data if revision.target == ContentRevision.Target.PROFILE else None,
+            "member": serializer.data if revision.target == ContentRevision.Target.TEAM else None,
+        })
+
+
+class ContentRevisionUndoView(APIView):
+    """POST: undo the most recent About-page edit.
+
+    Body is optional; {"target": "team", "object_id": 7} undoes the last edit
+    to that profile, and an empty body undoes the academy profile.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        target = request.data.get("target") or ContentRevision.Target.PROFILE
+        if target not in ContentRevision.Target.values:
+            return Response({"detail": "Unknown content area."}, status=status.HTTP_400_BAD_REQUEST)
+        object_id = request.data.get("object_id") if target == ContentRevision.Target.TEAM else None
+        if target == ContentRevision.Target.TEAM and not str(object_id or "").isdigit():
+            return Response({"detail": "A team profile id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        revision = revisions.latest(target, int(object_id) if object_id else None)
+        if revision is None:
+            return Response(
+                {"detail": "There is no earlier version of this text to go back to."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            serializer = revisions.restore(revision, changed_by=request.user)
+        except revisions.RevisionError as error:
+            return Response({"detail": str(error)}, status=status.HTTP_409_CONFLICT)
+        return Response({
+            "detail": f"Undid the last change to {revision.label}.",
+            "restored": ContentRevisionSerializer(revision).data,
+            "profile": serializer.data if revision.target == ContentRevision.Target.PROFILE else None,
+            "member": serializer.data if revision.target == ContentRevision.Target.TEAM else None,
+        })
 
 
 class TeamMemberViewSet(viewsets.ModelViewSet):
@@ -66,6 +138,16 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsAdminOrReadOnly]
     serializer_class = TeamMemberSerializer
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = revisions.save_and_record(
+            ContentRevision.Target.TEAM,
+            instance=instance,
+            data=request.data,
+            changed_by=request.user,
+        )
+        return Response(serializer.data)
 
     def get_queryset(self):
         queryset = TeamMember.objects.all()

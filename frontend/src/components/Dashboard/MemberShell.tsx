@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { BookOpen, ClipboardList, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell, Megaphone, BarChart3, Compass } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { Avatar } from '@/components/ui/Avatar';
 import { NativeDialog } from '@/components/ui/Modal';
 import { WorkspaceButton, styles } from './WorkspaceUI';
 
@@ -67,7 +68,7 @@ export default function MemberShell({ children }: { children: ReactNode }) {
     <nav aria-label="Workspace navigation">{items.map(({ title, href, icon: Icon }) => <Link key={href} href={href} className={styles.navLink}
       aria-current={pathname === href || (href.endsWith('/courses') && pathname === '/dashboard/learn') ? 'page' : undefined}
       onClick={() => dialog.current?.close()}><Icon aria-hidden="true" /><span>{title}</span></Link>)}</nav>
-    <div className={styles.profile}><p>{user?.full_name}</p><p>{administrator ? 'Administrator' : instructor ? 'Tutor workspace' : 'Student workspace'}</p></div>
+    <div className={styles.profile}><Avatar src={user?.avatar} name={user?.full_name} size="md" aria-hidden="true" /><div><p>{user?.full_name}</p><p>{administrator ? 'Administrator' : instructor ? 'Tutor workspace' : 'Student workspace'}</p></div></div>
     <WorkspaceButton loading={signingOut} onClick={async () => { setSigningOut(true); try { await logout(); } catch {} finally { router.replace('/login'); setSigningOut(false); } }}>Sign out</WorkspaceButton>
   </aside>;
   return <ThemeContext.Provider value={{ theme, toggle }}><div className={styles.shell} data-workspace-theme={theme}>

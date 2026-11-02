@@ -12,11 +12,13 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.core.models import TimeStampedModel
+from config.storages import public_media_storage
 
 # Token lifetimes (overridable in settings without a migration).
 EMAIL_VERIFICATION_TTL = getattr(
@@ -77,6 +79,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)  # Django admin access
     admin_guide_dismissed = models.BooleanField(default=False)
+    # A picture the user chooses for their own profile. It sits beside their
+    # name in the workspace, so it is public rather than pre-signed media.
+    avatar = models.ImageField(
+        upload_to="accounts/avatar/",
+        blank=True,
+        null=True,
+        storage=public_media_storage,
+        validators=[FileExtensionValidator(["jpg", "jpeg", "png", "webp"])],
+    )
+    avatar_updated_at = models.DateTimeField(null=True, blank=True)
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()

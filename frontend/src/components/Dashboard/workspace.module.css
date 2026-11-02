@@ -13,8 +13,12 @@
 .navLink:active { background: var(--color-navy-800); }
 .navLink[aria-current="page"] { color: var(--workspace-primary-text); background: var(--workspace-primary); font-weight: var(--font-weight-bold); }
 .sidebar :is(a,button):focus-visible { outline-color: var(--workspace-primary); }
-.profile { padding-block: calc(var(--spacing) * 5); border-block-start: thin solid var(--color-navy-800); }
+.profile { display: flex; align-items: center; gap: calc(var(--spacing) * 3); padding-block: calc(var(--spacing) * 5); border-block-start: thin solid var(--color-navy-800); }
+.profile > div { min-inline-size: 0; }
+.profile p { overflow-wrap: anywhere; }
 .profile p + p { margin-block-start: var(--spacing); color: var(--workspace-nav-muted); font-size: var(--text-sm); }
+.avatarRow { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--spacing) * 5); margin-block: calc(var(--spacing) * 5); }
+.avatarForm { flex: 1; min-inline-size: min(100%, var(--container-xs)); }
 .content { padding: calc(var(--spacing) * 5); max-inline-size: var(--container-7xl); margin-inline: auto; inline-size: 100%; }
 .mobileBar { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--spacing) * 4); padding: calc(var(--spacing) * 4); background: var(--workspace-surface); border-block-end: thin solid var(--workspace-line); }
 .desktopSidebar { display: none; }

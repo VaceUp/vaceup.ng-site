@@ -34,6 +34,8 @@ interface AuthContextType {
     phone_number?: string;
   }) => Promise<RegisterResponse>;
   updateProfile: (data: { full_name: string }) => Promise<User>;
+  uploadAvatar: (file: File, onProgress?: (percent: number) => void) => Promise<User>;
+  removeAvatar: () => Promise<User>;
   setAdminGuideDismissed: (dismissed: boolean) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -123,6 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return updated;
   }, []);
 
+  const uploadAvatar = useCallback(async (file: File, onProgress?: (percent: number) => void) => {
+    const updated = await api.uploadAvatar(file, onProgress);
+    setUser(updated);
+    return updated;
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    const updated = await api.removeAvatar();
+    setUser(updated);
+    return updated;
+  }, []);
+
   const setAdminGuideDismissed = useCallback(async (dismissed: boolean) => {
     const updated = await api.setAdminGuideDismissed(dismissed);
     setUser(updated);
@@ -152,10 +166,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       updateProfile,
+      uploadAvatar,
+      removeAvatar,
       setAdminGuideDismissed,
       logout,
     }),
-    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, updateProfile, logout, setAdminGuideDismissed, sessionError, retrySession]
+    [isOpen, mode, openAuth, closeAuth, user, isLoading, login, register, updateProfile, uploadAvatar, removeAvatar, logout, setAdminGuideDismissed, sessionError, retrySession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

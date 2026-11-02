@@ -72,6 +72,53 @@ class ApiClient {
     return response.json();
   }
 
+  /**
+   * Multipart upload with byte progress. XHR rather than fetch because only
+   * XHR reports how much of the body has been sent, and a photo upload that
+   * silently sits at 0 is indistinguishable from a broken form.
+   */
+  upload<T>(endpoint: string, form: FormData, onProgress?: (percent: number) => void): Promise<T> {
+    return this.uploadWithRetry<T>(endpoint, form, onProgress, false);
+  }
+
+  private uploadWithRetry<T>(
+    endpoint: string,
+    form: FormData,
+    onProgress: ((percent: number) => void) | undefined,
+    retried: boolean,
+  ): Promise<T> {
+    const sentToken = this.token;
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${this.baseUrl}${endpoint}`, true);
+      if (sentToken) xhr.setRequestHeader('Authorization', `Bearer ${sentToken}`);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+      xhr.onerror = () => reject(new ApiError(
+        'The server could not be reached. Check the internet connection, then try again.', 0,
+      ));
+      xhr.onload = () => {
+        const handle = async () => {
+          if (xhr.status === 401 && sentToken && !retried) {
+            try { await this.refreshToken(); } catch (error) { reject(error); return; }
+            resolve(await this.uploadWithRetry<T>(endpoint, form, onProgress, true));
+            return;
+          }
+          if (xhr.status === 204) { resolve(undefined as T); return; }
+          let body: unknown;
+          try { body = xhr.responseText ? JSON.parse(xhr.responseText) : undefined; } catch { body = undefined; }
+          if (xhr.status >= 200 && xhr.status < 300) resolve(body as T);
+          else reject(new ApiError(apiErrorMessage(body, xhr.status), xhr.status, body));
+        };
+        void handle();
+      };
+      xhr.send(form);
+    });
+  }
+
   // ============================================
   // AUTHENTICATION
   // ============================================
@@ -183,6 +230,16 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  }
+
+  async uploadAvatar(file: File, onProgress?: (percent: number) => void): Promise<User> {
+    const form = new FormData();
+    form.append('avatar', file);
+    return this.upload<User>('/auth/me/avatar/', form, onProgress);
+  }
+
+  async removeAvatar(): Promise<User> {
+    return this.request<User>('/auth/me/avatar/', { method: 'DELETE' });
   }
 
   async changePassword(data: ChangePasswordRequest): Promise<void> {

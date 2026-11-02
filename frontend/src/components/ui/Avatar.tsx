@@ -1,7 +1,18 @@
 'use client';
 
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+
+export function initialsOf(name?: string | null): string {
+  return (name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 const sizeStyles = {
   xs: 'w-6 h-6 text-xs',
@@ -68,6 +79,12 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
       className,
       ...props
     }, ref) => {
+      // A stored URL can outlive the file (a provider change, a deleted upload),
+      // so a failed load falls back to the same monogram as a missing picture.
+      const [failed, setFailed] = useState(false);
+      useEffect(() => setFailed(false), [src]);
+      const showImage = !!src && !failed;
+      const initials = initialsOf(name);
       return (
         <div
           ref={ref}
@@ -81,11 +98,13 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
           )}
           {...props}
         >
-          {src ? (
+          {showImage ? (
             <img
+              key={src}
               src={src}
               srcSet={srcSet}
               alt={alt || name || 'Avatar'}
+              onError={() => setFailed(true)}
               className={cn(
                 'w-full h-full object-cover',
                 shapeStyles[shape]
@@ -100,18 +119,7 @@ export const Avatar = forwardRef<HTMLDivElement, AvatarProps>(
                 'font-medium'
               )}
             >
-              {fallback || (
-                <span className="font-medium">
-                  {name
-                    ? name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .slice(0, 2)
-                        .toUpperCase()
-                    : '?'}
-                </span>
-              )}
+              {fallback || <span className="font-medium">{initials || '?'}</span>}
             </div>
           )}
 

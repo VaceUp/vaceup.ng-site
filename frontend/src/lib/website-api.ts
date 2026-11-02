@@ -8,6 +8,7 @@ export interface AcademyProfile {
   tagline: string;
   mission: string;
   story: string;
+  hero_title: string;
   location: string;
   founded_year: number | null;
   next_cohort_start?: string | null;
@@ -17,6 +18,25 @@ export interface AcademyProfile {
   instagram_url: string;
   facebook_url: string;
   website_url: string;
+}
+
+/** One saved edit of the About page, holding the wording it replaced. */
+export interface AboutRevision {
+  id: number;
+  target: 'profile' | 'team';
+  object_id: number | null;
+  label: string;
+  changed_fields: string[];
+  changed_by_name: string;
+  created_at: string;
+  created_at_label: string;
+}
+
+export interface AboutRestoreResult {
+  detail: string;
+  restored: AboutRevision;
+  profile: AcademyProfile | null;
+  member: Record<string, unknown> | null;
 }
 
 export interface TeamMember {
@@ -113,6 +133,16 @@ export function registerForEvent(
 export const getBlogPosts = () => walkPages<BlogPost>('/website/posts/', 100);
 
 export const getBlogPost = (id: number) => publicGet<BlogPost>(`/website/posts/${id}/`);
+
+// --- About page edit history (admins only, so these carry credentials) ---
+
+export const getAboutRevisions = () => api.request<AboutRevision[]>('/website/revisions/');
+
+export const undoAboutChange = (target: { target?: 'profile' | 'team'; object_id?: number } = {}) =>
+  api.request<AboutRestoreResult>('/website/revisions/undo/', { method: 'POST', body: JSON.stringify(target) });
+
+export const restoreAboutRevision = (id: number) =>
+  api.request<AboutRestoreResult>(`/website/revisions/${id}/restore/`, { method: 'POST', body: '{}' });
 
 export const formatEventWindow = (event: Pick<WebsiteEvent, 'starts_at' | 'ends_at'>) => {
   const start = new Date(event.starts_at);

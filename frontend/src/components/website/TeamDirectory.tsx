@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getPublishedTeam, type TeamMember } from '@/lib/website-api';
-import { Avatar } from '@/components/ui/Avatar';
+import { TeamPortrait } from './TeamPortrait';
+import styles from './team.module.css';
 
 function MemberLinks({ member }: { member: TeamMember }) {
   const links = [
@@ -50,7 +51,8 @@ export default function TeamDirectory() {
   return (
     <div>
       <section className="relative overflow-hidden bg-navy-950 py-20">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-brand/10 blur-3xl" aria-hidden="true" />
+        <div className={`${styles.orb} pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-brand/10 blur-3xl`} aria-hidden="true" />
+        <div className={`${styles.orb} pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-navy-500/20 blur-3xl`} aria-hidden="true" />
         <div className="mx-auto max-w-5xl px-6 text-center">
           <span className="inline-block rounded-full bg-gold-brand/10 px-4 py-2 text-sm font-semibold text-gold-brand">
             Meet the team
@@ -113,23 +115,21 @@ export default function TeamDirectory() {
             <p className="mx-auto mb-12 mt-3 max-w-2xl text-center text-gray-600">
               The people setting the direction of the academy.
             </p>
-            <div className="space-y-10">
+            <div className="space-y-12">
               {founders.map((member) => (
-                <article key={member.id} className="grid items-start gap-8 rounded-3xl bg-white p-8 shadow-sm md:grid-cols-[220px_1fr] md:p-12">
-                  <div className="text-center md:text-left">
-                    <Avatar
-                      src={member.image || undefined}
-                      name={member.name}
-                      size="2xl"
-                      className="mx-auto bg-navy-900 text-xl font-black text-gold-brand ring-4 ring-gold-brand/20 md:mx-0"
-                    />
-                    <h3 className="mt-4 text-xl font-black text-navy-950">{member.name}</h3>
-                    <p className="text-sm font-semibold text-gold-brand">{member.role_title}</p>
+                <article key={member.id} className="grid items-start gap-10 rounded-3xl bg-white p-8 shadow-sm md:grid-cols-[minmax(240px,320px)_1fr] md:p-12">
+                  <div>
+                    <TeamPortrait src={member.image || undefined} name={member.name} role={member.role_title} variant="lead" />
+                    <h3 className="mt-6 text-2xl font-black leading-tight text-navy-950">{member.name}</h3>
+                    <p className="mt-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-navy-700">
+                      <span className="h-0.5 w-6 shrink-0 bg-gold-brand" aria-hidden="true" />
+                      {member.role_title}
+                    </p>
                     <MemberLinks member={member} />
                   </div>
-                  <div>
+                  <div className="md:pt-2">
                     {member.quote && (
-                      <blockquote className="mb-6 border-l-4 border-gold-brand pl-4 text-lg italic text-navy-900">
+                      <blockquote className="mb-6 border-l-4 border-gold-brand pl-5 text-xl italic leading-relaxed text-navy-900">
                         {member.quote}
                       </blockquote>
                     )}
@@ -153,26 +153,22 @@ export default function TeamDirectory() {
             </p>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {teammates.map((member) => (
-                <article key={member.id} className="flex flex-col rounded-2xl border border-gray-100 bg-gray-50 p-6">
-                  <div className="flex items-center gap-4">
-                    <Avatar
-                      src={member.image || undefined}
-                      name={member.name}
-                      size="xl"
-                      className="bg-navy-900 font-bold text-gold-brand ring-2 ring-navy-900/10"
-                    />
-                    <div>
-                      <h3 className="font-bold text-navy-950">{member.name}</h3>
-                      <p className="text-sm text-gray-600">{member.role_title}</p>
-                    </div>
-                  </div>
-                  {member.quote && (
-                    <p className="mt-4 border-l-2 border-gold-brand pl-3 text-sm italic text-navy-900">
-                      {member.quote}
+                <article key={member.id} className="group flex flex-col overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                  <TeamPortrait src={member.image || undefined} name={member.name} role={member.role_title} variant="card" />
+                  <div className="flex flex-1 flex-col p-6">
+                    <h3 className="text-lg font-black leading-tight text-navy-950">{member.name}</h3>
+                    <p className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+                      <span className="h-0.5 w-5 shrink-0 bg-gold-brand" aria-hidden="true" />
+                      {member.role_title}
                     </p>
-                  )}
-                  {member.bio && <p className="mt-4 flex-1 text-sm leading-relaxed text-gray-600">{member.bio}</p>}
-                  <MemberLinks member={member} />
+                    {member.quote && (
+                      <p className="mt-4 border-l-2 border-gold-brand pl-3 text-sm italic text-navy-900">
+                        {member.quote}
+                      </p>
+                    )}
+                    {member.bio && <p className="mt-4 flex-1 text-sm leading-relaxed text-gray-600">{member.bio}</p>}
+                    <MemberLinks member={member} />
+                  </div>
                 </article>
               ))}
             </div>

@@ -30,6 +30,9 @@ class AcademyProfile(TimeStampedModel):
     tagline = models.CharField(max_length=300, blank=True)
     mission = models.TextField(blank=True)
     story = models.TextField(blank=True)
+    # The large line at the top of the About page. Blank keeps the published
+    # headline, so an admin can revert to it by clearing the field.
+    hero_title = models.CharField(max_length=300, blank=True)
     location = models.CharField(max_length=200, blank=True)
     founded_year = models.PositiveIntegerField(null=True, blank=True)
     # The date the homepage advertises. Editable by an admin so a new cohort
@@ -78,6 +81,40 @@ class TeamMember(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.role_title})"
+
+
+class ContentRevision(TimeStampedModel):
+    """The state an About-page item held just before it was last changed.
+
+    The academy edits this copy itself, so a mistyped paragraph should not
+    need a developer: every saved edit leaves the previous values here, and
+    restoring one of them is the "undo" the editor asks for.
+    """
+
+    class Target(models.TextChoices):
+        PROFILE = "profile", "Academy profile"
+        TEAM = "team", "Team profile"
+
+    target = models.CharField(max_length=10, choices=Target.choices, db_index=True)
+    # The team row this belongs to; the academy profile is a singleton, so it
+    # has no id and stores null.
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    label = models.CharField(max_length=200)
+    snapshot = models.JSONField()
+    changed_fields = models.JSONField(default=list, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="website_revisions",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        verbose_name = "content revision"
+        verbose_name_plural = "content revisions"
+        indexes = [models.Index(fields=["target", "object_id", "-created_at"])]
+
+    def __str__(self):
+        return f"{self.label} before {self.created_at:%Y-%m-%d %H:%M}"
 
 
 class Event(TimeStampedModel):

@@ -13,11 +13,39 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """Read shape for the authenticated user (``/auth/me``)."""
 
+    avatar = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ("id", "email", "full_name", "role", "is_active",
-                  "date_joined", "admin_guide_dismissed")
+                  "date_joined", "admin_guide_dismissed", "avatar", "avatar_updated_at")
         read_only_fields = fields
+
+    def get_avatar(self, obj):
+        if not obj.avatar:
+            return ""
+        try:
+            url = obj.avatar.url
+        except ValueError:
+            # A picture whose storage is not configured must not break sign-in.
+            return ""
+        # The local fallback stores files under MEDIA_URL ("/media/..."), which
+        # means nothing on the frontend's own origin. Remote stores are absolute.
+        request = self.context.get("request")
+        if request is not None and url.startswith("/"):
+            return request.build_absolute_uri(url)
+        return url
+
+
+class AvatarUploadSerializer(serializers.Serializer):
+    """A profile picture. ``ImageField`` verifies the bytes really are an image."""
+
+    avatar = serializers.ImageField()
+
+    def validate_avatar(self, image):
+        if image.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Choose a picture smaller than 5 MB.")
+        return image
 
 
 class RegisterSerializer(serializers.Serializer):

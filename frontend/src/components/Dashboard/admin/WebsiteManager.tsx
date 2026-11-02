@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api } from '@/lib/api';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
 import { failureMessage } from '@/lib/course-management';
 import type { WorkspacePage } from '@/lib/workspace-api';
+import {
+  getAboutRevisions, restoreAboutRevision, undoAboutChange,
+  type AboutRestoreResult, type AboutRevision,
+} from '@/lib/website-api';
 import { ConfirmDelete } from './AuthoringUI';
 import {
   Action, AdminList, AdminRow, AdminSection, CheckRow, Drawer, EmptyState, Field, FileField,
@@ -17,6 +21,7 @@ interface ProfileForm {
   tagline: string;
   mission: string;
   story: string;
+  hero_title: string;
   location: string;
   founded_year: string;
   next_cohort_start: string;
@@ -46,8 +51,22 @@ interface TeamRow {
   is_published: boolean;
 }
 
+// How each stored field is named to the editor in the change history.
+const FIELD_LABELS: Record<string, string> = {
+  name: 'name', tagline: 'tagline', mission: 'mission', story: 'our story',
+  hero_title: 'page headline', location: 'location', founded_year: 'founded year',
+  next_cohort_start: 'next cohort date', email: 'email', phone: 'phone',
+  linkedin_url: 'LinkedIn link', instagram_url: 'Instagram link', facebook_url: 'Facebook link',
+  website_url: 'website link', role_title: 'role title', bio: 'biography', quote: 'quote',
+  image_url: 'photo link', is_founder: 'founder setting', order: 'position on the page',
+  is_published: 'published setting',
+};
+
+const describeFields = (names: string[]) =>
+  names.map((name) => FIELD_LABELS[name] || name.replace(/_/g, ' ')).join(', ');
+
 const emptyProfile = (): ProfileForm => ({
-  id: null, name: '', tagline: '', mission: '', story: '', location: '', founded_year: '',
+  id: null, name: '', tagline: '', mission: '', story: '', hero_title: '', location: '', founded_year: '',
   next_cohort_start: '',
   email: '', phone: '', linkedin_url: '', instagram_url: '', facebook_url: '', website_url: '',
 });
@@ -76,29 +95,79 @@ export default function WebsiteManager() {
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<TeamRow | null>(null);
+  const [revisions, setRevisions] = useState<AboutRevision[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [reverting, setReverting] = useState<number | 'last' | null>(null);
+
+  // Both the profile endpoint and a restore reply are accepted here, so the
+  // shape is read loosely and turned into the form's own string fields.
+  const normalise = (data: { [K in keyof ProfileForm]?: unknown }): ProfileForm => ({
+    ...emptyProfile(),
+    ...(data as Partial<ProfileForm>),
+    founded_year: data.founded_year ? String(data.founded_year) : '',
+    next_cohort_start: typeof data.next_cohort_start === 'string' ? data.next_cohort_start : '',
+  });
+
+  const loadHistory = useCallback(() => {
+    getAboutRevisions()
+      .then((rows) => { setRevisions(rows); setHistoryError(''); })
+      .catch((err) => setHistoryError(failureMessage(err)));
+  }, []);
 
   useEffect(() => {
     let active = true;
     api.request<Partial<ProfileForm>>('/website/profile/', {}, false)
       .then((data) => {
         if (!active) return;
-        const loaded = {
-          ...emptyProfile(),
-          ...data,
-          founded_year: data.founded_year ? String(data.founded_year) : '',
-          next_cohort_start: data.next_cohort_start || '',
-        };
+        const loaded = normalise(data);
         setProfile(loaded);
         setBaseline(JSON.stringify(loaded));
         setProfileLoaded(true);
       })
       .catch((err) => { if (active) setProfileError(failureMessage(err)); });
+    loadHistory();
     return () => { active = false; };
-  }, []);
+  }, [loadHistory]);
 
   const set = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) => setProfile((current) => ({ ...current, [key]: value }));
   const setMemberField = <K extends keyof MemberForm>(key: K, value: MemberForm[K]) => setMember((current) => ({ ...current, [key]: value }));
   const dirty = profileLoaded && JSON.stringify(profile) !== baseline;
+
+  const profileHistory = revisions.filter((row) => row.target === 'profile');
+  const memberHistory = revisions.reduce<Record<number, number>>((counts, row) => {
+    if (row.target === 'team' && row.object_id) counts[row.object_id] = (counts[row.object_id] || 0) + 1;
+    return counts;
+  }, {});
+
+  const applyRestore = (result: AboutRestoreResult) => {
+    if (result.profile) {
+      const merged = normalise(result.profile);
+      setProfile(merged);
+      setBaseline(JSON.stringify(merged));
+    }
+    if (result.member) resource.refresh();
+    loadHistory();
+    toast.push(result.detail, 'success');
+  };
+
+  const undoLast = async () => {
+    setReverting('last');
+    try { applyRestore(await undoAboutChange()); }
+    catch (err) { toast.push(failureMessage(err), 'error'); } finally { setReverting(null); }
+  };
+
+  const undoMember = async (row: TeamRow) => {
+    setReverting(row.id);
+    try { applyRestore(await undoAboutChange({ target: 'team', object_id: row.id })); }
+    catch (err) { toast.push(failureMessage(err), 'error'); } finally { setReverting(null); }
+  };
+
+  const restoreOne = async (revision: AboutRevision) => {
+    setReverting(revision.id);
+    try { applyRestore(await restoreAboutRevision(revision.id)); }
+    catch (err) { setHistoryError(failureMessage(err)); } finally { setReverting(null); }
+  };
 
   const saveProfile = async (event: FormEvent) => {
     event.preventDefault();
@@ -111,14 +180,10 @@ export default function WebsiteManager() {
         next_cohort_start: profile.next_cohort_start || null,
       };
       const saved = await api.request<Partial<ProfileForm>>('/website/profile/', { method: 'PATCH', body: JSON.stringify(payload) });
-      const merged = {
-        ...profile,
-        ...saved,
-        founded_year: saved.founded_year ? String(saved.founded_year) : '',
-        next_cohort_start: saved.next_cohort_start || '',
-      };
+      const merged = normalise(saved);
       setProfile(merged);
       setBaseline(JSON.stringify(merged));
+      loadHistory();
       toast.push('Academy profile saved. The About page reads from it immediately.', 'success');
     } catch (err) { setProfileError(failureMessage(err)); } finally { setProfileBusy(false); }
   };
@@ -156,6 +221,7 @@ export default function WebsiteManager() {
       setMember(emptyMember());
       setPhoto(null);
       resource.refresh();
+      loadHistory();
     } catch (err) { setFormError(failureMessage(err)); } finally { setBusy(false); }
   };
 
@@ -165,6 +231,7 @@ export default function WebsiteManager() {
       await api.request(`/website/team/${row.id}/`, { method: 'PATCH', body: JSON.stringify({ is_published: !row.is_published }) });
       toast.push(`${row.name} is now ${row.is_published ? 'hidden from the About page' : 'visible on the About page'}.`, 'success');
       resource.refresh();
+      loadHistory();
     } catch (err) { toast.push(failureMessage(err), 'error'); } finally { setBusy(false); }
   };
 
@@ -187,7 +254,15 @@ export default function WebsiteManager() {
       <AdminSection
         title="Academy profile"
         description="Written on the About page hero and contact strip. Leave a field empty to fall back to the details configured elsewhere on the site."
-        actions={<Action type="submit" form="academy-profile-form" intent="primary" loading={profileBusy} disabled={!profileLoaded || !dirty}>Save profile</Action>}
+        actions={<>
+          <Action type="submit" form="academy-profile-form" intent="primary" loading={profileBusy} disabled={!profileLoaded || !dirty}>Save profile</Action>
+          <Action
+            loading={reverting === 'last'}
+            disabled={!profileLoaded || profileBusy || !!dirty || profileHistory.length === 0}
+            onClick={() => void undoLast()}
+          >Undo last change</Action>
+          <Action disabled={reverting !== null} onClick={() => { setHistoryOpen(true); loadHistory(); }}>Change history</Action>
+        </>}
       >
         <form id="academy-profile-form" onSubmit={(event) => void saveProfile(event)}>
           {profileError && <StatusNote tone="error">{profileError}</StatusNote>}
@@ -203,6 +278,9 @@ export default function WebsiteManager() {
                 </Field>
               </FormGrid>
               <FormGrid columns={1}>
+                <Field label="Page headline" hint="The large line at the top of the About page. Empty keeps the published headline.">
+                  <TextInput value={profile.hero_title} onChange={(event) => set('hero_title', event.target.value)} maxLength={300} placeholder="Building Africa's next generation of tech innovators" />
+                </Field>
                 <Field label="Tagline" hint="One line under the academy name.">
                   <TextInput value={profile.tagline} onChange={(event) => set('tagline', event.target.value)} maxLength={300} />
                 </Field>
@@ -224,6 +302,13 @@ export default function WebsiteManager() {
               <p className="mt-4 text-sm text-ink-500">
                 Contact details published on the site: {[profile.location, profile.email, profile.phone].filter(Boolean).join(' · ') || 'none set yet'}.
                 {' '}They are fixed, so this screen shows them but cannot change them.
+              </p>
+              <p className="mt-2 text-sm text-ink-500">
+                {profileHistory.length
+                  ? dirty
+                    ? 'Save this form first — undo goes back to the wording before your last save, not before these unsaved edits.'
+                    : `Undo puts back the wording before your last save. ${profileHistory.length} earlier ${profileHistory.length === 1 ? 'version is' : 'versions are'} kept in the change history.`
+                  : 'Nothing has been edited from this screen yet, so there is nothing to undo.'}
               </p>
             </>
           )}
@@ -254,10 +339,14 @@ export default function WebsiteManager() {
               badges={<>
                 <Pill tone={row.is_published ? 'live' : 'draft'}>{row.is_published ? 'Published' : 'Hidden'}</Pill>
                 {row.is_founder && <Pill>Founder</Pill>}
+                {memberHistory[row.id] ? <Pill tone="muted">{memberHistory[row.id]} earlier version{memberHistory[row.id] === 1 ? '' : 's'}</Pill> : null}
               </>}
               actions={<>
                 <Action disabled={busy} onClick={() => void togglePublished(row)}>{row.is_published ? 'Hide from site' : 'Publish on site'}</Action>
                 <Action disabled={busy} onClick={() => openEdit(row)}>Edit</Action>
+                {memberHistory[row.id] ? (
+                  <Action loading={reverting === row.id} disabled={busy || reverting !== null} onClick={() => void undoMember(row)}>Undo text</Action>
+                ) : null}
                 <Action intent="danger" disabled={busy} onClick={() => setConfirm(row)}>Delete</Action>
               </>}
             />
@@ -332,6 +421,44 @@ export default function WebsiteManager() {
             </div>
           </FormGrid>
         </form>
+      </Drawer>
+
+      <Drawer
+        open={historyOpen}
+        title="About page changes"
+        description="Every edit keeps the wording it replaced. Restoring puts that wording back; a restore never changes a photo."
+        onClose={() => setHistoryOpen(false)}
+        footer={<Action onClick={() => setHistoryOpen(false)}>Close</Action>}
+      >
+        {historyError && <StatusNote tone="error">{historyError}</StatusNote>}
+        {!revisions.length && !historyError && (
+          <EmptyState
+            icon="bi-clock-history"
+            title="No changes recorded yet"
+            description="As soon as the About page is edited from this screen, the wording it replaces is kept here for a one-click undo."
+          />
+        )}
+        {revisions.length > 0 && (
+          <AdminList label="Change history">
+            {revisions.map((row) => (
+              <AdminRow
+                key={row.id}
+                placeholder={row.target === 'profile' ? 'bi-building' : 'bi-person'}
+                title={row.label}
+                meta={`${row.created_at_label}${row.changed_by_name ? ` · by ${row.changed_by_name}` : ''}`}
+                description={`Replaces: ${describeFields(row.changed_fields) || 'text'}`}
+                badges={row.target === 'team' ? <Pill tone="muted">Team profile</Pill> : null}
+                actions={(
+                  <Action
+                    loading={reverting === row.id}
+                    disabled={reverting !== null}
+                    onClick={() => void restoreOne(row)}
+                  >Restore this wording</Action>
+                )}
+              />
+            ))}
+          </AdminList>
+        )}
       </Drawer>
 
       {confirm && <ConfirmDelete

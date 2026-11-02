@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { SITE, SOCIAL_LINKS } from '@/lib/site-config';
 import { getAcademyProfile, getPublishedTeam, type AcademyProfile, type TeamMember } from '@/lib/website-api';
 import { SocialIcon } from '@/components/ui/SocialIcon';
-import { Avatar } from '@/components/ui/Avatar';
+import { TeamPortrait } from '@/components/website/TeamPortrait';
 
 export default function AboutPage() {
   const [profile, setProfile] = useState<AcademyProfile | null>(null);
@@ -37,7 +37,9 @@ export default function AboutPage() {
             Our Story
           </span>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Building Africa&apos;s Next Generation of <span className="text-gold-brand">Tech Innovators</span>
+            {profile?.hero_title || (
+              <>Building Africa&apos;s Next Generation of <span className="text-gold-brand">Tech Innovators</span></>
+            )}
           </h1>
           <p className="text-lg text-navy-200 max-w-3xl mx-auto leading-relaxed">
             {profile?.story || 'VaceUp Digital Academy was born from a simple belief: every African deserves access to world-class technology education that leads to real careers.'}
@@ -58,16 +60,14 @@ export default function AboutPage() {
             <p className="text-gray-600 max-w-2xl mx-auto mb-12 text-center">The person behind the academy, in their own words.</p>
             <div className="space-y-10">
               {founders.map((member) => (
-                <article key={member.id} className="bg-white rounded-3xl p-8 shadow-sm md:p-12 grid gap-8 md:grid-cols-[220px_1fr] items-start">
-                  <div className="text-center md:text-left">
-                    <Avatar
-                      src={member.image || undefined}
-                      name={member.name}
-                      size="2xl"
-                      className="mx-auto bg-navy-900 text-gold-brand text-xl font-black md:mx-0 ring-4 ring-gold-brand/20"
-                    />
-                    <h3 className="mt-4 text-xl font-black text-navy-950">{member.name}</h3>
-                    <p className="text-sm font-semibold text-gold-brand">{member.role_title}</p>
+                <article key={member.id} className="bg-white rounded-3xl p-8 shadow-sm md:p-12 grid gap-8 md:grid-cols-[minmax(240px,320px)_1fr] items-start">
+                  <div>
+                    <TeamPortrait src={member.image || undefined} name={member.name} role={member.role_title} variant="lead" />
+                    <h3 className="mt-5 text-2xl font-black leading-tight text-navy-950">{member.name}</h3>
+                    <p className="mt-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-navy-700">
+                      <span className="h-0.5 w-6 shrink-0 bg-gold-brand" aria-hidden="true" />
+                      {member.role_title}
+                    </p>
                     <MemberLinks member={member} />
                   </div>
                   <div>
@@ -97,21 +97,17 @@ export default function AboutPage() {
             </p>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {others.map((member) => (
-                <article key={member.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-6">
-                  <div className="flex items-center gap-4">
-                    <Avatar
-                      src={member.image || undefined}
-                      name={member.name}
-                      size="xl"
-                      className="bg-navy-900 text-gold-brand font-bold ring-2 ring-navy-900/10"
-                    />
-                    <div>
-                      <h3 className="font-bold text-navy-950">{member.name}</h3>
-                      <p className="text-sm text-gray-600">{member.role_title}</p>
-                    </div>
+                <article key={member.id} className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                  <TeamPortrait src={member.image || undefined} name={member.name} role={member.role_title} variant="card" />
+                  <div className="p-6">
+                    <h3 className="text-lg font-black leading-tight text-navy-950">{member.name}</h3>
+                    <p className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-navy-700">
+                      <span className="h-0.5 w-5 shrink-0 bg-gold-brand" aria-hidden="true" />
+                      {member.role_title}
+                    </p>
+                    {member.bio && <p className="mt-4 text-sm text-gray-600 leading-relaxed">{member.bio}</p>}
+                    <MemberLinks member={member} />
                   </div>
-                  {member.bio && <p className="mt-4 text-sm text-gray-600 leading-relaxed">{member.bio}</p>}
-                  <MemberLinks member={member} />
                 </article>
               ))}
             </div>

@@ -275,6 +275,22 @@ class StorageReportTests(TestCase):
         self.assertIn("bucket", report)
 
 
+class StorageProbeTests(TestCase):
+    """Without credentials the probe stops before touching the network."""
+
+    def test_an_unconfigured_bucket_is_reported_and_named(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        with override_settings(OBJECT_STORAGE_CONFIGURED=False):
+            call_command("storage_probe", stdout=out)
+        output = out.getvalue()
+        self.assertIn("FAIL", output)
+        self.assertIn("AWS_STORAGE_BUCKET_NAME", output)
+        self.assertIn("AWS_ACCESS_KEY_ID", output)
+
+
 class LocalImageUploadTests(TestCase):
     """Writes a cover image through the same storage class the live server uses."""
 

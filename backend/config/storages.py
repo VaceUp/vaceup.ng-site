@@ -15,6 +15,8 @@ service can never take image uploads down:
 settings at instantiation time, so switching providers is an environment
 change, not a code change.
 """
+import posixpath
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, Storage
@@ -79,7 +81,7 @@ class CloudinaryStorage(Storage):
 
     ``upload_to`` paths become Cloudinary public_ids under
     ``CLOUDINARY_FOLDER``, so the same key layout the bucket used still reads
-    naturally (``vaceup/course/thumbnails/cover.jpg``).
+    naturally (``vaceup/course/thumbnails/cover``).
     """
 
     def __init__(self):
@@ -101,6 +103,24 @@ class CloudinaryStorage(Storage):
         )
 
     def public_id(self, name):
+        """The stored name, without its file extension.
+
+        Cloudinary reads a trailing ``.jpg`` in a delivery URL as the format
+        rather than as part of the name, so a public_id that keeps the
+        extension can only ever be fetched as ``cover.jpg.jpg``. Uploading
+        still succeeds and the page just shows a broken image with no error.
+        """
+        return posixpath.splitext(self.stored_key(name))[0]
+
+    def _format(self, name):
+        return posixpath.splitext(self.stored_key(name))[1].lstrip(".").lower()
+
+    def stored_key(self, name):
+        """The whole Cloudinary name for this key, extension included.
+
+        This is exactly what an upload used before public_id dropped the
+        extension, so the repair command can find the misplaced assets.
+        """
         return f"{self.folder}/{name}" if self.folder else name
 
     def exists(self, name):
@@ -138,7 +158,11 @@ class CloudinaryStorage(Storage):
     def url(self, name):
         from cloudinary import CloudinaryImage
 
-        return CloudinaryImage(self.public_id(name), resource_type="image").url
+        options = {"resource_type": "image"}
+        file_format = self._format(name)
+        if file_format:
+            options["format"] = file_format
+        return CloudinaryImage(self.public_id(name), **options).url
 
     def delete(self, name):
         from cloudinary import uploader

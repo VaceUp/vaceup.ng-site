@@ -110,6 +110,13 @@ class CloudinaryUrlParsingTests(TestCase):
 
 
 class CloudinaryStorageLayoutTests(TestCase):
+    """The public_id must not carry the extension the delivery URL reads as format.
+
+    Storing "cover.png" inside the public_id makes Cloudinary serve it only at
+    "cover.png.png", so every upload answered 200 while every page showed a
+    broken image and raised no error.
+    """
+
     @override_settings(
         CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
         CLOUDINARY_API_KEY="key", CLOUDINARY_API_SECRET="secret",
@@ -117,11 +124,40 @@ class CloudinaryStorageLayoutTests(TestCase):
     )
     def test_upload_to_paths_become_foldered_public_ids(self):
         storage = CloudinaryStorage()
-        self.assertEqual(storage.public_id("course/thumbnails/cover.png"),
+        self.assertEqual(storage.stored_key("course/thumbnails/cover.png"),
                          "vaceup/course/thumbnails/cover.png")
+        self.assertEqual(storage.public_id("course/thumbnails/cover.png"),
+                         "vaceup/course/thumbnails/cover")
         url = storage.url("course/thumbnails/cover.png")
         self.assertTrue(url.startswith("https://res.cloudinary.com/vaceup/image/upload/"), url)
-        self.assertIn("vaceup/course/thumbnails/cover.png", url)
+        self.assertTrue(url.endswith("/vaceup/course/thumbnails/cover.png"), url)
+
+    @override_settings(
+        CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
+        CLOUDINARY_API_KEY="key", CLOUDINARY_API_SECRET="secret",
+        CLOUDINARY_FOLDER="vaceup", CLOUDINARY_SECURE_DISTRIBUTION="",
+    )
+    def test_a_delivered_url_never_repeats_its_extension(self):
+        storage = CloudinaryStorage()
+        for name in (
+            "website/team/mary-anieama.jpg",
+            "website/events/banner.png",
+            "accounts/avatar/me.jpeg",
+        ):
+            url = storage.url(name)
+            self.assertTrue(url.endswith(f"/vaceup/{name}"), url)
+            extension = name.rsplit(".", 1)[1]
+            self.assertNotIn(f".{extension}.{extension}", url)
+
+    @override_settings(
+        CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
+        CLOUDINARY_API_KEY="key", CLOUDINARY_API_SECRET="secret",
+        CLOUDINARY_FOLDER="vaceup", CLOUDINARY_SECURE_DISTRIBUTION="",
+    )
+    def test_a_key_without_an_extension_still_builds_a_url(self):
+        storage = CloudinaryStorage()
+        self.assertEqual(storage.public_id("website/team/ada"), "vaceup/website/team/ada")
+        self.assertTrue(storage.url("website/team/ada").endswith("/vaceup/website/team/ada"))
 
     @override_settings(
         CLOUDINARY_CONFIGURED=True, CLOUDINARY_CLOUD_NAME="vaceup",
@@ -130,7 +166,7 @@ class CloudinaryStorageLayoutTests(TestCase):
     )
     def test_a_custom_distribution_and_no_folder_keep_the_key_untouched(self):
         storage = CloudinaryStorage()
-        self.assertEqual(storage.public_id("website/team/ada.jpg"), "website/team/ada.jpg")
+        self.assertEqual(storage.public_id("website/team/ada.jpg"), "website/team/ada")
         self.assertTrue(storage.url("website/team/ada.jpg").startswith("https://cdn.vaceup.ng/"))
 
 

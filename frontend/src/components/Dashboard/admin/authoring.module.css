@@ -22,6 +22,7 @@
 .field :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--workspace-error); }
 .check { display: flex; align-items: center; gap: calc(var(--spacing) * 3); min-block-size: calc(var(--spacing) * 11); font-size: var(--text-sm); }
 .check input { inline-size: calc(var(--spacing) * 5); block-size: calc(var(--spacing) * 5); accent-color: var(--workspace-focus); }
+.picker { display: grid; gap: calc(var(--spacing) * 1) calc(var(--spacing) * 5); max-block-size: calc(var(--spacing) * 64); padding-inline-end: calc(var(--spacing) * 2); overflow-y: auto; }
 .action { min-block-size: calc(var(--spacing) * 11); block-size: auto; max-inline-size: 100%; border: thin solid var(--workspace-control); border-radius: var(--radius-lg); background: var(--workspace-surface); color: var(--workspace-text); padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4); box-shadow: none; transform: none; }
 .action > span { white-space: normal; overflow: visible; text-overflow: clip; }
 .action:hover { background: var(--workspace-subtle); color: var(--workspace-text); }
@@ -45,5 +46,6 @@
 .root fieldset:disabled .action { opacity: .5; }
 .preview { inline-size: 100%; max-block-size: calc(var(--spacing) * 64); object-fit: contain; }
 @media (width >= theme(--breakpoint-md)) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (width >= theme(--breakpoint-lg)) { .picker { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (prefers-reduced-motion: reduce) { .root *, .dialog * { animation: none !important; transition: none !important; } }
 .preview { white-space: pre-wrap; overflow-wrap: anywhere; max-block-size: calc(var(--spacing) * 64); overflow: auto; }

@@ -20,6 +20,24 @@ type Tile = {
   shareTrack: MediaStreamTrack | null;
 };
 
+/**
+ * The words and doors around a room, supplied by whoever opened it.
+ *
+ * The LiveKit room address is deliberately not shown anywhere: for a staff
+ * meeting it carries a private code, and printing it on screen would let a
+ * screenshot open a room the viewer was never invited to.
+ */
+export type RoomChrome = {
+  /** A human name for the call — the event title or the meeting title. */
+  title: string;
+  /** Shown after the person steps out, where they decide whether to go back. */
+  leftNote: string;
+  /** Shown when the room is open but nobody else has walked in yet. */
+  waitingNote: string;
+  returnHref: string;
+  returnLabel: string;
+};
+
 const videoTrackOf = (participant: Participant, source: Track.Source): MediaStreamTrack | null => {
   const publication = participant.getTrackPublication(source);
   const track = publication?.track;
@@ -104,7 +122,7 @@ function TileCard({ tile, large }: { tile: Tile; large?: boolean }) {
   );
 }
 
-export default function LiveRoom({ access, eventSlug }: { access: RoomAccess; eventSlug: string }) {
+export default function LiveRoom({ access, chrome }: { access: RoomAccess; chrome: RoomChrome }) {
   const [session, setSession] = useState(0);
   const [left, setLeft] = useState(false);
 
@@ -113,9 +131,7 @@ export default function LiveRoom({ access, eventSlug }: { access: RoomAccess; ev
       <div className="flex min-h-screen items-center justify-center bg-navy-950 px-6 py-12">
         <div className="w-full max-w-md rounded-3xl bg-navy-900 p-8 text-center">
           <h1 className="text-xl font-bold text-white">You left the room</h1>
-          <p className="mt-3 text-sm text-navy-200">
-            Your seat is still held. Come back any time until the event ends.
-          </p>
+          <p className="mt-3 text-sm text-navy-200">{chrome.leftNote}</p>
           <div className="mt-6 flex flex-col gap-3">
             <Button
               onClick={() => { setLeft(false); setSession((value) => value + 1); }}
@@ -124,10 +140,10 @@ export default function LiveRoom({ access, eventSlug }: { access: RoomAccess; ev
               Go back in
             </Button>
             <Link
-              href={`/events/?slug=${encodeURIComponent(eventSlug)}`}
+              href={chrome.returnHref}
               className="min-h-[44px] inline-flex items-center justify-center rounded-xl border-2 border-navy-600 px-5 text-sm font-semibold text-navy-100 hover:border-navy-400"
             >
-              Back to the event page
+              {chrome.returnLabel}
             </Link>
           </div>
         </div>
@@ -135,10 +151,10 @@ export default function LiveRoom({ access, eventSlug }: { access: RoomAccess; ev
     );
   }
 
-  return <RoomSession key={session} access={access} onLeave={() => setLeft(true)} onReconnect={() => setSession((value) => value + 1)} />;
+  return <RoomSession key={session} access={access} chrome={chrome} onLeave={() => setLeft(true)} onReconnect={() => setSession((value) => value + 1)} />;
 }
 
-function RoomSession({ access, onLeave, onReconnect }: { access: RoomAccess; onLeave: () => void; onReconnect: () => void }) {
+function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAccess; chrome: RoomChrome; onLeave: () => void; onReconnect: () => void }) {
   const roomRef = useRef<Room | null>(null);
   const [phase, setPhase] = useState<'connecting' | 'live' | 'retrying' | 'failed'>('connecting');
   const [problem, setProblem] = useState('');
@@ -252,12 +268,11 @@ function RoomSession({ access, onLeave, onReconnect }: { access: RoomAccess; onL
     <div className="flex min-h-screen flex-col bg-navy-950">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-800 px-5 py-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-white">
-            {access.is_host ? 'Hosting' : 'In the room'} · {access.room}
-          </p>
+          <p className="truncate text-sm font-bold text-white">{chrome.title}</p>
           <p role="status" className="text-xs text-navy-300">
-            {phase === 'connecting' && 'Connecting to the live room…'}
-            {phase === 'live' && `${tiles.length} ${tiles.length === 1 ? 'person' : 'people'} in the room`}
+            {phase === 'connecting' && 'Opening the room…'}
+            {phase === 'live' &&
+              `${access.is_host ? 'Hosting' : 'In the room'} · ${tiles.length} ${tiles.length === 1 ? 'person' : 'people'}`}
             {phase === 'retrying' && 'Connection dropped — reconnecting…'}
             {phase === 'failed' && 'Not connected.'}
           </p>
@@ -295,7 +310,7 @@ function RoomSession({ access, onLeave, onReconnect }: { access: RoomAccess; onL
 
       <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         {phase === 'connecting' ? (
-          <p role="status" className="m-auto text-sm text-navy-300">Opening your seat…</p>
+          <p role="status" className="m-auto text-sm text-navy-300">Opening the room…</p>
         ) : stage ? (
           <div className="mx-auto w-full max-w-5xl">
             <TileCard tile={stage} large />
@@ -307,8 +322,7 @@ function RoomSession({ access, onLeave, onReconnect }: { access: RoomAccess; onL
           </div>
         ) : (
           <p className="m-auto max-w-sm text-center text-sm text-navy-300">
-            You are the only one here so far. The room stays open and everyone you
-            invited can walk in with their own link.
+            {chrome.waitingNote}
           </p>
         )}
       </main>

@@ -8,7 +8,7 @@ import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { joinEvent, resendJoinLink, type EventAccess } from '@/lib/website-api';
+import { getEvent, joinEvent, resendJoinLink, type EventAccess } from '@/lib/website-api';
 import { webUrl } from '@/lib/workspace-api';
 
 // The room pulls in the WebRTC client, which only exists in a browser.
@@ -38,6 +38,7 @@ function LiveRoute() {
   const { user, isLoading } = useAuth();
   const isStaff = user?.role === 'admin';
   const [access, setAccess] = useState<EventAccess | null>(null);
+  const [eventName, setEventName] = useState('');
   const [message, setMessage] = useState('');
   const [state, setState] = useState<'checking' | 'blocked' | 'waiting' | 'open'>('checking');
 
@@ -86,8 +87,27 @@ function LiveRoute() {
     if (externalUrl) window.location.replace(externalUrl);
   }, [externalUrl]);
 
+  // The room header names the event rather than the LiveKit room address. A
+  // draft event has no public record to read, so the plain label is the fallback.
+  useEffect(() => {
+    if (!slug) return undefined;
+    let cancelled = false;
+    getEvent(slug)
+      .then((event) => { if (!cancelled) setEventName(event.title); })
+      .catch(() => { if (!cancelled) setEventName(''); });
+    return () => { cancelled = true; };
+  }, [slug]);
+
+  const chrome = {
+    title: eventName || 'VaceUp Live Room',
+    leftNote: 'Your seat is still held. Come back any time until the event ends.',
+    waitingNote: 'You are the only one here so far. The room stays open and everyone you invited can walk in with their own link.',
+    returnHref: `/events/?slug=${encodeURIComponent(slug)}`,
+    returnLabel: 'Back to the event page',
+  };
+
   if (access?.provider === 'livekit') {
-    return <LiveRoom access={access} eventSlug={slug} />;
+    return <LiveRoom access={access} chrome={chrome} />;
   }
 
   if (access?.provider === 'jitsi') {

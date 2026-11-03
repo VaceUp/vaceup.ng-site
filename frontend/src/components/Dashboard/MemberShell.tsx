@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, ClipboardList, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell, Megaphone, BarChart3, Compass } from 'lucide-react';
+import { BookOpen, ClipboardList, LayoutDashboard, Video, Users, Award, CreditCard, Settings, MessageSquare, Code, Menu, X, Bell, Megaphone, BarChart3, Compass, Presentation } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Avatar } from '@/components/ui/Avatar';
 import { NativeDialog } from '@/components/ui/Modal';
@@ -58,6 +58,7 @@ export default function MemberShell({ children }: { children: ReactNode }) {
       { title: 'Certificates', href: '/dashboard/certificates', icon: Award },
       { title: 'Payment history', href: '/dashboard/billing', icon: CreditCard },
     ]),
+    ...(instructor ? [{ title: 'Staff meetings', href: '/dashboard/meetings', icon: Presentation }] : []),
     { title: 'Messages', href: '/messaging', icon: MessageSquare },
     { title: 'Notifications', href: '/notification', icon: Bell },
     { title: 'Code editor', href: '/codeeditor', icon: Code },

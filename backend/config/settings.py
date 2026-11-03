@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.enrollment",
     "apps.payments",
     "apps.liveclasses",
+    "apps.meetings",
     "apps.messaging",
     "apps.dashboard",
     "apps.assignments",
@@ -265,6 +266,10 @@ EVENT_JOIN_EARLY_MINUTES = env.int("EVENT_JOIN_EARLY_MINUTES", default=15)
 EVENT_JOIN_GRACE_MINUTES = env.int("EVENT_JOIN_GRACE_MINUTES", default=30)
 # Host name only, e.g. meet.jit.si, or your own Jitsi server once you have one.
 JITSI_DOMAIN = env("JITSI_DOMAIN", default="meet.jit.si")
+
+# --- Staff meetings (an administrator or tutor calls a colleague in-app) ---
+MEETING_LEAD_MINUTES = env.int("MEETING_LEAD_MINUTES", default=15)
+MEETING_GRACE_MINUTES = env.int("MEETING_GRACE_MINUTES", default=30)
 
 # --- Media storage: private S3 via django-storages (see config/storages.py) ---
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")

@@ -189,6 +189,22 @@ class LiveKitAddressTests(SimpleTestCase):
                 with override_settings(LIVEKIT_WS_URL=pasted):
                     self.assertEqual(livekit_ws_url(), "")
 
+    def test_no_value_takes_the_events_page_down_with_it(self):
+        """The public Events list asks this question for every row it serialises.
+
+        A urlsplit raises on an unbalanced bracket, and that raise arriving in a
+        serializer is a 500 on the whole page — the worst version of a settings
+        typo, because the screen calls it "service temporarily unavailable".
+        """
+        for pasted in ["wss://[oops:9", "wss://proj.livekit.cloud]", "wss://x:99999999",
+                       "wss://x:abc", "[", "%", "wss://\u0000"]:
+            with self.subTest(pasted=pasted):
+                with override_settings(LIVEKIT_WS_URL=pasted):
+                    try:
+                        livekit_ws_url()
+                    except Exception as exc:
+                        self.fail(f"LIVEKIT_WS_URL={pasted!r} raised {exc!r} instead of reporting no address")
+
     def test_keys_alone_do_not_add_up_to_a_room(self):
         with override_settings(LIVEKIT_API_KEY="devkey", LIVEKIT_API_SECRET="secret",
                                LIVEKIT_WS_URL=""):

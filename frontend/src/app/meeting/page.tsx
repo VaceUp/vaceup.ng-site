@@ -45,11 +45,16 @@ function MeetingRoute() {
     setProblem('');
   }, [id]);
 
+  // The room asks for this again whenever the person presses Try again: the
+  // credential is minted for one dial and expires, so a page left open cannot
+  // reconnect with the one it already holds.
+  const openRoom = () => openMeetingRoom(id);
+
   const enter = async () => {
     setBusy(true);
     setProblem('');
     try {
-      setAccess(await openMeetingRoom(id));
+      setAccess(await openRoom());
     } catch (error: unknown) {
       setAccess(null);
       setProblem(error instanceof Error && error.message
@@ -102,7 +107,7 @@ function MeetingRoute() {
       returnHref: user.role === 'admin' ? '/dashboard?tab=meetings' : '/dashboard/meetings',
       returnLabel: 'Back to my meetings',
     };
-    return <LiveRoom access={access} chrome={chrome} />;
+    return <LiveRoom access={access} chrome={chrome} refreshAccess={openRoom} />;
   }
 
   const item = meeting.data;

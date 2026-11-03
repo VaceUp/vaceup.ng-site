@@ -105,6 +105,52 @@ def media_storage_check(app_configs, **kwargs):
     return issues
 
 
+@register("vaceup_config")
+def live_room_config_check(app_configs, **kwargs):
+    """The LiveKit lines, read the way the browser will read them.
+
+    A booked call and an event's VaceUp Live Room both die quietly when the
+    address line is wrong, and the public Events page asks the same question for
+    every row it lists. Saying it here, at ``manage.py check``, is the difference
+    between a one-line fix and a red band nobody can read.
+    """
+    try:
+        from apps.liveclasses.livekit import livekit_ws_url
+    except Exception:
+        # A check must never be the reason manage.py will not start.
+        return []
+
+    issues = []
+    raw = str(_setting("LIVEKIT_WS_URL") or "").strip()
+    dialable = bool(livekit_ws_url())
+    keys = bool(_setting("LIVEKIT_API_KEY") and _setting("LIVEKIT_API_SECRET"))
+    if raw and not dialable:
+        issues.append(Warning(
+            "LIVEKIT_WS_URL is set, but not to an address a browser can dial, so "
+            "no VaceUp Live Room will open.",
+            hint="Write it on one line as wss://<your-project>.livekit.cloud, "
+                 "with no angle brackets, quotes or trailing comment. An "
+                 "https:// address is accepted and converted.",
+            id="core.W010",
+        ))
+    elif keys and not dialable:
+        issues.append(Warning(
+            "The LiveKit keys are set but LIVEKIT_WS_URL is not, so every live "
+            "room and staff meeting is refused until it is.",
+            hint="Add LIVEKIT_WS_URL=wss://<your-project>.livekit.cloud to the "
+                 "server's .env file and restart the app.",
+            id="core.W011",
+        ))
+    if dialable and not str(livekit_ws_url()).startswith("wss://"):
+        issues.append(Warning(
+            f"The live room address is {livekit_ws_url()}, an unencrypted socket. "
+            "A page served over https is refused it, so the room never connects.",
+            hint="Change the line to wss:// — LiveKit projects are always wss.",
+            id="core.W012",
+        ))
+    return issues
+
+
 def _writable_media_dir():
     """The closest existing ancestor of MEDIA_ROOT — creating paths is not a check's job."""
     path = str(_setting("MEDIA_ROOT", ""))

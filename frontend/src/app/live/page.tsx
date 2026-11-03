@@ -107,7 +107,16 @@ function LiveRoute() {
   };
 
   if (access?.provider === 'livekit') {
-    return <LiveRoom access={access} chrome={chrome} />;
+    // The room re-asks for the seat when the person presses Try again, because
+    // the credential it was handed is minted for one dial and goes stale.
+    const freshSeat = async () => {
+      const result = await joinEvent(slug, token);
+      if (result.provider !== 'livekit') {
+        throw new Error('This event is no longer running in the VaceUp Live Room. Reload this page.');
+      }
+      return result;
+    };
+    return <LiveRoom access={access} chrome={chrome} refreshAccess={freshSeat} />;
   }
 
   if (access?.provider === 'jitsi') {

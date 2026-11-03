@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ConnectionState, Room, RoomEvent, Track, type Participant } from 'livekit-client';
+import {
+  ConnectionError, ConnectionErrorReason, ConnectionState,
+  ConnectionQuality, Room, RoomEvent, Track, type Participant, type TrackPublication,
+} from 'livekit-client';
 import { Button } from '@/components/ui/Button';
 import type { EventAccess } from '@/lib/website-api';
 
@@ -122,7 +125,20 @@ function TileCard({ tile, large }: { tile: Tile; large?: boolean }) {
   );
 }
 
-export default function LiveRoom({ access, chrome }: { access: RoomAccess; chrome: RoomChrome }) {
+export default function LiveRoom({
+  access, chrome, refreshAccess,
+}: {
+  access: RoomAccess;
+  chrome: RoomChrome;
+  /**
+   * Ask the server for a fresh seat credential before dialling again.
+   *
+   * The token is minted once, when the person presses the button, and it
+   * expires. A room that reuses it can never connect, so "Try again" would be a
+   * dead control that blames the network for a key that simply went stale.
+   */
+  refreshAccess?: () => Promise<RoomAccess>;
+}) {
   const [session, setSession] = useState(0);
   const [left, setLeft] = useState(false);
 
@@ -151,7 +167,15 @@ export default function LiveRoom({ access, chrome }: { access: RoomAccess; chrom
     );
   }
 
-  return <RoomSession key={session} access={access} chrome={chrome} onLeave={() => setLeft(true)} onReconnect={() => setSession((value) => value + 1)} />;
+  return (
+    <RoomSession
+      key={session}
+      access={access}
+      chrome={chrome}
+      refreshAccess={refreshAccess}
+      onLeave={() => setLeft(true)}
+    />
+  );
 }
 
 /** Whether the browser can actually dial this address as a LiveKit socket. */
@@ -164,10 +188,80 @@ function isDialable(url: string) {
   }
 }
 
-function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAccess; chrome: RoomChrome; onLeave: () => void; onReconnect: () => void }) {
+/**
+ * What a refused connection means, in words the person standing in the room can act on.
+ *
+ * The client knows the difference between the room server refusing the key, the
+ * video path timing out and the server being unreachable — but its own sentence
+ * is written for whoever runs the server. Blaming the network for all three is
+ * how a settings fault turns into a day of guessing, so the reason is
+ * translated and the original line is kept underneath it for whoever is asked.
+ */
+function roomFailure(error: unknown): { next: string; said: string } {
+  const said = error instanceof Error ? error.message : String(error ?? 'The room did not answer.');
+  if (error instanceof ConnectionError) {
+    switch (error.reason) {
+      case ConnectionErrorReason.NotAllowed:
+        return {
+          said,
+          next: 'The room server would not accept the key this page was given, so your '
+            + 'seat did not open. Press Try again to be given a fresh one.',
+        };
+      case ConnectionErrorReason.Timeout:
+        return {
+          said,
+          next: 'The room answered but the video path did not open in time, which is what '
+            + 'a slow or heavily filtered network looks like. Press Try again.',
+        };
+      case ConnectionErrorReason.ServerUnreachable:
+        return {
+          said,
+          next: 'This device could not reach the room server at all. Work, school and '
+            + 'hotel networks often block video calls — try again on mobile data.',
+        };
+      case ConnectionErrorReason.WebSocket:
+        return {
+          said,
+          next: 'The line to the room server closed before the meeting started. Press Try '
+            + 'again to open it fresh.',
+        };
+      case ConnectionErrorReason.InternalError:
+      case ConnectionErrorReason.ServiceNotFound:
+        return {
+          said,
+          next: 'The room server refused to open this room. Press Try again, and if it '
+            + 'stays, the academy needs to check its LiveKit project.',
+        };
+      default:
+        break;
+    }
+  }
+  return {
+    said,
+    next: 'The live room could not be reached. Press Try again, and if it stays, tell the '
+      + 'academy what is written below.',
+  };
+}
+
+function RoomSession({
+  access, chrome, onLeave, refreshAccess,
+}: {
+  access: RoomAccess;
+  chrome: RoomChrome;
+  onLeave: () => void;
+  refreshAccess?: () => Promise<RoomAccess>;
+}) {
   const roomRef = useRef<Room | null>(null);
+  // A retry may be dialling a credential the server only just minted, so the
+  // live one is held here rather than read from the props again.
+  const accessRef = useRef(access);
+  const audioOnlyRef = useRef(false);
+  const [attempt, setAttempt] = useState(0);
   const [phase, setPhase] = useState<'connecting' | 'live' | 'retrying' | 'failed'>('connecting');
   const [problem, setProblem] = useState('');
+  const [serverSaid, setServerSaid] = useState('');
+  const [weak, setWeak] = useState(false);
+  const [audioOnly, setAudioOnly] = useState(false);
   const [soundNeeded, setSoundNeeded] = useState(false);
   const [tick, setTick] = useState(0);
   const [micOn, setMicOn] = useState(false);
@@ -175,12 +269,14 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
   const [shareOn, setShareOn] = useState(false);
 
   useEffect(() => {
+    const seat = accessRef.current;
+    let stopped = false;
     // The client dials the address with `new URL()`, so an empty or scheme-less
     // one fails as "Failed to construct 'URL'" — a library's own words, which
     // tells the academy nothing. Checked here rather than trusted, because the
     // frontend deploys ahead of the backend and a stale server still hands out
     // whatever its .env held.
-    if (!isDialable(access.ws_url)) {
+    if (!isDialable(seat.ws_url)) {
       setPhase('failed');
       setProblem(
         'This server is not giving out a room address the browser can dial, so the '
@@ -201,14 +297,32 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
     ] as const;
     events.forEach((name) => room.on(name, bump));
     room.on(RoomEvent.ConnectionStateChanged, (next: ConnectionState) => {
+      if (stopped) return;
       if (next === ConnectionState.Connected) setPhase('live');
       else if (next === ConnectionState.Reconnecting) setPhase('retrying');
       else if (next === ConnectionState.Disconnected) setPhase('failed');
       bump();
     });
+    // The room measures the link it is actually carrying, so a struggling
+    // person is told before they decide the call is broken.
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, person: Participant) => {
+      if (person.isLocal) setWeak(quality === ConnectionQuality.Lost);
+    });
+    // Someone switching their camera on mid-call must not cost a slow attendee
+    // the audio they were already hearing.
+    room.on(RoomEvent.TrackSubscribed, (track: Track, publication) => {
+      if (audioOnlyRef.current && track.kind === Track.Kind.Video) void publication.setSubscribed(false);
+      else bump();
+    });
 
-    room.connect(access.ws_url, access.token)
+    room.connect(seat.ws_url, seat.token, {
+      // A slow link needs more than one attempt and more than the default
+      // fifteen seconds before the browser gives up on the video path.
+      maxRetries: 3,
+      peerConnectionTimeout: 30_000,
+    })
       .then(async () => {
+        if (stopped) return;
         setPhase('live');
         try {
           await room.startAudio();
@@ -218,21 +332,69 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
         }
       })
       .catch((error: unknown) => {
+        if (stopped) return;
+        const failure = roomFailure(error);
         setPhase('failed');
-        // The client's own words are for whoever fixes the server, not for the
-        // person standing in the doorway, so they go to the console and the
-        // screen gets the one thing they can do next.
+        // The client's own words go to the console for whoever fixes the server;
+        // the screen gets the reason translated and the line kept, small, so a
+        // report arrives with the cause already named.
         console.error('The live room could not connect', error);
-        setProblem('The live room could not be reached. Check your connection, then press Try again.');
+        setProblem(failure.next);
+        setServerSaid(failure.said);
       })
       .finally(bump);
 
     return () => {
+      stopped = true;
       room.removeAllListeners();
       void room.disconnect();
       roomRef.current = null;
     };
-  }, [access.ws_url, access.token]);
+  }, [attempt]);
+
+  /** Dial again, with a credential the server has just been asked for. */
+  const retry = async () => {
+    setProblem('');
+    setServerSaid('');
+    setPhase('connecting');
+    if (refreshAccess) {
+      try {
+        accessRef.current = await refreshAccess();
+      } catch (error: unknown) {
+        setPhase('failed');
+        setProblem(error instanceof Error && error.message
+          ? error.message
+          : 'Your seat could not be re-checked with the server. Press Try again in a moment.');
+        return;
+      }
+    }
+    setAttempt((value) => value + 1);
+  };
+
+  /**
+   * Drop the pictures and keep the voices, which is the difference between a
+   * usable call and none at all on a weak or metered connection.
+   */
+  const keepAudio = async (on: boolean) => {
+    const room = roomRef.current;
+    audioOnlyRef.current = on;
+    setAudioOnly(on);
+    if (!room) return;
+    try {
+      if (on && room.localParticipant.isCameraEnabled) {
+        await room.localParticipant.setCameraEnabled(false);
+        setCamOn(false);
+      }
+      for (const person of room.remoteParticipants.values()) {
+        for (const publication of person.videoTrackPublications.values()) {
+          await publication.setSubscribed(!on);
+        }
+      }
+    } catch {
+      setProblem('The room would not change what it sends. Press the button again.');
+    }
+    setTick((value) => value + 1);
+  };
 
   const tiles = useMemo<Tile[]>(() => {
     const room = roomRef.current;
@@ -320,15 +482,36 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
       )}
 
       {(problem || phase === 'failed') && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-red-900/50 px-5 py-3">
-          <p role="alert" className="text-sm font-semibold text-red-50">
-            {problem || 'The live room dropped and could not reconnect.'}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3 bg-red-900/50 px-5 py-3">
+          <div className="min-w-0 flex-1">
+            <p role="alert" className="text-sm font-semibold text-red-50">
+              {problem || 'The live room dropped and could not reconnect.'}
+            </p>
+            {serverSaid && (
+              <p className="mt-1 break-words text-xs text-red-100">What the room reported: {serverSaid}</p>
+            )}
+          </div>
           {phase === 'failed' && (
-            <Button size="sm" variant="outline" className="border-red-100 text-red-50 hover:bg-red-800" onClick={onReconnect}>
+            <Button size="sm" variant="outline" className="border-red-100 text-red-50 hover:bg-red-800" onClick={() => void retry()}>
               Try again
             </Button>
           )}
+        </div>
+      )}
+
+      {weak && phase === 'live' && !audioOnly && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-navy-800 px-5 py-3">
+          <p role="status" className="text-sm text-navy-100">
+            Your connection to the room is weak, so the picture may freeze or drop out.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-navy-500 text-navy-100 hover:bg-navy-700"
+            onClick={() => void keepAudio(true)}
+          >
+            Keep audio only
+          </Button>
         </div>
       )}
 
@@ -371,6 +554,16 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
         >
           <i className={`bi ${camOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`} aria-hidden="true" />
           {camOn ? 'Camera off' : 'Camera on'}
+        </Button>
+        <Button
+          variant={audioOnly ? 'secondary' : 'outline'}
+          onClick={() => void keepAudio(!audioOnly)}
+          aria-pressed={audioOnly}
+          disabled={offline}
+          className={audioOnly ? '' : 'border-navy-600 text-navy-100 hover:bg-navy-800'}
+        >
+          <i className={`bi ${audioOnly ? 'bi-volume-up-fill' : 'bi-camera-reels-fill'}`} aria-hidden="true" />
+          {audioOnly ? 'Show video' : 'Keep audio only'}
         </Button>
         {access.is_host && (
           <Button

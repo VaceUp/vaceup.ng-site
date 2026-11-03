@@ -25,16 +25,28 @@ def livekit_ws_url() -> str:
     browser as "Failed to construct 'URL'", which reads to the academy like a
     broken meeting rather than a missing setting. Empty means there is no usable
     address, so callers refuse the room with a sentence instead of a stack trace.
+
+    Nothing in here may raise. The public event list asks this question for every
+    row it serialises, so a malformed value in ``.env`` would otherwise take the
+    whole Events page down as a 500 with no explanation — a bad setting is a room
+    that will not open, not a broken site.
     """
     raw = str(getattr(settings, "LIVEKIT_WS_URL", "") or "").strip()
     if not raw:
         return ""
-    parts = urlsplit(raw if "://" in raw else f"wss://{raw}")
+    try:
+        parts = urlsplit(raw if "://" in raw else f"wss://{raw}")
+        parts.port  # Raises for a ":99x" or out-of-range port, which the browser would then refuse.
+    except ValueError:
+        return ""
     scheme = parts.scheme.lower()
     if scheme in {"http", "https"}:
         scheme = "ws" if scheme == "http" else "wss"
-    # A pasted sentence, or a value cut short by an inline comment, is not a host.
-    if scheme not in {"ws", "wss"} or not parts.netloc or any(c.isspace() for c in parts.netloc):
+    # A pasted sentence, an inline comment, or the ``<your-project>`` placeholder
+    # from a setup guide is not a host, whatever parses around it.
+    if scheme not in {"ws", "wss"} or not parts.netloc:
+        return ""
+    if any(ord(c) < 33 or c in "<>\"'{}" for c in parts.netloc):
         return ""
     return f"{scheme}://{parts.netloc}{parts.path.rstrip('/')}"
 

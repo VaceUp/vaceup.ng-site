@@ -221,6 +221,23 @@ class EventJoinTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["ws_url"], "wss://lk.example")
 
+    @override_settings(LIVEKIT_API_KEY="devkey",
+                       LIVEKIT_API_SECRET="devsecret-devsecret-devsecret-9f",
+                       LIVEKIT_WS_URL="wss://[lk.example")
+    def test_an_unparsable_address_softens_the_page_instead_of_breaking_it(self):
+        """One bad settings line may not take the public Events page down.
+
+        The list serialises join_ready for every row, so a raise from the address
+        parser surfaced on the live site as an HTTP 500 with an HTML body — and a
+        browser holding that reads "the service is temporarily unavailable", which
+        tells an academy nothing about the one line they mistyped.
+        """
+        event = self._event(live_platform="livekit", meeting_url="")
+        response = self.client.get("/api/v1/website/events/")
+        self.assertEqual(response.status_code, 200)
+        row = next(r for r in response.data["results"] if r["slug"] == event.slug)
+        self.assertFalse(row["join_ready"])
+
     @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
     def test_the_built_in_room_without_keys_does_not_send_people_nowhere(self):
         event = self._event(live_platform="livekit", meeting_url="")

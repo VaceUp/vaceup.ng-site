@@ -6,10 +6,10 @@ address is never printed anywhere. The room is a LiveKit room, so this uses the
 keys you already have.
 
 Everything below was verified on this machine before it was committed: the backend
-suite ran 284 tests and passed, the frontend type-checks, lints with zero errors
-and builds, and the whole flow — booking, the invitation in the mail relay, both
-dashboards, the meeting page and the live room — was driven through a real browser
-at 1440px and 390px.
+suite ran 541 tests and passed (3 skipped), the frontend type-checks, lints with
+zero errors and builds, and the whole flow — booking, the invitation in the mail
+relay, both dashboards, the meeting page and the live room — was driven through a
+real browser at 1440px and 390px.
 
 ## Install this after the 2026-11-02 package
 

@@ -217,7 +217,8 @@ function roomFailure(error: unknown): { next: string; said: string } {
         return {
           said,
           next: 'This device could not reach the room server at all. Work, school and '
-            + 'hotel networks often block video calls — try again on mobile data.',
+            + 'hotel networks often block video calls — if you are on one of those, '
+            + 'switch to mobile data and press Try again.',
         };
       case ConnectionErrorReason.WebSocket:
         return {
@@ -243,6 +244,56 @@ function roomFailure(error: unknown): { next: string; said: string } {
   };
 }
 
+/**
+ * Failures a flaky link causes rather than a bad key or a bad room.
+ *
+ * These are the ones worth re-dialling without the person doing anything: a name
+ * server that answered late, a socket that died while the phone rejoined Wi-Fi,
+ * a handshake that ran out of time. Each wait is longer than the last so a
+ * network that is coming back gets time to come back.
+ */
+const AUTO_RETRY_DELAYS_MS = [2_000, 5_000, 12_000];
+
+const worthRetrying = (error: unknown) =>
+  error instanceof ConnectionError
+  && (
+    error.reason === ConnectionErrorReason.ServerUnreachable
+    || error.reason === ConnectionErrorReason.Timeout
+    || error.reason === ConnectionErrorReason.WebSocket
+  );
+
+/**
+ * Ask the room's host for its front door, over ordinary https.
+ *
+ * When the socket fails the client blames the network, but "the network" is
+ * three different faults: a name that will not resolve, a device that cannot
+ * reach the host at all, or a host that is reachable while the live socket
+ * alone is filtered. This tells the last two apart, because a device that can
+ * fetch the host's front door has a working route to it.
+ *
+ * `no-cors` is deliberate: any answer at all, including an error page, means the
+ * request reached the server, and the room host does not need to trust this origin.
+ */
+async function reachesRoomHost(wsUrl: string): Promise<boolean> {
+  // AbortController rather than AbortSignal.timeout: the phones this room is
+  // opened on can be a few browser versions behind, and a missing helper would
+  // turn "could not ask" into a false "cannot reach".
+  const stop = new AbortController();
+  const timer = window.setTimeout(() => stop.abort(), 8_000);
+  try {
+    const url = new URL(wsUrl);
+    url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+    url.pathname = '/';
+    url.search = '';
+    await fetch(url.toString(), { mode: 'no-cors', signal: stop.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function RoomSession({
   access, chrome, onLeave, refreshAccess,
 }: {
@@ -256,10 +307,14 @@ function RoomSession({
   // live one is held here rather than read from the props again.
   const accessRef = useRef(access);
   const audioOnlyRef = useRef(false);
+  // Counts the re-dials this screen has made on its own, so a link that keeps
+  // failing ends on the sentence instead of looping forever.
+  const autoTries = useRef(0);
   const [attempt, setAttempt] = useState(0);
   const [phase, setPhase] = useState<'connecting' | 'live' | 'retrying' | 'failed'>('connecting');
   const [problem, setProblem] = useState('');
   const [serverSaid, setServerSaid] = useState('');
+  const [reachNote, setReachNote] = useState('');
   const [weak, setWeak] = useState(false);
   const [audioOnly, setAudioOnly] = useState(false);
   const [soundNeeded, setSoundNeeded] = useState(false);
@@ -287,6 +342,12 @@ function RoomSession({
 
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
+    let retryTimer: number | undefined;
+    // Resolve the room server's name and open TLS to it while the person is
+    // still reading the screen, so the first dial does not pay for both. It is
+    // deliberately not awaited and its failure is not reported: the dial below
+    // is what decides whether the room opens.
+    void room.prepareConnection(seat.ws_url, seat.token).catch(() => {});
     const bump = () => setTick((value) => value + 1);
     const events = [
       RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected,
@@ -317,12 +378,16 @@ function RoomSession({
 
     room.connect(seat.ws_url, seat.token, {
       // A slow link needs more than one attempt and more than the default
-      // fifteen seconds before the browser gives up on the video path.
+      // fifteen seconds before the browser gives up on the video path — and a
+      // handshake that takes twenty seconds over a poor connection is still a
+      // handshake, not a failure.
       maxRetries: 3,
       peerConnectionTimeout: 30_000,
+      websocketTimeout: 30_000,
     })
       .then(async () => {
         if (stopped) return;
+        autoTries.current = 0;
         setPhase('live');
         try {
           await room.startAudio();
@@ -339,13 +404,39 @@ function RoomSession({
         // the screen gets the reason translated and the line kept, small, so a
         // report arrives with the cause already named.
         console.error('The live room could not connect', error);
-        setProblem(failure.next);
         setServerSaid(failure.said);
+        // A name server that answered late or Wi-Fi that came back mid-handshake
+        // is often gone by the next attempt, so the link gets a few more before
+        // the person has to do anything.
+        const wait = AUTO_RETRY_DELAYS_MS[autoTries.current];
+        if (worthRetrying(error) && wait !== undefined) {
+          autoTries.current += 1;
+          setProblem(
+            `${failure.next} This screen is also dialling again in ${Math.round(wait / 1_000)} seconds.`,
+          );
+          retryTimer = window.setTimeout(() => {
+            if (!stopped) setAttempt((value) => value + 1);
+          }, wait);
+        } else {
+          setProblem(failure.next);
+        }
+        // Only worth asking when the socket was labelled unreachable: if the
+        // device can fetch the host's front door, the route is fine and the
+        // live connection alone is what is being filtered.
+        if (error instanceof ConnectionError && error.reason === ConnectionErrorReason.ServerUnreachable) {
+          void reachesRoomHost(seat.ws_url).then((reachable) => {
+            if (stopped) return;
+            setReachNote(reachable
+              ? 'Check: this device reaches the room server over ordinary web, so the live connection itself is what is being blocked.'
+              : 'Check: this device cannot reach the room server even over ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the likely cause.');
+          });
+        }
       })
       .finally(bump);
 
     return () => {
       stopped = true;
+      window.clearTimeout(retryTimer);
       room.removeAllListeners();
       void room.disconnect();
       roomRef.current = null;
@@ -354,8 +445,10 @@ function RoomSession({
 
   /** Dial again, with a credential the server has just been asked for. */
   const retry = async () => {
+    autoTries.current = 0;
     setProblem('');
     setServerSaid('');
+    setReachNote('');
     setPhase('connecting');
     if (refreshAccess) {
       try {
@@ -487,6 +580,9 @@ function RoomSession({
             <p role="alert" className="text-sm font-semibold text-red-50">
               {problem || 'The live room dropped and could not reconnect.'}
             </p>
+            {reachNote && (
+              <p className="mt-1 break-words text-xs text-red-100">{reachNote}</p>
+            )}
             {serverSaid && (
               <p className="mt-1 break-words text-xs text-red-100">What the room reported: {serverSaid}</p>
             )}

@@ -156,8 +156,23 @@ key. Verified in a live browser: two presses produced two different tokens
 ## A poor connection is now expected, not fatal
 
 Defaults were a single attempt and 15 seconds before the browser gave up on the
-video path. The room now dials with `maxRetries: 3` and a 30-second peer-connection
-timeout, and adds two controls for a thin link:
+video path. The room now dials with `maxRetries: 3`, a 30-second peer-connection
+timeout and a 30-second socket handshake — a handshake that takes twenty seconds
+over a thin link is still a handshake, not a failure. It also resolves the room
+server's name and opens TLS while the person is still reading the screen, so the
+first dial does not pay for both.
+
+A socket that looks like a flaky link — the server called unreachable, a timeout,
+a socket that died — is re-dialled on the room's own initiative after **2, then 5,
+then 12 seconds**, with the wait written on screen (*This screen is also dialling
+again in 5 seconds*). After the third wait the ladder stops and leaves the
+sentence and **Try again**, so a link that stays down cannot loop. Pressing
+**Try again** restarts the ladder from the beginning. Measured in a real browser
+against a deliberately dead address: the first failure was named at t+8.9 s, the
+three waits ran, and the screen settled on the plain sentence at t+22 s with the
+socket count stable afterwards.
+
+For a thin link the room adds two controls:
 
 - A notice across the top while the call is up — *the connection to the room has
   dropped out* — with **Keep audio only**.
@@ -168,6 +183,24 @@ timeout, and adds two controls for a thin link:
 
 The capture buttons are disabled while the room is offline rather than looking
 pressable and doing nothing.
+
+### The message now says which layer failed
+
+"Could not reach the room server" hid two different faults: this device cannot
+reach the host at all, or it reaches the host while the live socket alone is
+filtered. When the socket is labelled unreachable the room fetches the same
+host's front door over ordinary https — any answer, even an error page, proves
+the route works. The band then adds one line:
+
+| What the check found | Line under the sentence |
+|---|---|
+| The front door answered | *Check: this device reaches the room server over ordinary web, so the live connection itself is what is being blocked.* |
+| The front door did not answer | *Check: this device cannot reach the room server even over ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the likely cause.* |
+
+That line is how the next report names the layer instead of repeating "it does
+not work". Verified rendered at 280px, 320px, 390px, 414px and 1440px against a
+dead address: the "cannot reach" line appeared, the band had no horizontal
+overflow at any of the five widths, and the raw host message stayed below it.
 
 ## The `.env` lines (paste these yourself — nothing in this package edits that file)
 
@@ -252,13 +285,16 @@ models change, so `migrate` only ever adds what is missing.
 | `BACKEND-RELEASE-2026-11-03-room-diagnosis.md` | this file |
 
 The frontend deploys on its own from `master` through Cloudflare Pages, so the
-five reason sentences, the fresh-key retry and the audio-only controls are live
-within a few minutes of the push — whether or not this zip is unpacked yet.
+five reason sentences, the fresh-key retry, the automatic re-dial ladder, the
+reachability check and the audio-only controls are live within a few minutes of
+the push — whether or not this zip is unpacked yet.
 
 ## What was not verified here
 
-The room's audio-only path, the dropped-connection notice and the retry timing
-were built against the `livekit-client` 2.23 API and type-check and build, but no
-LiveKit server is reachable from this machine, so they could not be exercised over
-a real call. Everything else quoted above — the check output, the diagnosis lines,
-the reason bands at three widths, the two fresh tokens — was run.
+The room's audio-only path and the dropped-connection notice were built against
+the `livekit-client` 2.23 API and type-check and build, but no LiveKit server is
+reachable from this machine, so they could not be exercised over a real call. The
+re-dial ladder and the reachability line were exercised in a real browser against
+a deliberately unreachable address at 280px, 320px, 390px, 414px and 1440px.
+Everything else quoted above — the check output, the diagnosis lines, the reason
+bands, the two fresh tokens — was run.

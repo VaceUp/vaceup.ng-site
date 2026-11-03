@@ -1,6 +1,6 @@
 # Backend release 2026-11-03 (2) — the room says why, and the Events page names its own fault
 
-Two separate faults, one package.
+Three faults, one package.
 
 1. The public **Events** page answers "The service is temporarily unavailable.
    Please try again shortly." That sentence is the frontend's translation of a
@@ -10,12 +10,82 @@ Two separate faults, one package.
    colleague, and the room blamed the network. It now states which of five
    things stopped the connection, and "Try again" gets a fresh key instead of
    re-offering an expired one.
+3. The live room could never open on the deployed site, on any device or any
+   network, because the site's own Content-Security-Policy did not allow the
+   room's host. The browser blocked the connection and the room reported the
+   block as "Failed to fetch", which reads like a dead network. The policy is
+   corrected below; this is the cause of "even on personal internet".
 
 The backend suite ran 562 tests and passed (3 skipped), `python manage.py check`
 is clean apart from the pre-existing object-storage warnings, the frontend
 type-checks, lints with warnings only and builds 67 pages. The room screens were
-re-driven in a real browser at 1440px, 390px and 280px, and every sentence quoted
-below is what the rendered page actually showed.
+re-driven in a real browser at 280px, 320px, 390px, 414px and 1440px, and every
+sentence quoted below is what the rendered page actually showed.
+
+## Why the room failed on every network: the site's own security policy
+
+`https://vaceup.ng` is served with this header, unchanged since before the live
+room existed:
+
+```
+Content-Security-Policy: … connect-src 'self' https://api.vaceup.ng
+  wss://api.vaceup.ng https://cdn.lordicon.com
+  https://*.r2.cloudflarestorage.com https://api.cloudinary.com; …
+```
+
+The room's host is not on that list. The browser therefore refuses all three
+things the room client needs:
+
+| The browser tries | The policy says |
+|---|---|
+| `wss://vaceup-lfzis3dt.livekit.cloud/rtc/v1` (the signal socket) | refused |
+| `https://vaceup-lfzis3dt.livekit.cloud/rtc/v1/validate` (the check after a failed socket) | refused |
+| `https://vaceup-lfzis3dt.livekit.cloud/settings/regions` (edge selection) | refused |
+
+`livekit-client` turns the refused `validate` fetch into `ConnectionError.
+serverUnreachable('could not establish signal connection')` with the inner
+`TypeError` text appended — so the screen reads **"Failed to fetch"**. That is
+the exact sentence in the report. A policy block, a dead DNS name and a phone on
+a train all produce that same sentence, which is why it looked like the network
+for so long.
+
+Measured, in one browser, with the same page, the same seat and the same room
+host — only the policy changed:
+
+| Policy | Console | Room band |
+|---|---|---|
+| The deployed one | `Connecting to 'wss://…/rtc/v1' violates … connect-src` plus the same for `validate` and `settings/regions` | *This site's own security policy is refusing the room server… Neither your internet nor this device is at fault* |
+| The corrected one | no policy violation | reached the server; *The room server would not accept the key this page was given…* — the scratch key used for the test is not the academy's, so a refusal here is the correct answer and proof the route works |
+
+The first run of that comparison happened before the page knew how to read the
+browser's own refusals. It showed the generic network sentence with the reach
+check underneath: *Check: this device cannot reach the room server even over
+ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the
+likely cause.* That line is right for a dead route and wrong for a policy block,
+so the room now listens for the browser's `securitypolicyviolation` events. When
+the refused address is the room's host, it replaces the sentence with the policy
+line above and stops the automatic re-dial — a policy does not heal by waiting.
+The re-dial ladder and the reach check still run for a genuinely dead route;
+measured separately against an address that refuses connections: first named at
+t+8.9 s, waits of 2, 5 and 12 seconds, settled at t+22 s, 12 sockets and then
+stable, no overflow at 390px.
+
+The correction is one line in `frontend/public/_headers`: add
+`https://*.livekit.cloud wss://*.livekit.cloud` to `connect-src`, and add
+`https://meet.jit.si` to `script-src`, `connect-src` and `frame-src`. Nothing
+else in the policy is loosened.
+
+### The Jitsi room was blocked by the same header
+
+Measured at 390px with an event on the Jitsi provider:
+
+| Policy | What the page showed |
+|---|---|
+| The deployed one | `Loading the script 'https://meet.jit.si/external_api.js' violates … script-src`; the page fell back to *The room is not showing inside this page.* |
+| The corrected one | no violation; the iframe mounted (`https://meet.jit.si/vaceup-Cohort-7-Masterclass-…#jitsi_meet_external`) and the page read *You are in as Amara Testseat.* |
+
+No horizontal overflow in either run.
+
 
 ## The Events page: what the probe says
 
@@ -196,6 +266,7 @@ the route works. The band then adds one line:
 |---|---|
 | The front door answered | *Check: this device reaches the room server over ordinary web, so the live connection itself is what is being blocked.* |
 | The front door did not answer | *Check: this device cannot reach the room server even over ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the likely cause.* |
+| The browser's own policy refused the host | Neither line. The main sentence becomes *This site's own security policy is refusing the room server…* and the re-dial ladder is cancelled. |
 
 That line is how the next report names the layer instead of repeating "it does
 not work". Verified rendered at 280px, 320px, 390px, 414px and 1440px against a

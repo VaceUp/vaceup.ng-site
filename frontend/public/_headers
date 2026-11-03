@@ -1,11 +1,15 @@
 # Cloudflare Pages requires a path before every header block.
+# connect-src must list the live-room hosts: the browser opens a socket to
+# wss://*.livekit.cloud and fetches /rtc/validate from the same host. Without
+# them the room is blocked on every network, and the client reports the block as
+# "Failed to fetch" — the same words it uses when the internet is down.
 /*
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(self), microphone=(self), geolocation=()
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://cdn.lordicon.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.vaceup.ng wss://api.vaceup.ng https://cdn.lordicon.com https://*.r2.cloudflarestorage.com https://api.cloudinary.com; media-src 'self' blob: https:; frame-src https://js.paystack.co; form-action 'self';
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://cdn.lordicon.com https://meet.jit.si; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.vaceup.ng wss://api.vaceup.ng https://*.livekit.cloud wss://*.livekit.cloud https://meet.jit.si https://cdn.lordicon.com https://*.r2.cloudflarestorage.com https://api.cloudinary.com; media-src 'self' blob: https:; frame-src https://js.paystack.co https://meet.jit.si; form-action 'self';
 
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable

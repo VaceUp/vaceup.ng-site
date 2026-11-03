@@ -343,6 +343,17 @@ function RoomSession({
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
     let retryTimer: number | undefined;
+    let policyTimer: number | undefined;
+    // The browser reports every request its own security policy refused. A
+    // policy that forgets the room host blocks the socket and the check after
+    // it, and the client then says "Failed to fetch" — words that blame the
+    // person's internet for a setting on this site. Recording the refusals lets
+    // this screen say which of the two it was.
+    const policyBlocks: string[] = [];
+    const onPolicyViolation = (event: SecurityPolicyViolationEvent) => {
+      if (event.blockedURI) policyBlocks.push(event.blockedURI);
+    };
+    document.addEventListener('securitypolicyviolation', onPolicyViolation);
     // Resolve the room server's name and open TLS to it while the person is
     // still reading the screen, so the first dial does not pay for both. It is
     // deliberately not awaited and its failure is not reported: the dial below
@@ -405,31 +416,59 @@ function RoomSession({
         // report arrives with the cause already named.
         console.error('The live room could not connect', error);
         setServerSaid(failure.said);
-        // A name server that answered late or Wi-Fi that came back mid-handshake
-        // is often gone by the next attempt, so the link gets a few more before
-        // the person has to do anything.
-        const wait = AUTO_RETRY_DELAYS_MS[autoTries.current];
-        if (worthRetrying(error) && wait !== undefined) {
-          autoTries.current += 1;
-          setProblem(
-            `${failure.next} This screen is also dialling again in ${Math.round(wait / 1_000)} seconds.`,
-          );
-          retryTimer = window.setTimeout(() => {
-            if (!stopped) setAttempt((value) => value + 1);
-          }, wait);
-        } else {
-          setProblem(failure.next);
+
+        let host = '';
+        try {
+          host = new URL(seat.ws_url).hostname;
+        } catch {
+          // isDialable already passed; there is no host to match against.
         }
-        // Only worth asking when the socket was labelled unreachable: if the
-        // device can fetch the host's front door, the route is fine and the
-        // live connection alone is what is being filtered.
-        if (error instanceof ConnectionError && error.reason === ConnectionErrorReason.ServerUnreachable) {
-          void reachesRoomHost(seat.ws_url).then((reachable) => {
-            if (stopped) return;
-            setReachNote(reachable
-              ? 'Check: this device reaches the room server over ordinary web, so the live connection itself is what is being blocked.'
-              : 'Check: this device cannot reach the room server even over ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the likely cause.');
-          });
+        const policyRefused = () =>
+          Boolean(host) && policyBlocks.some((blocked) => blocked.includes(host));
+        const policySentence = 'This site\'s own security policy is refusing the room server, '
+          + 'so the room cannot open until that setting is fixed. Neither your internet nor '
+          + 'this device is at fault — tell the academy the live room is blocked by a site setting.';
+
+        if (policyRefused()) {
+          setProblem(policySentence);
+          setReachNote('');
+        } else {
+          // A name server that answered late or Wi-Fi that came back mid-handshake
+          // is often gone by the next attempt, so the link gets a few more before
+          // the person has to do anything.
+          const wait = AUTO_RETRY_DELAYS_MS[autoTries.current];
+          if (worthRetrying(error) && wait !== undefined) {
+            autoTries.current += 1;
+            setProblem(
+              `${failure.next} This screen is also dialling again in ${Math.round(wait / 1_000)} seconds.`,
+            );
+            retryTimer = window.setTimeout(() => {
+              if (!stopped) setAttempt((value) => value + 1);
+            }, wait);
+          } else {
+            setProblem(failure.next);
+          }
+          // Only worth asking when the socket was labelled unreachable: if the
+          // device can fetch the host's front door, the route is fine and the
+          // live connection alone is what is being filtered.
+          if (error instanceof ConnectionError && error.reason === ConnectionErrorReason.ServerUnreachable) {
+            // The violation event can land a tick after the socket fails, so the
+            // policy is checked once more before the first re-dial: re-dialling
+            // cannot fix a policy, and the person should not be sent to their
+            // settings app for it.
+            policyTimer = window.setTimeout(() => {
+              if (stopped || !policyRefused()) return;
+              window.clearTimeout(retryTimer);
+              setProblem(policySentence);
+              setReachNote('');
+            }, 500);
+            void reachesRoomHost(seat.ws_url).then((reachable) => {
+              if (stopped) return;
+              setReachNote(reachable
+                ? 'Check: this device reaches the room server over ordinary web, so the live connection itself is what is being blocked.'
+                : 'Check: this device cannot reach the room server even over ordinary web, so a VPN, an ad-blocking DNS app or a proxy on this device is the likely cause.');
+            });
+          }
         }
       })
       .finally(bump);
@@ -437,6 +476,8 @@ function RoomSession({
     return () => {
       stopped = true;
       window.clearTimeout(retryTimer);
+      window.clearTimeout(policyTimer);
+      document.removeEventListener('securitypolicyviolation', onPolicyViolation);
       room.removeAllListeners();
       void room.disconnect();
       roomRef.current = null;

@@ -351,6 +351,9 @@ export function LiveClassesTab() {
                   description={row.description || undefined}
                   actions={<>
                     {row.provider === 'external' && link && <LinkAction href={link} external>Open meeting</LinkAction>}
+                    {row.provider === 'livekit' && (
+                      <LinkAction href={`/classroom/?class=${row.id}`}>Open room</LinkAction>
+                    )}
                     <Action onClick={() => void openAttendance(row)}>Attendance</Action>
                     <Action disabled={saving} onClick={() => openEdit(row)}>Edit</Action>
                   </>}

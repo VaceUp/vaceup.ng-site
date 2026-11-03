@@ -104,6 +104,13 @@ function LiveRoute() {
     waitingNote: 'You are the only one here so far. The room stays open and everyone you invited can walk in with their own link.',
     returnHref: `/events/?slug=${encodeURIComponent(slug)}`,
     returnLabel: 'Back to the event page',
+    links: slug
+      ? [{
+          label: 'Event page',
+          href: `/events/?slug=${encodeURIComponent(slug)}`,
+          hint: 'Details, time and the guest list',
+        }]
+      : [],
   };
 
   if (access?.provider === 'livekit') {
@@ -189,10 +196,14 @@ function SeatLink({ slug }: { slug: string }) {
     try {
       const result = await resendJoinLink(slug, email.trim());
       setSent(result.detail);
-    } catch (failure) {
-      setError(failure instanceof ApiError && failure.status === 429
-        ? 'Too many requests just now. Wait a minute and press the button again.'
-        : 'We could not send the link. Check the email address and try again.');
+    } catch (failure: unknown) {
+      // The server names what went wrong (throttled, or its mail is not set up),
+      // so that sentence is shown rather than a guess about the address.
+      setError(failure instanceof ApiError
+        ? (failure.status === 429
+            ? 'Too many requests just now. Wait a minute and press the button again.'
+            : failure.message)
+        : 'We could not send the link. Check your connection and try again.');
     } finally {
       setBusy(false);
     }

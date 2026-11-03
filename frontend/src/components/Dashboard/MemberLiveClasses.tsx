@@ -104,12 +104,18 @@ function Session({ item, instructor, onSaved }: { item: WorkspaceClass; instruct
   const [showAttendance, setShowAttendance] = useState(false);
   const finished = ['ended', 'cancelled'].includes(item.status) || (!!item.scheduled_end && new Date(item.scheduled_end).getTime() < Date.now() && !item.joinable);
   const join = async () => {
+    // The in-app room opens on its own page so the class, the staff meeting and
+    // the event all use the same room screen and the same controls.
+    if (item.provider === 'livekit') {
+      window.location.assign(`/classroom/?class=${item.id}`);
+      return;
+    }
     setBusy(true); setError(''); setJoinUrl(null);
     try {
       const result = await api.request<{ provider: string; url?: string }>(`/live-classes/${item.id}/join/`, { method: 'POST' });
       const url = result.provider === 'external' ? webUrl(result.url) : null;
       if (!url) {
-        setError('This session uses VaceUp’s in-app video room. Open it from the tutor’s shared link, or ask your tutor for the meeting link.');
+        setError('This session’s in-app room is not switched on yet. Ask the academy to check the live-room settings.');
         return;
       }
       setJoinUrl(url);

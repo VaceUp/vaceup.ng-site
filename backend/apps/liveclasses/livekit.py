@@ -119,6 +119,11 @@ def generate_livekit_token(
             "canPublish": can_publish,
             "canSubscribe": can_subscribe,
             "canPublishData": can_publish_data,
+            # The room writes a raised hand into the participant's metadata so
+            # somebody joining later still sees it. Without this grant the
+            # server refuses the update and the hand would only exist for the
+            # people who were already watching.
+            "canUpdateOwnMetadata": True,
             "hidden": hidden,
             "recorder": recorder,
         },
@@ -220,20 +225,25 @@ def get_livekit_manager() -> LiveKitRoomManager:
 
 
 def build_join_credentials(
-    *, user, live_class, can_publish: bool = False
+    *, user, live_class, can_publish: bool = False, is_host: bool = False
 ) -> Dict[str, Any]:
     """Build join credentials for a live class.
     
-    Returns a dict with provider, room, token, and WebSocket URL.
+    Returns a dict with provider, room, token, and WebSocket URL. The seat also
+    names its bearer and whether they are running the session, because the room
+    screen uses the same shape for a class, a staff meeting and an event — one
+    credential type, one room component, one set of controls.
     """
     if live_class.provider == LiveClass.Provider.LIVEKIT:
         if not livekit_configured():
             return {"provider": "external", "url": live_class.join_url}
         
         room = live_class.room_name or f"class-{live_class.id}"
+        identity = str(user.id)
+        display_name = user.full_name or ("Host" if is_host else "Guest")
         token = generate_livekit_token(
-            identity=str(user.id),
-            name=user.full_name,
+            identity=identity,
+            name=display_name,
             room=room,
             can_publish=can_publish,
         )
@@ -246,7 +256,10 @@ def build_join_credentials(
             "room": room,
             "ws_url": livekit_ws_url(),
             "token": token,
+            "identity": identity,
+            "display_name": display_name,
             "can_publish": can_publish,
+            "is_host": is_host,
         }
     
     # External provider (Meet, Zoom, etc.)

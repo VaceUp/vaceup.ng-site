@@ -11,6 +11,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.mail_delivery import email_configuration_errors
 from apps.core.permissions import IsAdmin, IsAdminOrReadOnly
 from apps.core.throttling import DatabaseAnonRateThrottle
 from apps.website import revisions
@@ -262,8 +263,19 @@ class EventViewSet(viewsets.ModelViewSet):
                 )
 
         transaction.on_commit(confirm)
+        # Telling somebody a confirmation is "on its way" when the server has no
+        # working mail settings is how a missing setting turns into a week of
+        # "the email never came". The screen can say it plainly, and the joining
+        # link is already on screen, so the seat is not lost either way.
+        mail_ready = not email_configuration_errors()
         payload = {
-            "detail": "You are registered. A confirmation email is on its way.",
+            "detail": (
+                "You are registered. A confirmation email is on its way."
+                if mail_ready else
+                "You are registered. The academy's email is not switched on yet, so "
+                "save the joining link below — it is your seat."
+            ),
+            "email_ready": mail_ready,
             "seats_taken": event.seats_taken,
             "is_full": event.is_full,
         }
@@ -308,6 +320,16 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "This event is not online, so there is no link to send."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        # A mail server that cannot send is not the attendee's problem to guess
+        # at. This answer is the same for every address, so it still does not
+        # reveal who registered.
+        if email_configuration_errors():
+            return Response(
+                {"detail": "The academy's email is not switched on, so no link could be "
+                           "sent. Use the personal link from your confirmation, or ask "
+                           "the academy to send it once its mail is set up."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         sent = 0
         if email:
@@ -372,6 +394,26 @@ class EventViewSet(viewsets.ModelViewSet):
             detail += f" {failed} could not be sent, so the mail setup needs a look."
         return Response({"detail": detail, "sent": sent, "failed": failed,
                          "total": len(registrations)})
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[IsAdmin],
+        url_path="mail-status",
+    )
+    def mail_status(self, request):
+        """Whether this server can send event mail, and what to fix if not.
+
+        Every message here is static guidance from the configuration checker:
+        no host, user, password or server reply is ever included, so it is safe
+        to show beside the event list.
+        """
+        errors = email_configuration_errors()
+        return Response({
+            "ready": not errors,
+            "errors": errors,
+            "hint": "python manage.py diagnose_email_delivery --send-test",
+        })
 
     @action(
         detail=True,

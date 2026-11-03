@@ -35,13 +35,19 @@ class BreakoutRoomFull(DomainError):
 def join_live_class(*, user, live_class):
     """Return join credentials for ``user``.
 
-    Host (owning instructor / admin) may join any time to start the session and
-    joins as a publisher. Students must be enrolled and within the join window;
-    their attendance is recorded once.
+    Host (owning instructor / admin) may join any time to start the session.
+    Students must be enrolled and within the join window; their attendance is
+    recorded once.
+
+    Everyone who is in the room can publish: a class is a conversation and a
+    whiteboard, not a broadcast, so a student needs the microphone, the camera
+    and the screen share exactly where a tutor has them.
     """
     is_host = user.is_admin or live_class.course.instructor_id == user.id
     if is_host:
-        return build_join_credentials(user=user, live_class=live_class, can_publish=True)
+        return build_join_credentials(
+            user=user, live_class=live_class, can_publish=True, is_host=True
+        )
 
     enrolled = Enrollment.objects.filter(
         student=user, course=live_class.course,
@@ -53,7 +59,9 @@ def join_live_class(*, user, live_class):
         raise ClassNotJoinable()
 
     Attendance.objects.get_or_create(live_class=live_class, student=user)
-    return build_join_credentials(user=user, live_class=live_class, can_publish=False)
+    return build_join_credentials(
+        user=user, live_class=live_class, can_publish=True, is_host=False
+    )
 
 
 def join_breakout_room(*, user, live_class, breakout_room: str) -> dict:
@@ -91,14 +99,20 @@ def join_breakout_room(*, user, live_class, breakout_room: str) -> dict:
         "room": breakout_room,
         "ws_url": livekit_ws_url(),
         "token": token,
+        "identity": str(user.id),
+        "display_name": user.full_name or ("Host" if is_host else "Guest"),
         "can_publish": True,
+        "is_host": is_host,
         "breakout": True,
     }
 
 
 def leave_breakout_room(*, user, live_class, breakout_room: str) -> dict:
     """Leave a breakout room and return to main room."""
-    return build_join_credentials(user=user, live_class=live_class, can_publish=False)
+    is_host = user.is_admin or live_class.course.instructor_id == user.id
+    return build_join_credentials(
+        user=user, live_class=live_class, can_publish=True, is_host=is_host
+    )
 
 
 def get_breakout_rooms(live_class) -> list:

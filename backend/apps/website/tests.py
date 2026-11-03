@@ -139,6 +139,33 @@ class WebsiteApiTests(TestCase):
         self.assertIn("hear about our future events", body)
         self.assertIn(f"/events/?slug={event.slug}", body)
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.dummy.EmailBackend")
+    def test_rsvp_says_when_the_confirmation_cannot_be_emailed(self):
+        # The seat is saved and its link is handed over on screen; the only
+        # thing the attendee must not be told is that an email is coming.
+        event = self._event(is_online=True, meeting_url="https://meet.google.com/abc-defg-hij")
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/v1/website/events/{event.slug}/register/",
+                {"name": "Ada Obi", "email": "ada@example.com"}, format="json",
+            )
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data["email_ready"])
+        self.assertIn("not switched on", response.data["detail"])
+        self.assertIn("join_link", response.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_rsvp_reports_that_the_confirmation_was_sent(self):
+        event = self._event()
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"/api/v1/website/events/{event.slug}/register/",
+                {"name": "Ada Obi", "email": "ada2@example.com"}, format="json",
+            )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["email_ready"])
+
     def test_in_person_confirmation_names_the_venue_once(self):
         event = self._event(location="669 Abeokuta Expressway")
         mail.outbox.clear()

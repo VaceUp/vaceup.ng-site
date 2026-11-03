@@ -97,6 +97,10 @@ export default function EventsManager() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('');
   const resource = useWorkspaceResource<WorkspacePage<EventRow>>(`/website/events/?page=${page}${filter ? `&${filter}` : ''}`);
+  // Whether this server can actually send event mail. Without it, a
+  // confirmation and a joining link are written and then dropped, and the
+  // registrant is left waiting for a message that never left the box.
+  const mailStatus = useWorkspaceResource<{ ready: boolean; errors: string[]; hint: string }>('/website/events/mail-status/');
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editing, setEditing] = useState<EventRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -319,6 +323,17 @@ export default function EventsManager() {
 
   return (
     <>
+      {mailStatus.data && !mailStatus.data.ready && (
+        <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-bold">Event email is not leaving this server.</p>
+          <p className="mt-1">{mailStatus.data.errors[0]}</p>
+          <p className="mt-2">
+            Registration confirmations and joining links stay unsent until this is
+            fixed. Run <code className="rounded bg-white px-1 py-0.5 font-mono text-xs">{mailStatus.data.hint}</code> on
+            the server to check the mail setup.
+          </p>
+        </div>
+      )}
       <AdminSection
         title="Events on the website"
         description="Visitors see published events only, and register on the public Events page. Drafts stay invisible until you publish them."

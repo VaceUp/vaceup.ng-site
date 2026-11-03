@@ -150,7 +150,13 @@ export function registerForEvent(
   slug: string,
   values: { name: string; email: string; phone: string; note: string; consent_marketing: boolean },
 ) {
-  return api.request<{ detail: string; seats_taken: number; is_full: boolean; join_link?: string }>(
+  return api.request<{
+    detail: string;
+    email_ready?: boolean;
+    seats_taken: number;
+    is_full: boolean;
+    join_link?: string;
+  }>(
     `/website/events/${encodeURIComponent(slug)}/register/`,
     { method: 'POST', body: JSON.stringify(values) },
     false,

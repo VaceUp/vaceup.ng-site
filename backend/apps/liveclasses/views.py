@@ -243,7 +243,10 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             "room": breakout_room,
             "ws_url": livekit_ws_url(),
             "token": token,
+            "identity": str(request.user.id),
+            "display_name": request.user.full_name or ("Host" if is_host else "Guest"),
             "can_publish": True,
+            "is_host": is_host,
             "breakout": True,
         })
 
@@ -253,7 +256,10 @@ class LiveClassViewSet(viewsets.ModelViewSet):
         live_class = self.get_object()
         
         creds = services.build_join_credentials(
-            user=request.user, live_class=live_class, can_publish=False
+            user=request.user,
+            live_class=live_class,
+            can_publish=True,
+            is_host=request.user.is_admin or live_class.course.instructor_id == request.user.id,
         )
         
         return Response({

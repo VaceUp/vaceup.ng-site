@@ -492,6 +492,52 @@ class EventResendLinkTests(TestCase):
             429,
         )
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.dummy.EmailBackend")
+    def test_a_server_that_cannot_send_says_so_instead_of_promising(self):
+        # "On its way" for a message the server will never send is how an
+        # attendee ends up waiting all evening for a link that already exists.
+        mail.outbox.clear()
+        response = self.client.post(self.url, {"email": "ada@example.com"}, format="json")
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("not switched on", response.data["detail"])
+        self.assertEqual(len(mail.outbox), 0)
+
+
+class EventMailStatusTests(TestCase):
+    """The admin screen can name why event mail is not leaving the server."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email="admin@vaceup.ng", password="x", full_name="Amara Host",
+            role=User.Role.ADMIN, is_active=True,
+        )
+        self.student = User.objects.create_user(
+            email="student@vaceup.ng", password="x", full_name="Ada Obi",
+            role=User.Role.STUDENT, is_active=True,
+        )
+        self.url = "/api/v1/website/events/mail-status/"
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.dummy.EmailBackend")
+    def test_a_dummy_backend_is_reported_with_advice_and_no_secrets(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["ready"])
+        self.assertTrue(response.data["errors"])
+        self.assertIn("diagnose_email_delivery", response.data["hint"])
+
+    def test_a_working_backend_is_reported_ready(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["ready"])
+        self.assertEqual(response.data["errors"], [])
+
+    def test_only_an_admin_may_read_it(self):
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
 
 class RosterLinkColumnTests(TestCase):
     """The printed list must answer "did this person get the link?"."""

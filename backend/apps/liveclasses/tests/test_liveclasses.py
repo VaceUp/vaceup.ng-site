@@ -166,6 +166,24 @@ class LiveClassTests(APITestCase):
         claims = jwt.decode(r.data["token"], "devsecret", algorithms=["HS256"])
         self.assertEqual(claims["video"]["room"], "room-1")
         self.assertTrue(claims["video"]["roomJoin"])
+        # A student is in the conversation: microphone, camera and the screen
+        # share are theirs to use, and the seat says they are not hosting.
+        self.assertTrue(claims["video"]["canPublish"])
+        self.assertTrue(r.data["can_publish"])
+        self.assertFalse(r.data["is_host"])
+        self.assertEqual(r.data["identity"], str(self.student.id))
+        self.assertTrue(r.data["display_name"])
+
+    @override_settings(LIVEKIT_API_KEY="devkey", LIVEKIT_API_SECRET="devsecret",
+                       LIVEKIT_WS_URL="wss://lk.example")
+    def test_livekit_host_seat_is_named_as_the_host(self):
+        lc = self._class(start=timezone.now() + timedelta(days=5), provider="livekit",
+                         room_name="room-2")
+        self.client.force_authenticate(self.instr)
+        r = self.client.post(f"{LC}{lc.id}/join/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.data["is_host"])
+        self.assertTrue(r.data["can_publish"])
 
 
 class LiveKitAddressTests(SimpleTestCase):

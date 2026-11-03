@@ -106,6 +106,11 @@ function MeetingRoute() {
       waitingNote: 'Nobody else has walked in yet. Your colleagues open this meeting from their own dashboard, and the invitation email leads to the same door.',
       returnHref: user.role === 'admin' ? '/dashboard?tab=meetings' : '/dashboard/meetings',
       returnLabel: 'Back to my meetings',
+      links: [{
+        label: user.role === 'admin' ? 'Staff meetings' : 'My meetings',
+        href: user.role === 'admin' ? '/dashboard?tab=meetings' : '/dashboard/meetings',
+        hint: 'The booking and the invitation list',
+      }],
     };
     return <LiveRoom access={access} chrome={chrome} refreshAccess={openRoom} />;
   }

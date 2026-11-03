@@ -342,8 +342,8 @@ class ApiClient {
     return this.request<LiveClass>(`/live-classes/${id}/`);
   }
 
-  async joinLiveClass(id: string): Promise<LiveClassSession> {
-    return this.request<LiveClassSession>(`/live-classes/${id}/join/`, { method: 'POST' });
+  async joinLiveClass(id: string): Promise<LiveClassEntry> {
+    return this.request<LiveClassEntry>(`/live-classes/${id}/join/`, { method: 'POST' });
   }
 
   // ============================================
@@ -695,7 +695,25 @@ export interface LiveClass {
 
 export interface LiveClassListParams { page?: number; page_size?: number; status?: string; search?: string; }
 
-export interface LiveClassSession { id: string; live_class: LiveClass; join_url: string; started_at?: string; ended_at?: string; }
+/**
+ * What the join endpoint hands back for one live class.
+ *
+ * A LiveKit class returns the same seat shape a staff meeting does, because the
+ * room screen is the same component; an external class simply names the URL the
+ * browser should move to.
+ */
+export type LiveClassEntry =
+  | {
+      provider: 'livekit';
+      room: string;
+      ws_url: string;
+      token: string;
+      identity: string;
+      display_name: string;
+      can_publish: boolean;
+      is_host: boolean;
+    }
+  | { provider: 'external'; url: string };
 
 export interface Conversation {
   id: string; participant: { id: string; name: string; avatar: string; online: boolean; };

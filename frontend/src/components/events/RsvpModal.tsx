@@ -27,6 +27,9 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
   const [formError, setFormError] = useState('');
   const [done, setDone] = useState('');
   const [seatLink, setSeatLink] = useState('');
+  // The server knows whether its mail settings can send; guessing here is how
+  // an attendee waits for an email that was never going to arrive.
+  const [mailReady, setMailReady] = useState(true);
 
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -46,6 +49,7 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
       });
       setDone(result.detail);
       setSeatLink(result.join_link || '');
+      setMailReady(result.email_ready !== false);
       onRegistered(result.seats_taken, result.is_full);
     } catch (requestError) {
       setFormError(requestError instanceof Error ? requestError.message : 'Your registration could not be saved.');
@@ -82,8 +86,16 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
           </div>
           {seatLink && event.is_online && (
             <p className="text-sm text-gray-600">
-              We have emailed this link to you as well. It is your seat, so please do
-              not pass it on — everyone coming should register for their own.
+              {mailReady
+                ? 'We have emailed this link to you as well. It is your seat, so please do not pass it on — everyone coming should register for their own.'
+                : 'The academy could not email this link, so keep this page open or save the link now. It is your seat, so please do not pass it on — everyone coming should register for their own.'}
+            </p>
+          )}
+          {!seatLink && !mailReady && (
+            <p role="alert" className="text-sm font-semibold text-red-700">
+              The academy could not email your confirmation because its mail is not
+              switched on yet. Keep the details on this screen, and contact the academy
+              if you need the joining link.
             </p>
           )}
         </div>

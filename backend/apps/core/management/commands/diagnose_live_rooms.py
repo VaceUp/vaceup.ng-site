@@ -167,11 +167,13 @@ class Command(BaseCommand):
 
         # The command runs on the box, so it may name any host it likes; the
         # point is to reach the view, not to test which domain it answers.
+        # Ask over https, because the deployment redirects http to it and a
+        # 301 would otherwise be reported instead of the answer the site gets.
         with override_settings(ALLOWED_HOSTS=["*"]):
             client = Client(SERVER_NAME="api.vaceup.ng")
             for path in ("/api/v1/website/events/", "/api/v1/meetings/readiness/"):
                 try:
-                    response = client.get(path, HTTP_ACCEPT="application/json")
+                    response = client.get(path, HTTP_ACCEPT="application/json", secure=True)
                 except Exception:
                     self.stdout.write(self.style.ERROR(f"{path} raised:\n{traceback.format_exc()}"))
                     response_failed = True
@@ -181,6 +183,8 @@ class Command(BaseCommand):
                     response_failed = response.status_code >= 500
                     if response_failed:
                         self.stdout.write(self.style.ERROR(line + f"\n  body: {body}"))
+                    elif 300 <= response.status_code < 400:
+                        self.stdout.write(line + " (redirected; the request did reach the app)")
                     else:
                         self.stdout.write(
                             line + (" (sign-in required, as expected)" if response.status_code == 401 else "")

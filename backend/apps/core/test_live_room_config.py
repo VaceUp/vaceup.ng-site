@@ -100,6 +100,13 @@ class DiagnoseLiveRoomsTests(TestCase):
         self.assertRegex(report, r"website: all \d+ migrations applied\.")
         self.assertRegex(report, r"meetings: all \d+ migrations applied\.")
 
+    @override_settings(SECURE_SSL_REDIRECT=True)
+    def test_the_https_redirect_does_not_hide_the_answer(self):
+        # The deployment redirects http to https; the probe must ask over https
+        # or every line reads "HTTP 301" and proves nothing.
+        report = self._run()
+        self.assertIn("/api/v1/website/events/ -> HTTP 200", report)
+
     def test_a_migration_that_has_not_been_applied_is_named_by_name(self):
         from django.db import connections
 

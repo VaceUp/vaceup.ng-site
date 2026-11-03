@@ -11,7 +11,7 @@ Two separate faults, one package.
    things stopped the connection, and "Try again" gets a fresh key instead of
    re-offering an expired one.
 
-The backend suite ran 561 tests and passed (3 skipped), `python manage.py check`
+The backend suite ran 562 tests and passed (3 skipped), `python manage.py check`
 is clean apart from the pre-existing object-storage warnings, the frontend
 type-checks, lints with warnings only and builds 67 pages. The room screens were
 re-driven in a real browser at 1440px, 390px and 280px, and every sentence quoted
@@ -43,6 +43,31 @@ MySQL answers "Unknown column" and Django turns that into the 500 you see.
 The package proves this rather than asserting it: `diagnose_live_rooms` reads the
 server's own migrations table and, if any of those are unapplied, prints which
 ones and the command that fixes it.
+
+## What the first run on the server showed
+
+The command was run on this deployment and it answered both questions:
+
+```
+LIVEKIT_API_KEY: set (15 characters)
+LIVEKIT_API_SECRET: set (44 characters)
+LIVEKIT_WS_URL: set (35 characters)
+The browser dials: wss://vaceup-lfzis3dt.livekit.cloud
+Token mints and verifies against this secret (room vaceup-diagnostic-room, valid 300 seconds).
+website: 2 of 9 migrations are not applied (0008_event_jitsi_room_secret, 0009_eventregistrant_broadcast_marker). Run: python manage.py migrate website
+meetings: all 1 migrations applied.
+Staff meetings: ready.
+```
+
+`python manage.py migrate website` applied those two, and the public Events page
+then answered `200` with its list and `404` for an event that does not exist —
+which is the correct pair, and exactly the missing-column fault described above.
+No LiveKit line had to change.
+
+The first run also printed `HTTP 301` for both request lines instead of the answer.
+That was the probe, not the site: it asked over plain `http` and this deployment
+redirects `http` to `https`. The probe now asks over `https`, so those two lines
+report `200` and `401` as they should. Nothing about the site needed changing.
 
 ## `python manage.py diagnose_live_rooms`
 

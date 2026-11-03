@@ -200,13 +200,34 @@ class EventJoinTests(TestCase):
         self.assertTrue(claims["video"]["roomJoin"])
         self.assertGreater(claims["exp"], claims["nbf"])
 
+    @override_settings(LIVEKIT_API_KEY="devkey",
+                       LIVEKIT_API_SECRET="devsecret-devsecret-devsecret-9f",
+                       LIVEKIT_WS_URL="https://lk.example/project")
+    def test_a_pasted_https_address_becomes_the_socket_the_browser_needs(self):
+        """A dashboard hands out an https URL; the room client only dials a ws one."""
+        event = self._event(live_platform="livekit", meeting_url="")
+        registration = self._registration(event)
+        response = self._join(event, token=registration.join_token)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["ws_url"], "wss://lk.example/project")
+
+    @override_settings(LIVEKIT_API_KEY="devkey",
+                       LIVEKIT_API_SECRET="devsecret-devsecret-devsecret-9f",
+                       LIVEKIT_WS_URL="lk.example")
+    def test_a_bare_host_is_still_a_room_address(self):
+        event = self._event(live_platform="livekit", meeting_url="")
+        registration = self._registration(event)
+        response = self._join(event, token=registration.join_token)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["ws_url"], "wss://lk.example")
+
     @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
     def test_the_built_in_room_without_keys_does_not_send_people_nowhere(self):
         event = self._event(live_platform="livekit", meeting_url="")
         registration = self._registration(event)
         response = self._join(event, token=registration.join_token)
         self.assertEqual(response.status_code, 503)
-        self.assertIn("LiveKit keys", response.data["detail"])
+        self.assertIn("LIVEKIT_API_KEY", response.data["detail"])
 
     @override_settings(JITSI_DOMAIN="meet.jit.si",
                        LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")

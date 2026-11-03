@@ -5,7 +5,6 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.conf import settings
 from django.http import HttpResponseRedirect
 
 from apps.core.permissions import IsInstructorOrAdmin
@@ -216,11 +215,15 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Not enrolled in this course."}, status=403)
         
         # Generate breakout room token
-        from apps.liveclasses.livekit import generate_breakout_token, livekit_configured
-        from django.conf import settings
+        from apps.liveclasses.livekit import (
+            livekit_configured, livekit_ws_url, missing_settings_advice,
+        )
         
         if not livekit_configured():
-            return Response({"detail": "LiveKit not configured."}, status=503)
+            return Response(
+                {"detail": f"Breakout rooms are not switched on yet. {missing_settings_advice()}"},
+                status=503,
+            )
         
         main_room = live_class.room_name or f"class-{live_class.id}"
         breakout_room_name = breakout_room
@@ -238,7 +241,7 @@ class LiveClassViewSet(viewsets.ModelViewSet):
         return Response({
             "provider": "livekit",
             "room": breakout_room,
-            "ws_url": getattr(settings, "LIVEKIT_WS_URL", ""),
+            "ws_url": livekit_ws_url(),
             "token": token,
             "can_publish": True,
             "breakout": True,

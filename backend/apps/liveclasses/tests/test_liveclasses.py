@@ -2,12 +2,15 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.courses.models import Category, Course
 from apps.enrollment.models import Enrollment
+from apps.liveclasses.livekit import (
+    livekit_configured, livekit_ws_url, missing_settings_advice,
+)
 from apps.liveclasses.models import Attendance, LiveClass
 
 User = get_user_model()
@@ -163,3 +166,33 @@ class LiveClassTests(APITestCase):
         claims = jwt.decode(r.data["token"], "devsecret", algorithms=["HS256"])
         self.assertEqual(claims["video"]["room"], "room-1")
         self.assertTrue(claims["video"]["roomJoin"])
+
+
+class LiveKitAddressTests(SimpleTestCase):
+    """What the browser is handed to dial, and what counts as having nothing to dial."""
+
+    def test_a_pasted_address_is_repaired_to_a_socket(self):
+        # The LiveKit dashboard shows an https URL; the room client only speaks
+        # ws:// and wss://, and a bare host is how people paste it.
+        for pasted, expected in [
+            ("https://proj.livekit.cloud", "wss://proj.livekit.cloud"),
+            ("lk.example/", "wss://lk.example"),
+            ("ws://localhost:7880", "ws://localhost:7880"),
+        ]:
+            with self.subTest(pasted=pasted):
+                with override_settings(LIVEKIT_WS_URL=pasted):
+                    self.assertEqual(livekit_ws_url(), expected)
+
+    def test_an_address_the_browser_could_not_dial_is_reported_as_missing(self):
+        for pasted in ["", "   ", "not a url", "ftp://lk.example"]:
+            with self.subTest(pasted=pasted):
+                with override_settings(LIVEKIT_WS_URL=pasted):
+                    self.assertEqual(livekit_ws_url(), "")
+
+    def test_keys_alone_do_not_add_up_to_a_room(self):
+        with override_settings(LIVEKIT_API_KEY="devkey", LIVEKIT_API_SECRET="secret",
+                               LIVEKIT_WS_URL=""):
+            advice = missing_settings_advice()
+            self.assertFalse(livekit_configured())
+            self.assertIn("LIVEKIT_WS_URL", advice)
+            self.assertNotIn("LIVEKIT_API_KEY", advice)

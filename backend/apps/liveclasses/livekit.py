@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import time
 from typing import Optional, List, Dict, Any
+from urllib.parse import urlsplit
 
 from django.conf import settings
 import jwt
@@ -16,12 +17,55 @@ import jwt
 from apps.liveclasses.models import LiveClass
 
 
+def livekit_ws_url() -> str:
+    """The address the browser dials, repaired to what the LiveKit client accepts.
+
+    A project address is usually pasted as ``https://…`` or as a bare host, and
+    the client only speaks ws:// and wss://. Handing it anything else fails in the
+    browser as "Failed to construct 'URL'", which reads to the academy like a
+    broken meeting rather than a missing setting. Empty means there is no usable
+    address, so callers refuse the room with a sentence instead of a stack trace.
+    """
+    raw = str(getattr(settings, "LIVEKIT_WS_URL", "") or "").strip()
+    if not raw:
+        return ""
+    parts = urlsplit(raw if "://" in raw else f"wss://{raw}")
+    scheme = parts.scheme.lower()
+    if scheme in {"http", "https"}:
+        scheme = "ws" if scheme == "http" else "wss"
+    # A pasted sentence, or a value cut short by an inline comment, is not a host.
+    if scheme not in {"ws", "wss"} or not parts.netloc or any(c.isspace() for c in parts.netloc):
+        return ""
+    return f"{scheme}://{parts.netloc}{parts.path.rstrip('/')}"
+
+
+def missing_livekit_settings() -> List[str]:
+    """Which settings have to be added before a room will open on this server."""
+    missing = []
+    if not getattr(settings, "LIVEKIT_API_KEY", ""):
+        missing.append("LIVEKIT_API_KEY")
+    if not getattr(settings, "LIVEKIT_API_SECRET", ""):
+        missing.append("LIVEKIT_API_SECRET")
+    if not livekit_ws_url():
+        missing.append("LIVEKIT_WS_URL")
+    return missing
+
+
+def missing_settings_advice() -> str:
+    """The fix, named exactly, for whoever is reading the screen."""
+    missing = missing_livekit_settings()
+    if not missing:
+        return ""
+    if len(missing) == 1:
+        listed = missing[0]
+    else:
+        listed = f"{', '.join(missing[:-1])} and {missing[-1]}"
+    return f"Add {listed} to the server's .env file and restart the app."
+
+
 def livekit_configured() -> bool:
-    """Check if LiveKit is properly configured."""
-    return bool(
-        getattr(settings, "LIVEKIT_API_KEY", "")
-        and getattr(settings, "LIVEKIT_API_SECRET", "")
-    )
+    """Whether this server can actually take somebody into a room."""
+    return not missing_livekit_settings()
 
 
 def generate_livekit_token(
@@ -111,7 +155,7 @@ class LiveKitRoomManager:
             raise RuntimeError("LiveKit not configured")
         self.api_key = settings.LIVEKIT_API_KEY
         self.api_secret = settings.LIVEKIT_API_SECRET
-        self.ws_url = getattr(settings, "LIVEKIT_WS_URL", "")
+        self.ws_url = livekit_ws_url()
     
     def create_room(
         self, name: str, empty_timeout: int = 300, max_participants: int = 100,
@@ -188,7 +232,7 @@ def build_join_credentials(
         return {
             "provider": "livekit",
             "room": room,
-            "ws_url": getattr(settings, "LIVEKIT_WS_URL", ""),
+            "ws_url": livekit_ws_url(),
             "token": token,
             "can_publish": can_publish,
         }

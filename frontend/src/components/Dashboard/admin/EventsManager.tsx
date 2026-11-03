@@ -73,7 +73,7 @@ const JOIN_HINTS: Record<Platform, string> = {
   jitsi: 'Attendees click Join and land in our own room, run on the free Jitsi server. '
     + 'Nothing to set up, but that server now cuts a meeting off at 95 minutes.',
   livekit: 'Attendees click Join and land in our own room, run on our LiveKit project. '
-    + 'Needs the LiveKit keys on the server.',
+    + 'Needs the LiveKit keys and the LiveKit server address on the server.',
 };
 
 const venueOf = (row: EventRow) => {

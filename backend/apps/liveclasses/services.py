@@ -2,14 +2,13 @@
 Includes breakout room and recording support."""
 from __future__ import annotations
 
-from django.conf import settings
 from django.db import transaction
 
 from apps.core.exceptions import DomainError, NotEnrolled
 from apps.enrollment.models import Enrollment
 from apps.liveclasses.livekit import (
     generate_livekit_token, generate_breakout_token,
-    build_join_credentials, livekit_configured
+    build_join_credentials, livekit_configured, livekit_ws_url
 )
 from apps.liveclasses.models import Attendance, LiveClass
 
@@ -90,7 +89,7 @@ def join_breakout_room(*, user, live_class, breakout_room: str) -> dict:
     return {
         "provider": "livekit",
         "room": breakout_room,
-        "ws_url": getattr(settings, "LIVEKIT_WS_URL", ""),
+        "ws_url": livekit_ws_url(),
         "token": token,
         "can_publish": True,
         "breakout": True,

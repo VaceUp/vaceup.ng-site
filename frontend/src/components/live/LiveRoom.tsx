@@ -154,6 +154,16 @@ export default function LiveRoom({ access, chrome }: { access: RoomAccess; chrom
   return <RoomSession key={session} access={access} chrome={chrome} onLeave={() => setLeft(true)} onReconnect={() => setSession((value) => value + 1)} />;
 }
 
+/** Whether the browser can actually dial this address as a LiveKit socket. */
+function isDialable(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'ws:' || parsed.protocol === 'wss:';
+  } catch {
+    return false;
+  }
+}
+
 function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAccess; chrome: RoomChrome; onLeave: () => void; onReconnect: () => void }) {
   const roomRef = useRef<Room | null>(null);
   const [phase, setPhase] = useState<'connecting' | 'live' | 'retrying' | 'failed'>('connecting');
@@ -165,6 +175,20 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
   const [shareOn, setShareOn] = useState(false);
 
   useEffect(() => {
+    // The client dials the address with `new URL()`, so an empty or scheme-less
+    // one fails as "Failed to construct 'URL'" — a library's own words, which
+    // tells the academy nothing. Checked here rather than trusted, because the
+    // frontend deploys ahead of the backend and a stale server still hands out
+    // whatever its .env held.
+    if (!isDialable(access.ws_url)) {
+      setPhase('failed');
+      setProblem(
+        'This server is not giving out a room address the browser can dial, so the '
+        + 'meeting cannot open. The academy needs its LiveKit settings checked.',
+      );
+      return;
+    }
+
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
     const bump = () => setTick((value) => value + 1);
@@ -195,11 +219,11 @@ function RoomSession({ access, chrome, onLeave, onReconnect }: { access: RoomAcc
       })
       .catch((error: unknown) => {
         setPhase('failed');
-        setProblem(
-          error instanceof Error && error.message
-            ? `The live room could not be reached (${error.message}).`
-            : 'The live room could not be reached. Check your connection and try again.',
-        );
+        // The client's own words are for whoever fixes the server, not for the
+        // person standing in the doorway, so they go to the console and the
+        // screen gets the one thing they can do next.
+        console.error('The live room could not connect', error);
+        setProblem('The live room could not be reached. Check your connection, then press Try again.');
       })
       .finally(bump);
 

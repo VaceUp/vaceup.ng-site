@@ -1,15 +1,21 @@
 # Backend release 2026-11-03 — staff meetings held inside VaceUp
 
 An administrator or a tutor books a colleague into a call and the call happens in
-the platform: no Meet link is traded, no outside account is needed, and the room
-address is never printed anywhere. The room is a LiveKit room, so this uses the
-keys you already have.
+the platform: no Meet link is traded, no outside account is needed, and the room's
+private name is never printed anywhere. The room is a LiveKit room, so it runs on
+the LiveKit project your keys already point at.
+
+This package also carries the fix for the failure a booked meeting hits when the
+server never told the browser where to dial — read **The room that would not
+open** below before you restart the app, because it needs one line in `.env`.
 
 Everything below was verified on this machine before it was committed: the backend
-suite ran 541 tests and passed (3 skipped), the frontend type-checks, lints with
-zero errors and builds, and the whole flow — booking, the invitation in the mail
-relay, both dashboards, the meeting page and the live room — was driven through a
-real browser at 1440px and 390px.
+suite ran 547 tests and passed (3 skipped), the frontend type-checks and builds with
+no errors (67 pages, compiled in 27.9s) and lints with warnings only, and the whole
+flow — booking, the invitation in the mail relay, both dashboards, the meeting page
+and the live room — was driven through a real browser at 1440px and 390px. The two
+room-address cases below were then re-driven in a live browser against a real server,
+and every sentence quoted here is the text the rendered page actually showed.
 
 ## Install this after the 2026-11-02 package
 
@@ -25,11 +31,11 @@ not, deploy `vaceup-backend-2026-11-02-jitsi-and-bulk-mail.zip` first.
 length, status) and `MeetingParticipant` (who was invited, when the invitation went
 out, when they walked in). Migration `0001` creates both and touches nothing else.
 
-**The room address stays private.** LiveKit guards a room by its name, so the name
-carries a random code that nobody outside the meeting has: `vaceup-meeting-<id>-<code>`.
-That name is never serialized to the frontend, never rendered on a page and never
-written into an email. What a person gets instead is a short-lived token that the
-server mints from their own account, and the only door is
+**Nobody outside the meeting can guess the room.** LiveKit guards a room by its
+name, so the name carries a random code that nobody outside the meeting has:
+`vaceup-meeting-<id>-<code>`. That name is never serialized to the frontend, never
+rendered on a page and never written into an email. What a person gets instead is a
+short-lived token that the server mints from their own account, and the only door is
 `https://vaceup.ng/meeting/?meeting=<id>`.
 
 **Who may enter, and when.** The room opens 15 minutes before the booked hour and
@@ -50,11 +56,44 @@ the meeting in their dashboard.` The meeting is in their dashboard either way.
 every invitee (`Called off: <title>`). **End the meeting** just closes the door so
 nobody can walk back into a finished call; the screen spells that difference out.
 
-**Readiness is said up front.** If the LiveKit keys are not on the server, the
-Staff meetings screen opens with the sentence
-`Meetings are not switched on for this academy yet. The LiveKit keys need to be in place on the server.`
-and adds that bookings still work — so an unset-up server does not read as a broken
+**Readiness is said up front.** If the server cannot open a room, the Staff
+meetings screen opens with a sentence naming the exact `.env` line that is missing —
+for instance
+`Meetings are not switched on for this academy yet. Add LIVEKIT_WS_URL to the server's .env file and restart the app.`
+— and adds that bookings still work, so an unset-up server does not read as a broken
 meeting.
+
+## The room that would not open
+
+The first cut of this release tested only the two LiveKit keys. A server carrying
+the keys but no room address therefore answered "ready", handed the browser an
+empty address, and the person who pressed **Open the room** got the LiveKit
+client's own words in a red band:
+
+```
+The live room could not be reached (Failed to construct 'URL': Invalid URL).
+```
+
+That is library text, so it names nothing the academy can act on. This package
+replaces it at each of the three layers:
+
+- **The address is repaired before it leaves the server.** `LIVEKIT_WS_URL` may be
+  written `wss://your-project.livekit.cloud`, `https://your-project.livekit.cloud`
+  (which is what the LiveKit dashboard prints) or a bare host. An `https://` value
+  becomes `wss://` and a bare host is given the `wss://` prefix, so the browser
+  always receives a socket address. Anything that cannot be a host at all — a
+  blank, a stray sentence, an `ftp://` value — counts as missing rather than being
+  passed through.
+- **A missing address now means the room is not switched on.** The three places
+  that previously looked only for the keys — staff meetings, an event's VaceUp Live
+  Room, and live-class breakout rooms — check the address as well, and each of them
+  names the line to add.
+- **The browser stops quoting the library.** If the server hands out an address the
+  browser genuinely cannot dial, the room says so in one line and leaves **Try
+  again** on the screen; a real connection failure reads "The live room could not be
+  reached. Check your connection, then press Try again." The client's own error
+  text now goes to the browser console, where it is useful to whoever is fixing the
+  server.
 
 ## Where it is on screen
 
@@ -76,24 +115,33 @@ The frontend deploys on its own from `master`, so these are already live:
   3 people`, and if the connection drops it says so and reconnects instead of
   going blank.
 
-## Nothing to add to `.env` if the LiveKit keys are already there
+## One line to add to `.env`
 
-You said the keys are set up. `apps.meetings` reads the same three that live
-classes already use, so if these lines are in `/home/coqrpund/vaceup_api/.env`
-there is nothing to add:
+The `.env` file stays yours to edit — this is the text for you to paste, and it is
+one new line only. Open `/home/coqrpund/vaceup_api/.env` and add:
 
 ```
-LIVEKIT_API_KEY=your-livekit-api-key
-LIVEKIT_API_SECRET=your-livekit-api-secret
 LIVEKIT_WS_URL=wss://your-project.livekit.cloud
 ```
 
-Write the real values you already have, not the placeholders above — they are here
-only to show the shape of the three lines. The room will not open without the key
-and the secret; `LIVEKIT_WS_URL` is what the browser connects to.
+Put your own project address where the placeholder is. LiveKit Cloud prints it on
+the same project page that lists your API key and secret. If what you have reads
+`https://your-project.livekit.cloud` instead, paste that — this release converts an
+`https://` value into `wss://` before the browser sees it, and a bare host gets the
+`wss://` prefix, so all three forms work.
 
-Two lines are worth adding because they make the join window a setting instead of
-a default. These *are* the defaults, so the app behaves identically without them:
+This is the line that was missing when a booked meeting refused to open. Without
+it the booking still saves, the invitation still mails, and the screen reads
+`Meetings are not switched on for this academy yet. Add LIVEKIT_WS_URL to the server's .env file and restart the app.`
+rather than opening an empty room.
+
+`LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` stay exactly as they already are;
+`apps.meetings` reads the same three lines that live classes already use. If a key
+is missing as well, the same sentence names every missing line at once.
+
+Two further lines are worth adding because they make the join window a setting
+instead of a default. These *are* the defaults, so the app behaves identically
+without them:
 
 ```
 MEETING_LEAD_MINUTES=15
@@ -137,11 +185,18 @@ already installed for the rest of the API; the LiveKit SDK is not used on the
 server at all. In the browser the room is built on `livekit-client`, which has been
 a frontend dependency since the live-classes work and ships in the bundle.
 
+This pass also replaces four files outside `apps.meetings` —
+`apps/liveclasses/livekit.py`, `apps/liveclasses/services.py`,
+`apps/liveclasses/views.py` and `apps/website/join.py` — because the same address
+feeds live classes and event rooms. None of them changes a model, so
+`migrate meetings` remains the only database step.
+
 ## Prove it reached the server
 
 1. Sign in as an administrator, open **Staff Meetings**. If the screen opens with
-   `Meetings are not switched on for this academy yet`, the keys did not make it
-   onto the server — fix that before going on.
+   `Meetings are not switched on for this academy yet`, it names the `.env` line
+   that is missing — add exactly that line, restart, and the band goes away before
+   you go on.
 2. Press **Book a meeting**, give it a name, set a start time a few minutes out,
    tick a tutor and send. It should answer `Booked. Mailed: <their name>.` If it
    says `Could not mail:` instead, the meeting still exists and shows in their
@@ -152,6 +207,17 @@ a frontend dependency since the live-classes work and ships in the bundle.
    fill the screen and show both of you.
 4. Book a second meeting and press **Call it off**. The invitee should receive
    `Called off: <title>`.
+5. If a room still will not open, ask the server what address it is handing out:
+
+   ```
+   python manage.py shell -c "from apps.liveclasses.livekit import livekit_ws_url; print(livekit_ws_url())"
+   ```
+
+   It prints the line a browser dials. A `wss://…` value is correct even when
+   `.env` holds the `https://…` form the LiveKit dashboard shows, and a bare host
+   comes back with the `wss://` prefix already on it. A blank line means the value
+   is not being read at all, which is exactly what the Staff meetings band is
+   telling you.
 
 ## The API behind it
 
@@ -170,3 +236,17 @@ ever sees meetings they host or were invited to.
 | `POST /meetings/<id>/cancel/` | call it off and mail everyone invited |
 
 A booking takes up to 25 invitees. `duration_minutes` is 5 to 480.
+
+## What ships on the website side
+
+The frontend is not in this archive. It deploys on its own from `master` through
+Cloudflare Pages as soon as the commit is pushed, so the room's two new sentences,
+the Staff meetings guide line and the event form's LiveKit hint are live within a few
+minutes of the push — whether or not you have unpacked this zip yet.
+
+Either half on its own behaves. With the new frontend and the old backend, an empty
+address now reads `This server is not giving out a room address the browser can dial,
+so the meeting cannot open. The academy needs its LiveKit settings checked.` instead
+of the library's `Invalid URL`. With the new backend and the old frontend, the server
+refuses before the browser has to guess, and repairs the address when it can. Paste
+the `.env` line, unpack the zip, restart, then reload the admin.

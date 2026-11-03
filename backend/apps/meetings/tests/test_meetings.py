@@ -159,21 +159,31 @@ class MeetingTests(APITestCase):
         row = MeetingParticipant.objects.get(meeting=meeting, user=self.tutor)
         self.assertIsNotNone(row.joined_at)
 
-    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
+    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="", LIVEKIT_WS_URL="")
     def test_a_server_without_keys_says_so_instead_of_opening_a_blank_room(self):
         response = self._book(self.admin)
         meeting = Meeting.objects.get(pk=response.data["id"])
         opened = self._token(self.tutor, meeting)
         self.assertEqual(opened.status_code, 503)
-        self.assertIn("LiveKit keys", opened.data["detail"])
+        self.assertIn("LIVEKIT_API_KEY", opened.data["detail"])
 
-    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="")
+    @override_settings(LIVEKIT_API_KEY="", LIVEKIT_API_SECRET="", LIVEKIT_WS_URL="")
     def test_the_dashboard_is_told_up_front_whether_the_room_can_open(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.get(f"{MEETINGS}readiness/")
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["ready"])
-        self.assertIn("LiveKit keys", response.data["detail"])
+        self.assertIn("LIVEKIT_API_KEY", response.data["detail"])
+
+    @override_settings(**{**LIVEKIT_KEYS, "LIVEKIT_WS_URL": ""})
+    def test_keys_without_an_address_are_reported_as_the_address_not_the_keys(self):
+        """The browser dials an address, not a key, so the sentence must name the right line."""
+        response = self._book(self.admin)
+        meeting = Meeting.objects.get(pk=response.data["id"])
+        opened = self._token(self.tutor, meeting)
+        self.assertEqual(opened.status_code, 503)
+        self.assertIn("LIVEKIT_WS_URL", opened.data["detail"])
+        self.assertNotIn("LIVEKIT_API_KEY", opened.data["detail"])
 
     def test_somebody_not_invited_cannot_get_into_the_room(self):
         meeting = self._meeting()

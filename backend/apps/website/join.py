@@ -11,7 +11,10 @@ import re
 from django.conf import settings
 from django.utils import timezone
 
-from apps.liveclasses.livekit import generate_livekit_token, livekit_configured
+from apps.liveclasses.livekit import (
+    generate_livekit_token, livekit_configured, livekit_ws_url,
+    missing_settings_advice,
+)
 from apps.website.models import Event
 
 MIN_TOKEN_TTL = 3600
@@ -131,8 +134,7 @@ def join_access(*, event, registration=None, user=None):
 
     if not livekit_configured():
         raise JoinDenied(
-            "The VaceUp Live Room is not switched on on this server yet. "
-            "The academy needs its LiveKit keys in place.",
+            "The VaceUp Live Room is not switched on yet. " + missing_settings_advice(),
             503,
         )
     room = event.room_name or f"event-{event.slug}"
@@ -156,7 +158,7 @@ def join_access(*, event, registration=None, user=None):
         "provider": "livekit",
         "room": room,
         "token": token,
-        "ws_url": getattr(settings, "LIVEKIT_WS_URL", ""),
+        "ws_url": livekit_ws_url(),
         "identity": identity,
         "display_name": display_name,
         "can_publish": can_publish,

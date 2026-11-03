@@ -63,7 +63,7 @@ export const ADMIN_SECTIONS = [
   { id: 'meetings', name: 'Staff Meetings', icon: 'video-camera', group: 'Communications',
     description: 'Call a tutor into the platform instead of sending an outside meeting link.',
     steps: ['Use Book a meeting to name the call, set the time and tick the colleagues coming in.', 'Each person gets an email and a meeting in their own dashboard — nobody needs an account outside VaceUp.', 'Open the room from the meeting when it is due, then End the meeting when you are done or Call it off if it will not happen.', 'Check who has walked in before you start talking; the list says who opened their room.'],
-    hint: 'The in-app room needs the LiveKit keys on the server, and the screen tells you if they are missing. A meeting is only visible to the people booked into it, and the room address is never shown or emailed.' },
+    hint: 'The in-app room needs the LiveKit keys and the LiveKit server address on the server; if either is missing, the screen names the exact line to add. A meeting is only visible to the people booked into it, and the room code is never shown or emailed.' },
   { id: 'account', name: 'Your account', icon: 'person-circle', group: 'People & access',
     description: 'Set how you appear to learners: your name, your picture and how you sign in.',
     steps: ['Upload a square picture at least 400 pixels wide; it appears beside your name in messages.', 'Save the display name people should see — the sign-in email address stays as it is.', 'Change your password when a shared or leaked password needs retiring.'],

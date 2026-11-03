@@ -48,7 +48,7 @@ class MeetingViewSet(viewsets.ModelViewSet):
         """
         return Response({
             "ready": services.room_is_ready(),
-            "detail": "" if services.room_is_ready() else services.ROOM_OFF,
+            "detail": "" if services.room_is_ready() else services.room_off_notice(),
         })
 
     @action(detail=False, methods=["get"], permission_classes=[IsInstructorOrAdmin])

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useAuth } from '@/lib/auth-context';
 import { downloadEventIcs } from '@/lib/calendar';
+import { trackMeta } from '@/lib/meta-pixel';
 import { formatEventWindow, registerForEvent, type WebsiteEvent } from '@/lib/website-api';
 
 interface Props {
@@ -46,6 +48,14 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
         phone: form.phone.trim(),
         note: form.note.trim(),
         consent_marketing: form.consent_marketing,
+      });
+      // Only the server's yes counts: a failed or rejected registration must
+      // never teach the advert account that a seat was taken.
+      trackMeta('CompleteRegistration', {
+        content_name: event.title,
+        content_category: 'event',
+        content_ids: [event.slug],
+        status: true,
       });
       setDone(result.detail);
       setSeatLink(result.join_link || '');
@@ -158,6 +168,14 @@ export default function RsvpModal({ event, onClose, onRegistered }: Props) {
           >
             Confirm registration
           </Button>
+          <p className="text-xs leading-relaxed text-gray-500">
+            We use the Meta pixel on this page to measure our adverts. It never
+            receives the name, email or phone you enter here. Read our{' '}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-navy-900">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </form>
       )}
     </Modal>

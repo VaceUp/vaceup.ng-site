@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { downloadEventIcs } from '@/lib/calendar';
+import { trackMeta } from '@/lib/meta-pixel';
 import { formatEventWindow, getEvent, type WebsiteEvent } from '@/lib/website-api';
 import RegisterButton from './RegisterButton';
 import JoinBand from './JoinBand';
@@ -15,6 +16,7 @@ export default function EventDetail({ slug }: { slug: string }) {
   const [seats, setSeats] = useState<{ taken: number; full: boolean } | null>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const viewed = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +25,21 @@ export default function EventDetail({ slug }: { slug: string }) {
     setSeats(null);
     setCopied(false);
     getEvent(slug)
-      .then((value) => { if (!cancelled) setEvent(value); })
+      .then((value) => {
+        if (cancelled) return;
+        setEvent(value);
+        // The advert's landing page is usually this detail view. Reporting the
+        // event there lets the ad account see which event drew the visit,
+        // without sending any of the visitor's details.
+        if (viewed.current !== value.slug) {
+          viewed.current = value.slug;
+          trackMeta('ViewContent', {
+            content_name: value.title,
+            content_category: 'event',
+            content_ids: [value.slug],
+          });
+        }
+      })
       .catch(() => { if (!cancelled) setError('This event is no longer listed. Open the Events page to see what is coming up.'); });
     return () => { cancelled = true; };
   }, [slug]);

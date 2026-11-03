@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import AppShell from '@/components/layout/AppShell';
 import AuthModal from '@/components/landing/AuthModal';
 import PageTransition from '@/components/ui/PageTransition';
+import MetaPixel from '@/components/analytics/MetaPixel';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -37,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-white text-[#0A1128] antialiased`}>
+        <MetaPixel />
         <AuthProvider>
           {/* Single global chrome — pages must NOT render their own Header/Footer.
               AppShell hides the marketing chrome on dashboard/tool pages. */}

@@ -7,13 +7,19 @@
 # Permissions-Policy must also name meet.jit.si: a Jitsi room runs inside a
 # frame, and the default camera=(self)/microphone=(self) gives that frame no
 # camera and no microphone, so the room looks one-way.
+#
+# The Meta pixel is loaded on public pages only. Its loader comes from
+# connect.facebook.net (script-src) and it reports back to connect.facebook.net
+# and www.facebook.com (connect-src). Image beacons are covered by the https:
+# entry in img-src. Remove these three origins and the pixel silently stops
+# reporting — the ad account then shows clicks but no registrations.
 /*
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(self "https://meet.jit.si"), microphone=(self "https://meet.jit.si"), display-capture=(self), geolocation=()
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://cdn.lordicon.com https://meet.jit.si; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.vaceup.ng wss://api.vaceup.ng https://*.livekit.cloud wss://*.livekit.cloud https://meet.jit.si https://cdn.lordicon.com https://*.r2.cloudflarestorage.com https://api.cloudinary.com; media-src 'self' blob: https:; frame-src https://js.paystack.co https://meet.jit.si; form-action 'self';
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://cdn.lordicon.com https://meet.jit.si https://connect.facebook.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.vaceup.ng wss://api.vaceup.ng https://*.livekit.cloud wss://*.livekit.cloud https://meet.jit.si https://cdn.lordicon.com https://*.r2.cloudflarestorage.com https://api.cloudinary.com https://connect.facebook.net https://www.facebook.com; media-src 'self' blob: https:; frame-src https://js.paystack.co https://meet.jit.si; form-action 'self';
 
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable

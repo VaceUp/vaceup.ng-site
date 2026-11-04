@@ -495,6 +495,45 @@ function RoomSession({
     roomRef.current = room;
     let retryTimer: number | undefined;
     let policyTimer: number | undefined;
+    // The library carries a remote voice track but never plays it. Without an
+    // element per voice the microphone publishes, the meters move, and the room
+    // stays silent — the report that reads "mic is on but nobody hears me".
+    // Each subscribed audio track gets its own hidden <audio>; it is removed
+    // when that person leaves, and replayed once the browser unlocks sound.
+    const voiceHost = document.createElement('div');
+    voiceHost.hidden = true;
+    voiceHost.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(voiceHost);
+    const voices = new Map<Track, HTMLAudioElement>();
+    const playVoices = () => {
+      voices.forEach((element) => { void element.play().catch(() => {}); });
+    };
+    const attachVoice = (track: Track) => {
+      if (track.kind !== Track.Kind.Audio || voices.has(track)) return;
+      const element = track.attach() as HTMLAudioElement;
+      element.autoplay = true;
+      element.setAttribute('playsinline', '');
+      element.style.display = 'none';
+      voiceHost.appendChild(element);
+      voices.set(track, element);
+      void element.play().catch(() => {});
+    };
+    const detachVoice = (track: Track) => {
+      const element = voices.get(track);
+      if (element) {
+        element.remove();
+        voices.delete(track);
+      }
+      track.detach().forEach((attached) => attached.remove());
+    };
+    /** A reconnect can hand back tracks that subscribed before this listener ran. */
+    const attachVoicesAlreadyHere = () => {
+      room.remoteParticipants.forEach((person) => {
+        person.audioTrackPublications.forEach((publication) => {
+          if (publication.isSubscribed && publication.track) attachVoice(publication.track);
+        });
+      });
+    };
     // The browser reports every request its own security policy refused. A
     // policy that forgets the room host blocks the socket and the check after
     // it, and the client then says "Failed to fetch" — words that blame the
@@ -536,13 +575,20 @@ function RoomSession({
     // reads as "camera works, voice does not" — so the room's own playback
     // state, not just a thrown error, decides whether to ask for a tap.
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-      if (!stopped) setSoundNeeded(soundIsBlocked(room));
+      if (stopped) return;
+      setSoundNeeded(soundIsBlocked(room));
+      // Sound may have just been unlocked by the tap that started playback.
+      playVoices();
     });
     // A tap anywhere on the page is enough for most browsers to start sound.
     // Waiting only for the banner is how a person watches a silent call.
     const unlockSound = () => {
       void room.startAudio()
-        .then(() => { if (!stopped) setSoundNeeded(soundIsBlocked(room)); })
+        .then(() => {
+          if (stopped) return;
+          setSoundNeeded(soundIsBlocked(room));
+          playVoices();
+        })
         .catch(() => {});
     };
     document.addEventListener('pointerdown', unlockSound, { once: true });
@@ -550,8 +596,18 @@ function RoomSession({
     // Someone switching their camera on mid-call must not cost a slow attendee
     // the audio they were already hearing.
     room.on(RoomEvent.TrackSubscribed, (track: Track, publication) => {
+      if (track.kind === Track.Kind.Audio) attachVoice(track);
       if (audioOnlyRef.current && track.kind === Track.Kind.Video) void publication.setSubscribed(false);
       else bump();
+    });
+    room.on(RoomEvent.TrackUnsubscribed, (track: Track) => detachVoice(track));
+    room.on(RoomEvent.ParticipantDisconnected, (person: RemoteParticipant) => {
+      person.audioTrackPublications.forEach((publication) => {
+        if (publication.track) detachVoice(publication.track);
+      });
+    });
+    room.on(RoomEvent.TrackUnpublished, (publication) => {
+      if (publication.track) detachVoice(publication.track);
     });
 
     room.connect(seat.ws_url, seat.token, {
@@ -576,6 +632,10 @@ function RoomSession({
         }
         if (!stopped) {
           setSoundNeeded(soundIsBlocked(room));
+          // Voices that arrived while the handshake was settling still need an
+          // element before they can be heard.
+          attachVoicesAlreadyHere();
+          playVoices();
           // A re-dial builds a new room, so the controls must show what this
           // room is actually sending instead of the previous one's buttons.
           setMicOn(room.localParticipant.isMicrophoneEnabled);
@@ -656,6 +716,12 @@ function RoomSession({
       document.removeEventListener('securitypolicyviolation', onPolicyViolation);
       document.removeEventListener('pointerdown', unlockSound);
       document.removeEventListener('keydown', unlockSound);
+      voices.forEach((element, track) => {
+        element.remove();
+        track.detach().forEach((attached) => attached.remove());
+      });
+      voices.clear();
+      voiceHost.remove();
       room.removeAllListeners();
       void room.disconnect();
       roomRef.current = null;

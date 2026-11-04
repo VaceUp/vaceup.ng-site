@@ -8,6 +8,7 @@ import { WorkspaceHeading } from '@/components/Dashboard/WorkspaceUI';
 import { Action, Feedback, Field, styles } from '@/components/Dashboard/admin/AuthoringUI';
 import { LANGUAGES, quickInsertsFor, type CodeSuggestion } from '@/lib/code-editor-languages';
 import codeStyles from '@/components/code-editor/code-editor.module.css';
+import { CodeRunner } from '@/components/code-editor/CodeRunner';
 import type { CodeEditorHandle } from '@/components/code-editor/CodeEditor';
 
 // CodeMirror touches the DOM on import, so the editor loads in the browser only.
@@ -44,7 +45,7 @@ function Editor() {
     editorRef.current?.applySuggestion(suggestion);
     setNotice(`${suggestion.label} inserted at the cursor.`);
   }
-  return <section className={`${styles.root} ${styles.stack}`} aria-label="Practice code editor"><WorkspaceHeading title="Code practice" description="Write and download your code. Each language keeps its own draft in this browser tab." />
+  return <section className={`${styles.root} ${styles.stack}`} aria-label="Practice code editor"><WorkspaceHeading title="Code practice" description="Write, run and download your code. Each language keeps its own draft in this browser tab." />
     <Field label="Programming language"><select value={language} onChange={e => { setLanguage(e.target.value); setNotice(''); }}>{LANGUAGES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></Field>
     <div className={styles.stack}>
       <span className={codeStyles.suggestionsLegend} id="code-editor-label">{languageLabel} code</span>
@@ -62,7 +63,7 @@ function Editor() {
       <Action onClick={async () => { setError(''); try { await navigator.clipboard.writeText(code); setNotice('Code copied.'); } catch { setError('Copy was blocked by the browser. Select the code and copy it manually.'); } }}>Copy code</Action>
       {language === 'json' && <Action onClick={() => { try { setDrafts({ ...drafts, json: JSON.stringify(JSON.parse(code), null, 2) }); setNotice('JSON formatted.'); setError(''); } catch { setError('This is not valid JSON. Check quotes, commas and brackets, then try again.'); } }}>Format JSON</Action>}
     </div>
-    <div className={styles.panel}><h2>Running code</h2><p className={styles.muted}>Code execution is not connected yet. Download this file and run it in your own development environment. This page does not run your code or invent output. Do not put passwords or API keys in practice drafts.</p></div>
+    <CodeRunner language={language} languageLabel={languageLabel} code={code} />
   </section>;
 }
 export default function CodeEditorPage() { return <MemberAccess><Editor /></MemberAccess>; }

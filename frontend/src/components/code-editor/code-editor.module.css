@@ -62,6 +62,200 @@
   color: var(--workspace-muted);
 }
 
+.runner {
+  display: grid;
+  gap: calc(var(--spacing) * 4);
+  padding: calc(var(--spacing) * 5);
+  border: thin solid var(--workspace-line);
+  border-radius: var(--radius-2xl);
+  background: var(--workspace-surface);
+}
+
+.runHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 4);
+}
+
+.runIntro {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  min-inline-size: 0;
+}
+
+.runTitle {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.runNote {
+  max-inline-size: var(--container-2xl);
+  color: var(--workspace-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.runActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--spacing) * 3);
+}
+
+.runStatus {
+  color: var(--workspace-muted);
+  font-size: var(--text-sm);
+}
+
+.runError {
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+  border: thin solid var(--workspace-error);
+  border-radius: var(--radius-lg);
+  background: var(--workspace-error-bg);
+  color: var(--workspace-error);
+  font-size: var(--text-sm);
+}
+
+.consent {
+  display: grid;
+  gap: calc(var(--spacing) * 3);
+  padding: calc(var(--spacing) * 4);
+  border: thin solid var(--workspace-line);
+  border-radius: var(--radius-lg);
+  background: var(--workspace-subtle);
+}
+
+.consent p {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.consent strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.inputField {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.inputField textarea {
+  inline-size: 100%;
+  min-block-size: calc(var(--spacing) * 20);
+  padding: calc(var(--spacing) * 3);
+  border: thin solid var(--workspace-control);
+  border-radius: var(--radius-lg);
+  background: var(--workspace-surface);
+  color: var(--workspace-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+}
+
+.inputField textarea:hover {
+  border-color: var(--workspace-focus);
+}
+
+.inputField textarea:focus-visible {
+  outline: calc(var(--spacing) / 2) solid var(--workspace-focus);
+  outline-offset: calc(var(--spacing) / 2);
+}
+
+.console {
+  display: grid;
+  gap: calc(var(--spacing) * 1);
+  max-block-size: calc(var(--spacing) * 80);
+  padding: calc(var(--spacing) * 4);
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  background: var(--workspace-nav);
+  color: var(--color-navy-50);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.consoleError {
+  color: var(--color-red-200);
+}
+
+.outputBlock {
+  max-block-size: calc(var(--spacing) * 80);
+  max-inline-size: 100%;
+  margin: 0;
+  padding: calc(var(--spacing) * 4);
+  overflow: auto;
+  border: thin solid var(--code-line);
+  border-radius: var(--radius-lg);
+  background: var(--code-surface);
+  color: var(--code-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  white-space: pre;
+}
+
+.outputBlock:focus-visible {
+  outline: calc(var(--spacing) / 2) solid var(--workspace-focus);
+  outline-offset: calc(var(--spacing) / 2);
+}
+
+.tableWrap {
+  max-inline-size: 100%;
+  overflow-x: auto;
+  border: thin solid var(--workspace-line);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  color: var(--workspace-text);
+  font-size: var(--text-sm);
+}
+
+.table caption {
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border-block-end: thin solid var(--workspace-line);
+  background: var(--workspace-subtle);
+  font-weight: var(--font-weight-semibold);
+  text-align: start;
+}
+
+.table th,
+.table td {
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border-block-start: thin solid var(--workspace-line);
+  border-inline-end: thin solid var(--workspace-line);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.table th {
+  background: var(--workspace-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+.table tr > :last-child {
+  border-inline-end: 0;
+}
+
+.preview {
+  inline-size: 100%;
+  block-size: calc(var(--spacing) * 96);
+  border: thin solid var(--workspace-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chip {
     transition: none;

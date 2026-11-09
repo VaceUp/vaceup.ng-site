@@ -155,29 +155,29 @@ _RECONCILE_AFTER = timedelta(seconds=30)
 _RECONCILE_LIMIT = 5
 
 
-def reconcile_locked_applications(user):
-    """Settle a checkout Paystack captured but this server never confirmed.
+def reconcile_pending_payments(user, *, course_ids=None, max_age=None):
+    """Settle checkouts Paystack captured but this server never confirmed.
 
     The return page and the webhook are the fast paths, and both can be missed:
     the buyer may close the tab before returning, and a webhook only arrives
-    while it is registered on the Paystack dashboard. When an accepted
-    application still has no enrollment, asking the provider directly is what
-    lets the course unlock without a support ticket. A provider outage must
-    never take the workspace down with it.
+    while it is registered on the Paystack dashboard. Asking the provider
+    directly is what lets a paid course unlock without a support ticket. A
+    provider outage must never take the workspace down with it.
     """
     if user.is_instructor:
         return 0
-    course_ids = list(approved_applications(user).values_list("course_id", flat=True))
-    if not course_ids:
+    if course_ids is not None and not course_ids:
         return 0
-    open_payments = list(
-        Payment.objects.filter(
-            student=user, status__in=payment_services.RECHECKABLE_STATUSES,
-            updated_at__lt=timezone.now() - _RECONCILE_AFTER,
-        )
-        .filter(Q(course_id__in=course_ids) | Q(items__course_id__in=course_ids))
-        .distinct().order_by("-created_at")[:_RECONCILE_LIMIT]
+    payments = Payment.objects.filter(
+        student=user, status__in=payment_services.RECHECKABLE_STATUSES,
+        updated_at__lt=timezone.now() - _RECONCILE_AFTER,
     )
+    if course_ids is not None:
+        payments = payments.filter(
+            Q(course_id__in=course_ids) | Q(items__course_id__in=course_ids))
+    if max_age is not None:
+        payments = payments.filter(created_at__gte=timezone.now() - max_age)
+    open_payments = list(payments.distinct().order_by("-created_at")[:_RECONCILE_LIMIT])
     if not open_payments:
         return 0
     try:
@@ -185,6 +185,14 @@ def reconcile_locked_applications(user):
     except PaymentProviderUnavailable:
         logger.warning("Paystack unreachable while reconciling payments for user %s", user.pk)
         return 0
+
+
+def reconcile_locked_applications(user):
+    """Re-check only the orders behind an accepted application still owed."""
+    return reconcile_pending_payments(
+        user,
+        course_ids=list(approved_applications(user).values_list("course_id", flat=True)),
+    )
 
 
 def _agenda_item(kind, pk, title, course, when, state, detail, href):
@@ -447,6 +455,12 @@ class WorkspacePaymentListView(PrivateWorkspaceResponse, ListAPIView):
     permission_classes = [IsWorkspaceMember]
     serializer_class = WorkspacePaymentSerializer
     filterset_fields = ["status"]
+
+    def list(self, request, *args, **kwargs):
+        # The history is where a learner checks "did my payment go through", so
+        # an order the provider confirms is settled before the list is built.
+        reconcile_pending_payments(request.user, max_age=timedelta(days=90))
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

@@ -20,6 +20,7 @@ User = get_user_model()
 
 APPLICATIONS = "/api/v1/dashboard/applications/"
 OVERVIEW = "/api/v1/dashboard/overview/"
+HISTORY = "/api/v1/dashboard/payments/"
 SECRET = "sk_test_secret"
 
 
@@ -117,6 +118,27 @@ class PaymentReconciliationTests(APITestCase):
         gateway.assert_not_called()
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.status, Payment.Status.PENDING)
+
+    def test_payment_history_settles_a_direct_purchase(self):
+        # Bought from the public course page: no application was ever made.
+        Application.objects.all().delete()
+        old_enough(self.payment)
+        with patch("apps.payments.services.get_gateway") as gateway:
+            gateway.return_value.verify.return_value = self.confirmed()
+            response = self.client.get(HISTORY)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"][0]["status"], Payment.Status.SUCCESS)
+        self.assertTrue(Enrollment.objects.filter(
+            student=self.student, course=self.course,
+            status=Enrollment.Status.ACTIVE).exists())
+
+    def test_payment_history_survives_a_provider_outage(self):
+        old_enough(self.payment)
+        with patch("apps.payments.services.get_gateway") as gateway:
+            gateway.return_value.verify.side_effect = PaymentProviderUnavailable()
+            response = self.client.get(HISTORY)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"][0]["status"], Payment.Status.PENDING)
 
     def test_command_settles_every_captured_payment(self):
         old_enough(self.payment)

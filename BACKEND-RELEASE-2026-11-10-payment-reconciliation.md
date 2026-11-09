@@ -35,9 +35,10 @@ time.
 or **My courses**, and an accepted application still has no enrollment, the server
 now asks Paystack about that student's open orders before building the response.
 The repair therefore happens the moment the student looks at the screen that says
-they owe. The call is bounded (5 orders, not repeated within 30 seconds) and a
-Paystack outage cannot break the dashboard — the screen still loads, and the next
-open tries again.
+they owe. **Payment history** does the same for the last 90 days of orders, which
+also repairs a direct purchase that never went through an application. The call is
+bounded (5 orders, not repeated within 30 seconds) and a Paystack outage cannot
+break the dashboard — the screen still loads, and the next open tries again.
 
 **`apps/payments/management/commands/reconcile_payments.py`** — a command to settle
 every open order at once, and to see exactly which student is affected.
@@ -119,8 +120,9 @@ Optional, for repairs without a dashboard visit: a cPanel cron every 15 minutes:
 
 ## Verified before shipping
 
-- Full backend suite: **578 tests, OK (3 skipped)**, including seven new tests for
-  this path: dashboard repair, overview repair, provider outage, a genuinely unpaid
-  checkout, no provider call when nothing is owed, the command, and running the
-  command twice without double-enrolling.
+- Full backend suite: **580 tests, OK (3 skipped)**, including nine new tests for
+  this path: dashboard repair, overview repair, payment-history repair (with and
+  without an application), provider outage, a genuinely unpaid checkout, no
+  provider call when nothing is owed, the command, and running the command twice
+  without double-enrolling.
 - No model changes (`makemigrations --check` reports none).

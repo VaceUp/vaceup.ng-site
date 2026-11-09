@@ -29,6 +29,7 @@ class OrderIntegrityTests(APITestCase):
     def checkout(self):
         with patch("apps.payments.services.get_gateway") as gateway:
             gateway.return_value.initialize.return_value = {"authorization_url": "https://checkout.paystack.com/test", "access_code": "test"}
+            gateway.return_value.verify.return_value = {"status": "ongoing"}
             response = self.client.post("/api/v1/payments/checkout/", {"cart_items": [item.pk for item in self.items]}, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         return Payment.objects.get(reference=response.data["reference"])

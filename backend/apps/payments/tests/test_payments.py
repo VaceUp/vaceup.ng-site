@@ -72,14 +72,49 @@ class PaymentTests(APITestCase):
         self.assertEqual(r.data["status"], "pending")
         self.assertEqual(Payment.objects.filter(student=self.student).count(), 1)
 
-    def test_initialize_is_idempotent_reuses_pending(self):
+    def test_initialize_reuses_an_attempt_the_provider_still_holds_open(self):
         self.client.force_authenticate(self.student)
         with patch("apps.payments.services.get_gateway",
-                   return_value=FakeGateway()):
+                   return_value=FakeGateway({"status": "ongoing"})):
             r1 = self.client.post(INIT, {"course": self.paid.id}, format="json")
             r2 = self.client.post(INIT, {"course": self.paid.id}, format="json")
         self.assertEqual(r1.data["reference"], r2.data["reference"])
         self.assertEqual(Payment.objects.filter(student=self.student).count(), 1)
+
+    def test_initialize_does_not_reuse_a_link_whose_payment_completed(self):
+        """A paid attempt with a missed webhook must enrol, not offer a dead link."""
+        self.client.force_authenticate(self.student)
+        with patch("apps.payments.services.get_gateway",
+                   return_value=FakeGateway({"status": "ongoing"})):
+            first = self.client.post(INIT, {"course": self.paid.id}, format="json")
+        self.assertEqual(first.status_code, 201)
+
+        with patch("apps.payments.services.get_gateway",
+                   return_value=FakeGateway(success_data())):
+            second = self.client.post(INIT, {"course": self.paid.id}, format="json")
+
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.data["status"], "success")
+        self.assertEqual(second.data["reference"], first.data["reference"])
+        self.assertTrue(Enrollment.objects.filter(
+            student=self.student, course=self.paid).exists())
+        self.assertEqual(Payment.objects.count(), 1)
+
+    def test_initialize_replaces_a_dead_checkout_link(self):
+        """Paystack starts a link once; an abandoned one gets a new reference."""
+        self.client.force_authenticate(self.student)
+        with patch("apps.payments.services.get_gateway",
+                   return_value=FakeGateway({"status": "ongoing"})):
+            first = self.client.post(INIT, {"course": self.paid.id}, format="json")
+        with patch("apps.payments.services.get_gateway",
+                   return_value=FakeGateway({"status": "abandoned"})):
+            second = self.client.post(INIT, {"course": self.paid.id}, format="json")
+
+        self.assertEqual(second.status_code, 201)
+        self.assertNotEqual(second.data["reference"], first.data["reference"])
+        self.assertEqual(second.data["status"], "pending")
+        retired = Payment.objects.get(reference=first.data["reference"])
+        self.assertEqual(retired.status, Payment.Status.ABANDONED)
 
     def test_initialize_free_course_rejected(self):
         self.client.force_authenticate(self.student)

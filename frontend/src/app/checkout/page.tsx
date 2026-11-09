@@ -19,6 +19,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState('');
   const [needsLogin, setNeedsLogin] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
+  const [settled, setSettled] = useState('');
   const [returnTo, setReturnTo] = useState('/checkout/');
   const submitting = useRef(false);
   const load = useCallback(async () => {
@@ -60,6 +61,16 @@ export default function CheckoutPage() {
         if (Number(total) !== 0) throw new Error('The server did not return a payment order. No payment has been started. Contact support.');
         setEnrolled(true); return;
       }
+      if (payment.status === 'success') {
+        // The server checked an earlier attempt with Paystack and confirmed
+        // it. Sending the learner back to that link would only show
+        // "we could not start this transaction".
+        setSettled('Your earlier payment for this order is confirmed. Your enrollment is open.');
+        return;
+      }
+      if (payment.status !== 'pending') {
+        throw new Error(`This order could not be confirmed (reference ${payment.reference}). Do not pay again — contact the academy so it can be checked.`);
+      }
       window.location.assign(paymentRedirect(payment, total));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start payment. Refresh checkout before trying again.');
@@ -69,7 +80,7 @@ export default function CheckoutPage() {
     <Feedback error={error} />
     {loading ? <p role="status">Confirming your order...</p> : needsLogin ? <div className={styles.stack}>
       <p>Sign in or create an account before enrolling.</p><Link className={styles.action} href={'/login?next=' + encodeURIComponent(returnTo)}>Sign in</Link><Link className={styles.action} href={'/register?next=' + encodeURIComponent(returnTo)}>Create an account</Link>
-    </div> : enrolled ? <div className={styles.stack}><Feedback message="Your free-course enrollment is complete." /><Link className={styles.action + ' ' + styles.primary} href="/dashboard/courses/">Open my courses</Link></div> : <div className={styles.stack}>
+    </div> : settled ? <div className={styles.stack}><Feedback message={settled} /><Link className={styles.action + ' ' + styles.primary} href="/dashboard/courses/">Open my courses</Link><Link className={styles.action} href="/dashboard/billing/">Payment history</Link></div> : enrolled ? <div className={styles.stack}><Feedback message="Your free-course enrollment is complete." /><Link className={styles.action + ' ' + styles.primary} href="/dashboard/courses/">Open my courses</Link></div> : <div className={styles.stack}>
       {lines.length > 0 && <>
         <p className={styles.muted}>Enrolling as {email}</p>
         <ul className={styles.list}>{lines.map(line => <li className={styles.row + ' ' + styles.between} key={line.courseId}><span>{line.title}</span><strong>{formatPrice(line.price)}</strong></li>)}</ul>

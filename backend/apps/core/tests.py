@@ -132,5 +132,6 @@ class DatabaseConcurrencyTests(TransactionTestCase):
         course = Course.objects.create(title="Course", category=Category.objects.create(name="Skills"), instructor=tutor, price=5000, is_published=True)
         with patch("apps.payments.services.get_gateway") as gateway:
             gateway.return_value.initialize.return_value = {"authorization_url": "https://checkout.paystack.com/test", "access_code": "test"}
+            gateway.return_value.verify.return_value = {"status": "ongoing"}
             results = self.concurrent(lambda: initialize_payment(student=student, course=course).pk)
         self.assertEqual(len(set(results)), 1)

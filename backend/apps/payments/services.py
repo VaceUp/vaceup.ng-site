@@ -57,6 +57,50 @@ def _check_quote(total, expected_total):
         raise ValidationError("The course price has changed. Refresh checkout and review the updated total.")
 
 
+# Statuses in which the provider still considers the checkout open, so its
+# link can be handed to the learner again.
+_OPEN_GATEWAY_STATUSES = {"pending", "ongoing", "processing", "queued"}
+
+
+def _hand_back_attempt(payment):
+    """Decide whether the stored checkout link can start a payment again.
+
+    Paystack starts a checkout link only once; a link whose payment already
+    completed answers "we could not start this transaction", and an abandoned
+    session is just as final. Asking the provider first also repairs a payment
+    that completed while the return page or webhook was missed — the learner
+    is confirmed and enrolled instead of being sent to a dead link — and a
+    mangled reference that the provider no longer knows is treated the same
+    way. Returns ``None`` when a fresh link must be minted.
+    """
+    try:
+        data = get_gateway().verify(reference=payment.reference)
+    except PaymentProviderUnavailable:
+        raise
+    except PaymentFailed:
+        return None
+    gateway_status = (data.get("status") or "").lower()
+    if gateway_status in _OPEN_GATEWAY_STATUSES:
+        return payment
+    if gateway_status != "success":
+        return None
+
+    expected = to_minor_unit(payment.amount)
+    try:
+        paid = int(data.get("amount") or 0)
+    except (TypeError, ValueError):
+        paid = -1
+    if (paid != expected or str(data.get("currency", "")).upper() != payment.currency
+            or data.get("reference") != payment.reference):
+        # A captured charge that does not match this order needs a human, not
+        # a second charge attempt.
+        payment.mark_failed(gateway_response=data)
+        return payment
+    payment.mark_success(gateway_response=data)
+    _grant_enrollments_for_payment(payment)
+    return payment
+
+
 def _initialize_order(student, lines):
     """Caller holds the student row lock for concurrent checkout serialization."""
     currency = settings.PAYMENT_CURRENCY.upper()
@@ -66,6 +110,16 @@ def _initialize_order(student, lines):
     payment = Payment.objects.filter(
         student=student, checkout_fingerprint=fingerprint, status=Payment.Status.PENDING, pricing_version=1,
     ).first()
+    if payment is not None and payment.authorization_url:
+        reused = _hand_back_attempt(payment)
+        if reused is None:
+            # Keep the attempt for the audit trail, but never offer its dead
+            # link again. A late payment on it is still verified by reference.
+            payment.mark_failed(
+                status=Payment.Status.ABANDONED,
+                gateway_response={"superseded": True, "reason": "A fresh checkout link was issued."},
+            )
+        payment = reused
     if payment is None:
         payment = Payment.objects.create(
             student=student, course=lines[0][0], amount=sum(amount for _, amount in lines),
@@ -75,7 +129,9 @@ def _initialize_order(student, lines):
             PaymentItem(payment=payment, course=course, amount=amount, course_title=course.title)
             for course, amount in lines
         ])
-    if payment.authorization_url:
+    if payment.status != Payment.Status.PENDING or payment.authorization_url:
+        # Settled (or needs support) while checking the old attempt: nothing
+        # new should be charged.
         return payment
     data = get_gateway().initialize(
         reference=payment.reference,

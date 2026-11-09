@@ -1,4 +1,7 @@
-"""Account-scoped student/tutor workspace reads. No demo data or write side effects."""
+"""Account-scoped student/tutor workspace reads. No demo data; the only write is
+settling a checkout the payment provider already confirmed (see
+``reconcile_locked_applications``)."""
+import logging
 from datetime import timedelta
 
 from django.db.models import Count, Exists, F, Min, OuterRef, Q, Subquery, Sum
@@ -13,11 +16,15 @@ from rest_framework.response import Response
 from apps.applications.models import Application
 from apps.assignments.models import Assignment, Quiz, QuizAttempt, Submission
 from apps.certificates.models import Certificate
+from apps.core.exceptions import PaymentProviderUnavailable
 from apps.courses.models import Course, Lesson
 from apps.courses.serializers import CourseDetailSerializer
 from apps.enrollment.models import Enrollment, LessonProgress
 from apps.liveclasses.models import JOIN_GRACE, LiveClass
+from apps.payments import services as payment_services
 from apps.payments.models import Payment
+
+logger = logging.getLogger(__name__)
 
 ACCESS_STATUSES = (Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED)
 
@@ -140,6 +147,44 @@ def approved_applications(user):
         .select_related("course")
         .order_by("-reviewed_at", "-pk")
     )
+
+
+# A re-check is a provider round trip, so a payment the provider just answered
+# about is not asked about again while the same page loads its panels.
+_RECONCILE_AFTER = timedelta(seconds=30)
+_RECONCILE_LIMIT = 5
+
+
+def reconcile_locked_applications(user):
+    """Settle a checkout Paystack captured but this server never confirmed.
+
+    The return page and the webhook are the fast paths, and both can be missed:
+    the buyer may close the tab before returning, and a webhook only arrives
+    while it is registered on the Paystack dashboard. When an accepted
+    application still has no enrollment, asking the provider directly is what
+    lets the course unlock without a support ticket. A provider outage must
+    never take the workspace down with it.
+    """
+    if user.is_instructor:
+        return 0
+    course_ids = list(approved_applications(user).values_list("course_id", flat=True))
+    if not course_ids:
+        return 0
+    open_payments = list(
+        Payment.objects.filter(
+            student=user, status__in=payment_services.RECHECKABLE_STATUSES,
+            updated_at__lt=timezone.now() - _RECONCILE_AFTER,
+        )
+        .filter(Q(course_id__in=course_ids) | Q(items__course_id__in=course_ids))
+        .distinct().order_by("-created_at")[:_RECONCILE_LIMIT]
+    )
+    if not open_payments:
+        return 0
+    try:
+        return payment_services.reconcile_payments(open_payments)
+    except PaymentProviderUnavailable:
+        logger.warning("Paystack unreachable while reconciling payments for user %s", user.pk)
+        return 0
 
 
 def _agenda_item(kind, pk, title, course, when, state, detail, href):
@@ -317,6 +362,7 @@ class WorkspaceOverviewView(PrivateWorkspaceResponse, GenericAPIView):
 
     def get(self, request):
         user = request.user
+        reconcile_locked_applications(user)
         courses = accessible_courses(user)
         if user.is_instructor:
             enrollments = Enrollment.objects.filter(course__instructor=user)
@@ -413,6 +459,12 @@ class WorkspaceApplicationListView(PrivateWorkspaceResponse, ListAPIView):
 
     permission_classes = [IsWorkspaceMember]
     serializer_class = WorkspaceApplicationSerializer
+
+    def list(self, request, *args, **kwargs):
+        # Runs before the queryset is read, so a payment confirmed here is gone
+        # from this response instead of surfacing one request later.
+        reconcile_locked_applications(request.user)
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

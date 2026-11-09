@@ -248,6 +248,43 @@ def verify_payment(*, reference, student=None):
     raise PaymentFailed(failure_message)
 
 
+# Statuses worth asking the provider about again. A failed attempt can still have
+# captured money (a return and webhook both missed, then a later attempt
+# superseded it), so our stored status is never the final word — Paystack is.
+RECHECKABLE_STATUSES = (
+    Payment.Status.PENDING, Payment.Status.ABANDONED, Payment.Status.FAILED,
+)
+
+
+def reconcile_payments(payments) -> int:
+    """Settle payments the provider has confirmed but this server has not.
+
+    The return page and the webhook are the fast confirmation paths, but both
+    can be missed: the buyer can close the tab, and a webhook is only delivered
+    when it is registered on the Paystack dashboard. Re-running the normal
+    idempotent ``verify_payment`` against the provider is what gives the learner
+    access in those cases, without a second charge and without support.
+
+    Returns the number of payments repaired to SUCCESS. Raises
+    ``PaymentProviderUnavailable`` so callers can stop instead of retrying every
+    row while the provider is down.
+    """
+    repaired = 0
+    for payment in payments:
+        if payment.status == Payment.Status.SUCCESS:
+            continue
+        try:
+            settled = verify_payment(reference=payment.reference)
+        except PaymentProviderUnavailable:
+            raise
+        except (PaymentFailed, NotFound, DomainError):
+            # Marked or unverifiable — nothing left for this row.
+            continue
+        if settled.status == Payment.Status.SUCCESS:
+            repaired += 1
+    return repaired
+
+
 def _grant_enrollments_for_payment(payment):
     """Grant enrollment(s) for a successful payment.
     

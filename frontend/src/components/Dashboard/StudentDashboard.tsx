@@ -40,7 +40,7 @@ export const StudentDashboard: React.FC<DashboardProps> = ({
     name: 'Amaka Obi',
     email: 'amaka.obi@example.com',
     phone: '+234 803 555 0192',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+    avatarUrl: '/img/avatar-1.webp',
   };
 
   const handleSimulatePayment = () => {

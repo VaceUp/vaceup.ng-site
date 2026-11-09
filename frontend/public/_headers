@@ -34,6 +34,13 @@
 /runners/*
   Cache-Control: public, max-age=86400
 
+# Programme thumbnails, learner portraits and the hero photo, served from this
+# origin instead of a photo CDN. A day of caching keeps them off the wire on
+# return visits; the filenames are not hashed, so a day is also the longest a
+# replaced photo can hide.
+/img/*
+  Cache-Control: public, max-age=86400
+
 # The logo and academy marks change rarely. A day of browser caching stops
 # them being re-validated on every navigation, while a replaced file still
 # reaches visitors the next day.

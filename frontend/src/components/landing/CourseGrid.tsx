@@ -35,7 +35,7 @@ export const COURSES: Course[] = [
     price: '₦50,000',
     numericPrice: 50000,
     description: 'Equips learners with practical administrative, communication, digital productivity, and client-support skills required to operate as a professional Virtual Assistant.',
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-virtual-assistant.webp',
     learnings: [
       'Administrative support & email management',
       'Calendar management & meeting coordination',
@@ -66,7 +66,7 @@ export const COURSES: Course[] = [
     price: '₦70,000',
     numericPrice: 70000,
     description: 'Master the complete pipeline of transforming raw data into meaningful insights using Excel, SQL, Data Visualization, and Business Intelligence dashboards.',
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-data-analysis.webp',
     learnings: [
       'Data concepts & analytical thinking process',
       'Spreadsheet analysis, formulas, and Pivot Tables',
@@ -97,7 +97,7 @@ export const COURSES: Course[] = [
     price: '₦70,000',
     numericPrice: 70000,
     description: 'Learn user research, wireframing, information architecture, interface design, interactive prototyping, and usability testing.',
-    image: 'https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-ui-ux-design.webp',
     learnings: [
       'Design thinking & UX research methodologies',
       'User personas and user journey mapping',
@@ -128,7 +128,7 @@ export const COURSES: Course[] = [
     price: '₦60,000',
     numericPrice: 60000,
     description: 'Equips learners with creative and technical skills required to produce professional visual communications for brands, businesses, and social media.',
-    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-graphic-design.webp',
     learnings: [
       'Core design principles & composition',
       'Color theory and typography systems',
@@ -158,7 +158,7 @@ export const COURSES: Course[] = [
     price: '₦80,000',
     numericPrice: 80000,
     description: 'Master full-stack fundamentals including HTML, CSS, JavaScript, Git, frontend user interfaces, backend database architectures, and cloud deployment.',
-    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-web-development.webp',
     learnings: [
       'Semantic HTML5 & modern CSS3 layouts',
       'Responsive web design principles',
@@ -191,7 +191,7 @@ export const COURSES: Course[] = [
     price: '₦65,000',
     numericPrice: 65000,
     description: 'Focuses on responsible and practical AI usage in business, research, and daily workflows rather than simply memorizing software options.',
-    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-artificial-intelligence.webp',
     learnings: [
       'AI concepts, Machine Learning & Generative AI',
       'Prompt engineering frameworks & contextual instructions',
@@ -224,7 +224,7 @@ export const COURSES: Course[] = [
     price: '₦40,000',
     numericPrice: 40000,
     description: 'Children explore shapes, colors, layout, and typography in an engaging, project-based environment to create digital artwork, posters, and simple branding.',
-    image: 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-kids-graphic-design.webp',
     learnings: [
       'Digital shapes, colors, and typography',
       'Digital illustration and drawing basics',
@@ -253,7 +253,7 @@ export const COURSES: Course[] = [
     price: '₦40,000',
     numericPrice: 40000,
     description: 'Young learners explore how apps and websites are constructed, sketch screen layouts, create wireframes, and design interactive app prototypes.',
-    image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-kids-ui-ux.webp',
     learnings: [
       'Understanding app structure and user goals',
       'Idea generation & problem solving',
@@ -282,7 +282,7 @@ export const COURSES: Course[] = [
     price: '₦45,000',
     numericPrice: 45000,
     description: 'Children learn code fundamentals through HTML, CSS, and interactive JavaScript, building their own web pages from scratch.',
-    image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-kids-ui-ux.webp',
     learnings: [
       'How the internet and websites work',
       'HTML elements, structure, and text styling',
@@ -311,7 +311,7 @@ export const COURSES: Course[] = [
     price: '₦45,000',
     numericPrice: 45000,
     description: 'Helps children understand what AI is, how computers learn from data, how to prompt generative AI, and how to use technology safely and ethically.',
-    image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=800',
+    image: '/img/course-kids-ai.webp',
     learnings: [
       'What AI is and how it powers games and phones',
       'How computers learn through data and patterns',
@@ -384,6 +384,8 @@ export const CourseGrid: React.FC<CourseGridProps> = ({
                 <img
                   src={course.image}
                   alt={course.title}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover opacity-90 transition-transform duration-500 hover:scale-105"
                 />
                 <span className="absolute top-4 left-4 rounded-full bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold tracking-wide uppercase text-navy-950 shadow-sm">

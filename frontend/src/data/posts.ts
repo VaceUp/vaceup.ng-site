@@ -30,7 +30,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Career Support',
     date: '2026-08-20',
     readTime: '8 min read',
-    image: '/blog/tech-career.jpg',
+    image: '/blog/tech-career.webp',
     featured: true,
     body: [
       {
@@ -72,7 +72,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Technology',
     date: '2026-07-28',
     readTime: '6 min read',
-    image: '/blog/ai-africa.jpg',
+    image: '/blog/ai-africa.webp',
     body: [
       {
         p: 'AI is not coming to African tech — it is already here. Nigerian fintechs use it for fraud detection, logistics companies for route optimization, and solo freelancers use it to deliver work that used to take teams. The question is no longer whether AI matters, but who knows how to use it well.',
@@ -108,7 +108,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Career Support',
     date: '2026-07-10',
     readTime: '7 min read',
-    image: '/blog/remote-work.jpg',
+    image: '/blog/remote-work.webp',
     body: [
       {
         p: 'Remote work is the single biggest opportunity shift for African professionals in a generation — but it punishes poor communication and unreliability faster than any office ever could. Here is what separates the professionals who keep clients for years from those who churn through gigs.',
@@ -144,7 +144,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Data',
     date: '2026-06-18',
     readTime: '5 min read',
-    image: '/blog/data-skills.jpg',
+    image: '/blog/data-skills.webp',
     body: [
       {
         p: 'Ask any business owner in Lagos how the business is doing and you will hear "God is faithful" — which is true, and also not a dashboard. The gap between running a business on vibes and running it on numbers is exactly the gap basic data skills close.',
@@ -177,7 +177,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Design',
     date: '2026-05-30',
     readTime: '6 min read',
-    image: '/blog/design-career.jpg',
+    image: '/blog/design-career.webp',
     body: [
       {
         p: 'Every week our design tutors review student portfolios, and the pattern is always the same: beautiful screens, no story. Screens without decisions tell the recruiter nothing about how you think — and thinking is what they are hiring.',
@@ -210,7 +210,7 @@ export const BLOG_POSTS: BlogPost[] = [
     authorRole: 'Career Support',
     date: '2026-05-12',
     readTime: '6 min read',
-    image: '/blog/freelancing.jpg',
+    image: '/blog/freelancing.webp',
     body: [
       {
         p: 'The most common question in our final-week classes: "Should I get a job or start freelancing?" The honest answer depends on your runway, temperament and goals — but the framework below has helped hundreds of our graduates decide well.',

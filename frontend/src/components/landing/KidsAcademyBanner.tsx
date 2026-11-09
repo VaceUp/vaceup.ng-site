@@ -53,22 +53,22 @@ export const KidsAcademyBanner: React.FC<KidsAcademyBannerProps> = ({
               <div className="flex -space-x-2 overflow-hidden">
                 <img
                   className="inline-block h-9 w-9 rounded-full ring-2 ring-[#000459] object-cover"
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=70&w=96"
+                  src="/img/avatar-1.webp"
                   alt="Student avatar"
                 />
                 <img
                   className="inline-block h-9 w-9 rounded-full ring-2 ring-[#000459] object-cover"
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=70&w=96"
+                  src="/img/avatar-3.webp"
                   alt="Student avatar"
                 />
                 <img
                   className="inline-block h-9 w-9 rounded-full ring-2 ring-[#000459] object-cover"
-                  src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=70&w=96"
+                  src="/img/avatar-4.webp"
                   alt="Student avatar"
                 />
                 <img
                   className="inline-block h-9 w-9 rounded-full ring-2 ring-[#000459] object-cover"
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=70&w=96"
+                  src="/img/avatar-5.webp"
                   alt="Student avatar"
                 />
               </div>
@@ -83,8 +83,10 @@ export const KidsAcademyBanner: React.FC<KidsAcademyBannerProps> = ({
           <div className="lg:col-span-6">
             <div className="relative overflow-hidden rounded-3xl border-4 border-white/10 shadow-2xl">
               <img
-                src="https://images.unsplash.com/photo-1653566031285-8e198bca09d5?auto=format&fit=crop&q=80&w=1200"
+                src="/img/kids-banner.webp"
                 alt="Young Black girl sitting in front of a laptop computer"
+                loading="lazy"
+                decoding="async"
                 className="h-[420px] w-full object-cover rounded-2xl"
               />
             </div>

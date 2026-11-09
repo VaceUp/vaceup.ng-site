@@ -97,7 +97,6 @@ export const Footer = () => {
             <h4 className="text-xs font-bold uppercase tracking-widest text-gold-brand">Learn</h4>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li><Link href="/blog" className={linkClass}>Blog</Link></li>
-              <li><Link href="/resources" className={linkClass}>Free Resources</Link></li>
               <li><Link href="/events" className={linkClass}>Events</Link></li>
               <li><Link href="/dashboard" className={linkClass}>Student Dashboard</Link></li>
             </ul>

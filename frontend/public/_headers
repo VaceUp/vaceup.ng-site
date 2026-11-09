@@ -34,6 +34,18 @@
 /runners/*
   Cache-Control: public, max-age=86400
 
+# The logo and academy marks change rarely. A day of browser caching stops
+# them being re-validated on every navigation, while a replaced file still
+# reaches visitors the next day.
+/*.webp
+  Cache-Control: public, max-age=86400
+
+/*.png
+  Cache-Control: public, max-age=86400
+
+/*.ico
+  Cache-Control: public, max-age=86400
+
 /reset-password/*
   ! Referrer-Policy
   Referrer-Policy: no-referrer

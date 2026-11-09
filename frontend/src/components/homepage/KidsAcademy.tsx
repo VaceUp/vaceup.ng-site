@@ -21,7 +21,8 @@ export function KidsAcademy() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
           <img
-            src="/kids-academy-logo.png"
+            src="/kids-academy-logo.webp"
+            loading="lazy"
             alt="VaceUp Kids Tech Academy logo — Learn Today. Build Tomorrow. Lead the Future."
             className="h-28 w-28 mx-auto mb-6 rounded-2xl bg-white object-contain p-2 shadow-lg"
           />

@@ -64,22 +64,22 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
                 <div className="flex -space-x-3 overflow-hidden">
                   <img
                     className="inline-block h-10 w-10 rounded-full ring-2 ring-navy-900 object-cover"
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250"
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=70&w=96"
                     alt="Student"
                   />
                   <img
                     className="inline-block h-10 w-10 rounded-full ring-2 ring-navy-900 object-cover"
-                    src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250"
+                    src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=70&w=96"
                     alt="Student"
                   />
                   <img
                     className="inline-block h-10 w-10 rounded-full ring-2 ring-navy-900 object-cover"
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250"
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=70&w=96"
                     alt="Student"
                   />
                   <img
                     className="inline-block h-10 w-10 rounded-full ring-2 ring-navy-900 object-cover"
-                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250"
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=70&w=96"
                     alt="Student"
                   />
                 </div>
@@ -97,7 +97,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth }) => {
             <div className="relative lg:col-span-5 flex justify-center lg:justify-end">
               <div className="relative w-full max-w-md lg:max-w-none overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
                 <img
-                  src="https://images.unsplash.com/photo-1765650114604-23e5c5c132be?w=800&auto=format&fit=crop&q=80"
+                  src="https://images.unsplash.com/photo-1765650114604-23e5c5c132be?w=640&auto=format&fit=crop&q=70"
                   alt="VaceUp Academy Student"
                   className="h-[380px] sm:h-[480px] lg:h-[520px] w-full object-cover object-center"
                 />

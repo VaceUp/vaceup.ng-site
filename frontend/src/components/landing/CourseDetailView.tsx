@@ -58,9 +58,9 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
 
               <div className="mt-8 flex items-center gap-3">
                 <div className="flex -space-x-2">
-                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250" alt="Learner" />
-                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=250" alt="Learner" />
-                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250" alt="Learner" />
+                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=70&w=96" alt="Learner" />
+                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=70&w=96" alt="Learner" />
+                  <img className="h-8 w-8 rounded-full ring-2 ring-[#00088A]" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=70&w=96" alt="Learner" />
                 </div>
                 <p className="text-xs text-gray-200">
                   Join learners from <span className="font-bold text-emerald-400">Nigeria</span>, <span className="font-bold text-emerald-400">Ghana</span>, and <span className="font-bold text-emerald-400">Kenya</span> building digital skills.

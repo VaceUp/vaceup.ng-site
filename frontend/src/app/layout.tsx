@@ -1,5 +1,5 @@
 import './globals.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
+import './bootstrap-icons.css';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth-context';
 import AppShell from '@/components/layout/AppShell';

@@ -142,7 +142,7 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Recording not available yet."}, status=404)
         if not live_class._user_has_recording_access(request.user):
             return Response(
-                {"detail": "Recordings are available to learners who attended this class."},
+                {"detail": "Recordings are available to learners enrolled in this course."},
                 status=403,
             )
         playback_url = live_class.get_recording_playback_url(request.user, expires_in=3600)

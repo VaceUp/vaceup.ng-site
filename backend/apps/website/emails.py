@@ -2,11 +2,12 @@
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
 
 from apps.accounts.mail_delivery import classify_delivery_failure, send_account_message
 from apps.website.join import room_is_ready
+from apps.core.email_layout import render_email
 
 logger = logging.getLogger("apps.website")
 
@@ -35,8 +36,8 @@ def event_page_link(event):
 def send_event_broadcast(*, registration, subject, note, include_link=True):
     """Send the academy's own note about this event to one registrant.
 
-    One recipient per message, so an address never appears beside another
-    attendee's, and the relay sees the same plain-text shape it already accepts.
+    One recipient per message. HTML has a readable layout; plain text remains
+    available to clients that do not display HTML.
     """
     event = registration.event
     lines = [f"Hi {registration.name.split(' ')[0] or 'there'},", ""]
@@ -55,12 +56,19 @@ def send_event_broadcast(*, registration, subject, note, include_link=True):
         "",
         "VaceUp Digital Academy",
     ]
-    message = EmailMessage(
+    message = EmailMultiAlternatives(
         subject=subject,
         body="\n".join(lines),
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         to=[registration.email],
     )
+    message.attach_alternative(render_email(
+        title=subject, text=f"Hi {registration.name.split(' ')[0] or 'there'},\n\n{note.strip()}", category="Event update",
+        details=[("Event", event.title), ("When", _window(event)), ("Where", "Online" if event.is_online else event.location or "Venue to be confirmed")],
+        cta_label="Open the live room", cta_url=registration.join_link() if include_link and event.is_online and room_is_ready(event) else "",
+        secondary_label="View event details", secondary_url=event_page_link(event),
+        footer="You received this update because you registered for this event. Your joining link is personal; please do not forward it.",
+    ), "text/html")
     try:
         send_account_message(message)
     except Exception as exc:
@@ -125,12 +133,24 @@ def send_rsvp_confirmation(*, registration):
     ]
     body = "\n".join(lines)
 
-    message = EmailMessage(
+    message = EmailMultiAlternatives(
         subject=f"Confirmed: {event.title} on {_moment(event.starts_at)}",
         body=body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         to=[registration.email],
     )
+    message.attach_alternative(render_email(
+        title="Your seat is confirmed", text=(
+            f"Hi {registration.name.split(' ')[0] or 'there'},\n\nYou're booked for {event.title}. We look forward to seeing you."
+            + (f"\n\nYour note: {registration.note}" if registration.note else "")
+            + ("\n\nThe academy has not set the meeting details yet. Keep your personal link; it shows them as soon as they are added." if online and not room_is_ready(event) else "")
+        ),
+        category="Event confirmation", details=[("Event", event.title), ("When", _window(event)), ("Where", venue)],
+        cta_label="Open your classroom" if online else "View event details",
+        cta_url=registration.join_link() if online else event_page_link(event),
+        secondary_label="View event details" if online else "", secondary_url=event_page_link(event) if online else "",
+        footer=f"{consent_line} If you can no longer attend, reply to release your seat. Keep your personal joining link private.",
+    ), "text/html")
     try:
         send_account_message(message)
     except Exception as exc:
@@ -170,12 +190,19 @@ def send_join_link_email(*, registration):
         "",
         "VaceUp Digital Academy",
     ]
-    message = EmailMessage(
+    message = EmailMultiAlternatives(
         subject=f"Joining link: {event.title} on {_moment(event.starts_at)}",
         body="\n".join(lines),
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         to=[registration.email],
     )
+    message.attach_alternative(render_email(
+        title="Your classroom is ready", text=f"Hi {registration.name.split(' ')[0] or 'there'},\n\nUse your personal link below to join {event.title}. Open it a few minutes before the session starts.",
+        category="Joining details", details=[("Event", event.title), ("When", _window(event)), ("Where", venue)],
+        cta_label="Open your classroom", cta_url=registration.join_link(),
+        secondary_label="View event details", secondary_url=event_page_link(event),
+        footer="This link holds your seat. Please keep it private and do not forward this email.",
+    ), "text/html")
     try:
         send_account_message(message)
     except Exception as exc:

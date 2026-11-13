@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{{ title }}</title>
+  <!-- Email adapter: literal inline values are required by Outlook and Gmail. -->
+  <style>
+    body { margin:0; padding:0; }
+    @media only screen and (max-width:620px) {
+      .email-outer { padding:16px 8px !important; }
+      .email-content { padding:28px 20px !important; }
+      .email-header { padding:24px 20px !important; }
+      .email-title { font-size:26px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:{{ theme.page }};color:{{ theme.text }};font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{{ preheader }}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:{{ theme.page }};">
+    <tr><td align="center" class="email-outer" style="padding:36px 16px;">
+      <!--[if mso]><table role="presentation" width="600"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;border:1px solid {{ theme.line }};border-radius:16px;background:{{ theme.surface }};">
+        <tr><td class="email-header" style="padding:28px 36px;background:{{ theme.brand }};border-radius:16px 16px 0 0;">
+          <a href="{{ site_url }}" style="font-size:28px;line-height:1.2;font-weight:800;color:{{ theme.surface }};text-decoration:none;">VaceUp<span style="color:{{ theme.accent }};">.</span></a>
+          <p style="margin:6px 0 0;color:{{ theme.accent }};font-size:12px;line-height:1.5;letter-spacing:1px;">DIGITAL ACADEMY</p>
+        </td></tr>
+        <tr><td class="email-content" style="padding:36px;overflow-wrap:anywhere;word-break:break-word;">
+          <p style="margin:0 0 12px;font-size:13px;font-weight:700;line-height:1.5;color:{{ theme.muted }};">{{ category }}</p>
+          <h1 class="email-title" style="margin:0 0 28px;font-size:32px;line-height:1.25;font-weight:700;letter-spacing:-0.5px;color:{{ theme.brand }};">{{ title }}</h1>
+          <div style="font-size:16px;line-height:1.75;color:{{ theme.text }};">{{ message_html|safe }}</div>
+          {% if details %}<table width="100%" cellpadding="0" cellspacing="0" aria-label="Session details" style="width:100%;margin:8px 0 24px;border-top:1px solid {{ theme.line }};border-bottom:1px solid {{ theme.line }};font-size:14px;line-height:1.6;">
+            {% for label, value in details %}<tr><th scope="row" align="left" valign="top" style="width:64px;white-space:nowrap;padding:12px 16px 12px 0;color:{{ theme.muted }};font-weight:400;">{{ label }}</th><td valign="top" style="padding:12px 0;color:{{ theme.text }};font-weight:600;">{{ value }}</td></tr>{% endfor %}
+          </table>{% endif %}
+          {% if cta_url %}<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;"><tr><td bgcolor="{{ theme.accent }}" style="background:{{ theme.accent }};border-radius:8px;">
+            <a href="{{ cta_url }}" style="display:inline-block;padding:15px 24px;border:1px solid {{ theme.accent }};border-radius:8px;font-size:16px;line-height:1.4;font-weight:700;color:{{ theme.brand }};text-decoration:none;">{{ cta_label }}</a>
+          </td></tr></table>{% endif %}
+          {% if secondary_url %}<p style="margin:0;font-size:14px;line-height:1.6;"><a href="{{ secondary_url }}" style="color:{{ theme.brand }};text-decoration:underline;">{{ secondary_label }}</a></p>{% endif %}
+        </td></tr>
+        <tr><td class="email-content" style="padding:24px 36px;border-top:1px solid {{ theme.line }};font-size:12px;line-height:1.7;color:{{ theme.muted }};">
+          <p style="margin:0 0 8px;font-weight:700;color:{{ theme.brand }};">VaceUp Digital Academy</p>
+          {% if footer %}<p style="margin:0 0 12px;">{{ footer }}</p>{% endif %}
+          {% if preview %}<p style="margin:0 0 12px;">Preview only. Sent messages include a personal unsubscribe link.</p>{% endif %}
+          {% if unsubscribe_url %}<a href="{{ unsubscribe_url }}" style="color:{{ theme.muted }};text-decoration:underline;">Unsubscribe from marketing emails</a>{% endif %}
+        </td></tr>
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </td></tr>
+  </table>
+</body>
+</html>

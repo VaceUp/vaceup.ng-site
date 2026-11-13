@@ -2,6 +2,12 @@ import { api, type PaginatedResponse } from './api';
 
 /** Public website content served by apps.website (profile, team, events, blog). */
 
+export interface AcademyIntake {
+  id: number; title: string; starts_on: string; ends_on: string;
+  available_courses: { id: number; slug: string; title: string }[];
+  registration_url: string;
+}
+
 export interface AcademyProfile {
   id: number | null;
   name: string;
@@ -12,6 +18,8 @@ export interface AcademyProfile {
   location: string;
   founded_year: number | null;
   next_cohort_start?: string | null;
+  next_intake?: AcademyIntake | null;
+  intakes_managed?: boolean;
   email: string;
   phone: string;
   linkedin_url: string;

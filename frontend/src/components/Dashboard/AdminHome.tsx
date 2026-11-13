@@ -23,6 +23,8 @@ import { MeetingsWorkspace } from '@/components/Dashboard/MeetingsWorkspace';
 import { MemberAccount } from '@/components/Dashboard/MemberPages';
 import WebsiteManager from '@/components/Dashboard/admin/WebsiteManager';
 import EventsManager from '@/components/Dashboard/admin/EventsManager';
+import ChallengesManager from '@/components/Dashboard/admin/ChallengesManager';
+import IntakesManager from '@/components/Dashboard/admin/IntakesManager';
 import BlogManager from '@/components/Dashboard/admin/BlogManager';
 
 export function AdminHome() {
@@ -73,6 +75,8 @@ export function AdminHome() {
       {/* ═══ Public website ═══ */}
       {tab === 'website' && <WebsiteManager />}
       {tab === 'events' && <EventsManager />}
+      {tab === 'challenges' && <ChallengesManager />}
+      {tab === 'intakes' && <IntakesManager />}
       {tab === 'blog' && <BlogManager />}
 
       {tab === 'flags' && <PlatformSettings />}

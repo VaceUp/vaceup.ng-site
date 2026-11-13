@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "apps.marketing",
     "apps.announcements",
     "apps.website",
+    "apps.challenges",
     "drf_spectacular",
 ]
 
@@ -122,6 +123,10 @@ REST_FRAMEWORK = {
         "payment_webhook": "600/min",
         # Re-issuing an event seat is unauthenticated, so keep it slow.
         "event_resend": "3/min",
+        "challenge_register": "5/hour",
+        "challenge_access": "5/hour",
+        "challenge_verify": "10/min",
+        "challenge_upload": "30/hour",
     },
     # OpenAPI/Swagger
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -217,6 +222,21 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
 SERVER_EMAIL = env("SERVER_EMAIL", default="").strip() or DEFAULT_FROM_EMAIL
 # Base URL of the frontend that renders the emailed verify/reset links.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="https://vaceup.ng")
+
+# Challenge inference is opt-in and never falls through to a paid provider.
+GROQ_API_KEY = env("GROQ_API_KEY", default="").strip()
+CHALLENGE_AI_ENABLED = env.bool("CHALLENGE_AI_ENABLED", default=False)
+CHALLENGE_ASSESSMENT_CALIBRATED = env.bool("CHALLENGE_ASSESSMENT_CALIBRATED", default=False)
+CHALLENGE_GROQ_MODEL = env("CHALLENGE_GROQ_MODEL", default="qwen/qwen3.8-27b")
+CHALLENGE_AI_DAILY_TOKEN_LIMIT = env.int("CHALLENGE_AI_DAILY_TOKEN_LIMIT", default=180000)
+CHALLENGE_AI_MAX_OUTPUT_TOKENS = env.int("CHALLENGE_AI_MAX_OUTPUT_TOKENS", default=1200)
+CHALLENGE_AI_TIMEOUT_SECONDS = env.int("CHALLENGE_AI_TIMEOUT_SECONDS", default=45)
+CHALLENGE_PUBLIC_COUNTER_COLLECTOR = env("CHALLENGE_PUBLIC_COUNTER_COLLECTOR", default="disabled")
+CHALLENGE_VERIFY_TTL_HOURS = env.int("CHALLENGE_VERIFY_TTL_HOURS", default=48)
+CHALLENGE_SESSION_TTL_HOURS = env.int("CHALLENGE_SESSION_TTL_HOURS", default=24)
+CHALLENGE_MAX_PROJECT_BYTES = env.int("CHALLENGE_MAX_PROJECT_BYTES", default=20 * 1024 * 1024)
+CHALLENGE_MAX_ENGAGEMENT_BYTES = env.int("CHALLENGE_MAX_ENGAGEMENT_BYTES", default=10 * 1024 * 1024)
+CHALLENGE_MAX_REGISTRATIONS = env.int("CHALLENGE_MAX_REGISTRATIONS", default=10000)
 MARKETING_PUBLIC_API_URL = env("MARKETING_PUBLIC_API_URL", default="https://api.vaceup.ng")
 ACADEMY_SITE_URL = env("ACADEMY_SITE_URL", default="https://vaceup.ng")
 
@@ -371,6 +391,8 @@ if not OBJECT_STORAGE_CONFIGURED:
 
 # --- CORS: lock to the known frontend origin(s) ---
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+from corsheaders.defaults import default_headers  # noqa: E402
+CORS_ALLOW_HEADERS = (*default_headers, "x-challenge-token")
 
 # --- CSRF: required by Django 4+ for admin/form POSTs served from these hosts ---
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])

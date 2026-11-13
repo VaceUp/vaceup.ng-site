@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { courseImage, formatPrice, getPublicCourse, type CatalogCourse } from '@/lib/public-catalog';
 import { catalogAction } from '@/components/homepage/PublicCatalog';
 import styles from './course.module.css';
+import IntakeNotice from '@/components/homepage/IntakeNotice';
 
 function DetailList({ title, text }: { title: string; text?: string }) {
   const items = (text || '').split('\n').map((line) => line.trim()).filter(Boolean);
@@ -30,6 +31,7 @@ function CoursePageContent() {
         <div className="space-y-5"><p className="text-sm font-semibold">{course.category_name || course.category} / <span className="capitalize">{course.level}</span></p><h1 className="text-3xl font-black sm:text-4xl">{course.title}</h1><p className="text-sm text-content-muted">{course.instructor_name}{course.duration ? ` / ${course.duration}` : ''}</p><p className="text-2xl font-bold">{formatPrice(course.price)}</p><Link href={`/apply?course=${course.id}`} className={catalogAction}>Apply for this course</Link></div>
       </header>
       {course.tagline && <p className="text-xl">{course.tagline}</p>}
+      <IntakeNotice course={course.slug} />
       <section className="space-y-4"><h2 className="text-2xl font-bold">About this course</h2><p className="whitespace-pre-line leading-relaxed text-content-secondary">{course.description}</p></section>
       {course.target_audience && <section className="space-y-4"><h2 className="text-2xl font-bold">Who this course is for</h2><p>{course.target_audience}</p></section>}
       <DetailList title="What you will learn" text={course.learning_outcomes} />

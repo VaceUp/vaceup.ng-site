@@ -13,11 +13,13 @@ from apps.website.views import (
     EventViewSet,
     TeamMemberViewSet,
 )
+from apps.website.intakes import IntakeViewSet
 
 router = DefaultRouter()
 router.register("website/team", TeamMemberViewSet, basename="website-team")
 router.register("website/events", EventViewSet, basename="website-event")
 router.register("website/posts", BlogPostViewSet, basename="website-post")
+router.register("website/intakes", IntakeViewSet, basename="website-intake")
 
 urlpatterns = [
     path("website/profile/", AcademyProfileView.as_view(), name="website-profile"),

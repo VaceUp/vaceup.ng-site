@@ -33,7 +33,7 @@ declare global {
   }
 }
 
-const PRIVATE_PATHS = ['/login', '/register', '/verify', '/verify-email'];
+const PRIVATE_PATHS = ['/login', '/register', '/verify', '/verify-email', '/challenge', '/challenges'];
 
 /** Public marketing pages are measured; signed-in product screens are not. */
 export function isTrackedPage(pathname: string) {

@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: '/about', label: 'About' },
   { href: '/team', label: 'Team' },
   { href: '/events', label: 'Events' },
+  { href: '/challenge', label: 'Challenge' },
   { href: '/blog', label: 'Blog' },
   { href: '/contact', label: 'Contact' },
 ];

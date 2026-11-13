@@ -1,6 +1,7 @@
 """Serializers for public website content (profile, team, events, blog)."""
 
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from apps.website.join import room_is_ready
@@ -35,11 +36,23 @@ def _image_url(obj, field, request=None):
 
 
 class AcademyProfileSerializer(serializers.ModelSerializer):
+    next_intake = serializers.SerializerMethodField()
+    intakes_managed = serializers.SerializerMethodField()
+
+    def get_next_intake(self, obj):
+        from apps.website.intakes import PublicIntakeSerializer, upcoming_intakes
+        row = upcoming_intakes().first()
+        return PublicIntakeSerializer(row).data if row else None
+
+    def get_intakes_managed(self, obj):
+        from apps.website.models import AcademyIntake
+        return AcademyIntake.objects.exists()
+
     class Meta:
         model = AcademyProfile
         fields = (
             "id", "name", "tagline", "mission", "story", "hero_title", "location",
-            "founded_year", "next_cohort_start",
+            "founded_year", "next_cohort_start", "next_intake", "intakes_managed",
             "email", "phone", "linkedin_url",
             "instagram_url", "facebook_url", "website_url",
         )
@@ -124,13 +137,23 @@ class EventPublicSerializer(serializers.ModelSerializer):
         return room_is_ready(obj)
 
 
+class EventHostsField(serializers.ManyRelatedField):
+    def get_value(self, dictionary):
+        if hasattr(dictionary, "getlist") and dictionary.getlist(self.field_name) == [""]:
+            return []
+        return super().get_value(dictionary)
+
+
 class EventAdminSerializer(EventPublicSerializer):
+    hosts = EventHostsField(required=False, child_relation=serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.filter(role__in=["admin", "instructor"], is_active=True),
+    ))
     registrations_count = serializers.IntegerField(source="seats_taken", read_only=True)
 
     class Meta(EventPublicSerializer.Meta):
         fields = EventPublicSerializer.Meta.fields + (
             "meeting_url", "room_name", "cover_image", "is_published",
-            "registrations_count", "created_at", "updated_at",
+            "registrations_count", "created_at", "updated_at", "hosts",
         )
         extra_kwargs = {"cover_image": {"write_only": True, "required": False}}
 

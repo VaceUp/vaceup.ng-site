@@ -1,6 +1,7 @@
 """Live classes: an instructor schedules a session on a course; enrolled
 students join within a time window and attendance is recorded."""
 from datetime import timedelta
+import uuid
 
 from django.conf import settings
 from django.db import models
@@ -172,9 +173,8 @@ class LiveClass(TimeStampedModel):
         if user.is_admin or self.course.instructor_id == user.id:
             return True
         
-        # Check if student was enrolled and attended
+        # Active and completed enrollments include access to catch-up recordings.
         from apps.enrollment.models import Enrollment
-        from apps.liveclasses.models import Attendance
         
         is_enrolled = Enrollment.objects.filter(
             student=user,
@@ -185,14 +185,33 @@ class LiveClass(TimeStampedModel):
         if not is_enrolled:
             return False
         
-        # Check if student attended the live class
-        attended = Attendance.objects.filter(
-            live_class=self,
-            student=user
-        ).exists()
-        
-        # Students who attended have access
-        return attended
+        # Replays also let enrolled learners catch up on a missed class.
+        return True
+
+
+class RoomRecording(TimeStampedModel):
+    """Private, independently uploaded recording segments for a room."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    live_class = models.ForeignKey(LiveClass, null=True, blank=True, on_delete=models.CASCADE, related_name="recordings")
+    event = models.ForeignKey("website.Event", null=True, blank=True, on_delete=models.CASCADE, related_name="recordings")
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.CASCADE, related_name="recordings")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    title = models.CharField(max_length=200)
+    key = models.CharField(max_length=500, unique=True)
+    content_type = models.CharField(max_length=50)
+    size_bytes = models.PositiveBigIntegerField()
+    status = models.CharField(max_length=20, default="uploading", choices=[("uploading", "Uploading"), ("ready", "Ready")])
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [models.CheckConstraint(
+            condition=(
+                models.Q(live_class__isnull=False, event__isnull=True, meeting__isnull=True)
+                | models.Q(live_class__isnull=True, event__isnull=False, meeting__isnull=True)
+                | models.Q(live_class__isnull=True, event__isnull=True, meeting__isnull=False)
+            ), name="recording_exactly_one_room",
+        )]
 
 
 class Attendance(TimeStampedModel):

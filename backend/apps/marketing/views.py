@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from apps.accounts.mail_delivery import classify_delivery_failure
 from apps.core.exceptions import DomainError, IllegalStateTransition
 from apps.core.permissions import IsAdmin
+from apps.core.email_layout import render_email
 from . import services
 from .models import EmailCampaign, EmailRecipient, EmailLog, EmailSuppression, EmailTemplate
 from .serializers import (EmailCampaignSerializer, EmailCampaignCreateSerializer,
@@ -22,6 +23,15 @@ class EmailCampaignViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdmin]
     queryset = EmailCampaign.objects.select_related("created_by", "template").prefetch_related("target_courses")
     serializer_class = EmailCampaignSerializer
+
+    @action(detail=False, methods=["post"], url_path="render-preview")
+    def render_preview(self, request):
+        """Render an unsent draft without queueing or mailing anybody."""
+        subject = serializers.CharField(max_length=200).run_validation(request.data.get("subject"))
+        text = serializers.CharField(max_length=100000).run_validation(request.data.get("custom_text"))
+        response = Response({"html": render_email(title=subject, text=text, category="News from VaceUp", preview=True)})
+        response["Cache-Control"] = "no-store"
+        return response
 
     def get_serializer_class(self):
         return EmailCampaignCreateSerializer if self.action in ("create", "update", "partial_update") else EmailCampaignSerializer

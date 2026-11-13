@@ -41,8 +41,17 @@ class CampaignDeliveryTests(APITestCase):
 
     def test_non_admin_denied(self):
         self.client.force_authenticate(self.learner)
+        self.assertEqual(self.client.post(BASE + "render-preview/", {"subject": "Preview", "custom_text": "Message"}, format="json").status_code, 403)
         self.assertEqual(self.client.get(BASE).status_code, 403)
         self.assertEqual(self.client.post(f"{BASE}{self.campaign.pk}/send-now/", {}, format="json").status_code, 403)
+
+    def test_browser_preview_formats_unsaved_draft_without_sending(self):
+        result = self.client.post(BASE + "render-preview/", {"subject": "Excel class", "custom_text": "Hi Ada,\n\n# Get ready\n- Bring Excel\n- Join early"}, format="json")
+        self.assertEqual(result.status_code, 200, result.data)
+        self.assertIn('<ul ', result.data["html"])
+        self.assertEqual(result["Cache-Control"], "no-store")
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(EmailRecipient.objects.exists())
 
     def test_snapshot_idempotent_and_sent_once(self):
         self.queue(); self.queue()
@@ -50,6 +59,10 @@ class CampaignDeliveryTests(APITestCase):
         self.assertEqual(services.process_queue(), {"sent": 2})
         self.assertEqual(services.process_queue(), {})
         self.assertEqual(len(mail.outbox), 2)
+        for message in mail.outbox:
+            self.assertEqual(message.alternatives[0].mimetype, "text/html")
+            self.assertIn("Unsubscribe from marketing emails", message.alternatives[0].content)
+            self.assertIn("Stop marketing emails:", message.body)
         self.campaign.refresh_from_db()
         self.assertEqual(self.campaign.status, "sent")
         self.assertEqual(self.campaign.sent_count, 2)

@@ -87,7 +87,8 @@ def join_access(*, event, registration=None, user=None):
     else is only let in with the token from their own confirmation email, and
     only while the room is open.
     """
-    is_host = user is not None and getattr(user, "is_authenticated", False) and user.is_admin
+    is_host = bool(user is not None and getattr(user, "is_authenticated", False)
+                   and user.is_active and (user.is_admin or event.hosts.filter(pk=user.pk).exists()))
     if not is_host and registration is None:
         raise JoinDenied("This join link is not one we issued for this event.", 403)
     if not event.is_online:

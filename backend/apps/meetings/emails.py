@@ -2,10 +2,11 @@
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
 
 from apps.accounts.mail_delivery import send_account_message
+from apps.core.email_layout import render_email
 
 logger = logging.getLogger("apps.meetings")
 
@@ -24,14 +25,14 @@ def meeting_link(meeting):
 
 
 def _send(*, subject, body, recipient):
-    message = EmailMessage(
+    message = EmailMultiAlternatives(
         subject=subject,
         body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[recipient],
         headers={"X-VaceUp-Meeting": "staff"},
     )
-    message.content_subtype = "plain"
+    message.attach_alternative(render_email(title=subject, text=body, category="Staff meeting"), "text/html")
     send_account_message(message)
 
 

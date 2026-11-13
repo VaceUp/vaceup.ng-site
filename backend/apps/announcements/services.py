@@ -6,6 +6,7 @@ from django.utils import timezone
 from apps.accounts.models import User, MailJob
 from apps.announcements.models import Announcement
 from apps.enrollment.models import Enrollment
+from apps.core.email_layout import render_email
 
 
 def recipients(announcement):
@@ -56,9 +57,14 @@ def deliver_announcement(job):
     announcement = Announcement.objects.filter(pk=job.object_id, send_email=True).first()
     if not announcement or not announcement.is_published or not recipients(announcement).filter(pk=job.user_id).exists():
         return False
-    # Plain text avoids rendering untrusted rich-text HTML in mail clients.
+    # The HTML formatter escapes author text and adds structure without trusting HTML.
     count = send_mail(announcement.title.replace('\r', ' ').replace('\n', ' '),
-                     announcement.body, settings.DEFAULT_FROM_EMAIL, [job.user.email], fail_silently=False)
+                     announcement.body, settings.DEFAULT_FROM_EMAIL, [job.user.email], fail_silently=False,
+                     html_message=render_email(
+                         title=announcement.title, text=announcement.body, category="Academy announcement",
+                         cta_label="Open your dashboard", cta_url=settings.FRONTEND_LINK_BASE.rstrip('/') + '/dashboard/announcements/',
+                         footer="An update for your academy account or enrolled courses.",
+                     ))
     if count != 1:
         raise RuntimeError('SMTP did not accept the announcement message')
     return True

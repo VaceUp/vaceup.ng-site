@@ -253,17 +253,19 @@ class WorkspaceTests(APITestCase):
         AWS_ACCESS_KEY_ID="test-key", AWS_SECRET_ACCESS_KEY="test-secret",
         AWS_STORAGE_BUCKET_NAME="test-bucket", AWS_S3_ENDPOINT_URL="https://storage.example.test",
         AWS_S3_REGION_NAME="auto")
-    def test_recording_url_requires_attendance_and_ready_state(self):
+    def test_recording_url_allows_enrolled_learners_who_missed_class(self):
         self.session.recording_key = "recordings/workshop.mp4"
         self.session.recording_status = "ready"
         self.session.save(update_fields=["recording_key", "recording_status"])
         path = f'/api/v1/live-classes/{self.session.pk}/recording-url/'
-        self.assertEqual(self.client.get(path).status_code, 403)
-        self.client.post(f'/api/v1/live-classes/{self.session.pk}/join/')
+        self.assertFalse(self.session.attendances.exists())
         response = self.client.get(path)
         self.assertEqual(response.status_code, 200, response.data)
         self.assertIn("workshop.mp4", response.data['url'])
         self.assertEqual(response.data['expires_in'], 3600)
+        self.session.recording_status = "processing"
+        self.session.save(update_fields=["recording_status"])
+        self.assertEqual(self.client.get(path).status_code, 404)
 
     def test_course_search_pagination_and_constant_queries(self):
         # Warm the shared throttle bucket: first-use INSERT/savepoint queries

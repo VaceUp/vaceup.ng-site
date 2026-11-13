@@ -40,6 +40,10 @@ class AnnouncementDeliveryTests(APITestCase):
         self.assertEqual(process_one(), 'sent')
         self.assertIsNone(process_one())
         self.assertEqual({message.to[0] for message in mail.outbox}, {self.student.email, self.tutor.email})
+        for message in mail.outbox:
+            self.assertEqual(message.body, self.item.body)
+            self.assertEqual(message.alternatives[0].mimetype, "text/html")
+            self.assertIn("Open your dashboard", message.alternatives[0].content)
         self.item.refresh_from_db(); self.assertTrue(self.item.email_sent)
 
     def test_worker_rechecks_revoked_audience_and_unpublication(self):

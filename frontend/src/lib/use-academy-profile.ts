@@ -15,7 +15,9 @@ export function useAcademyProfile(): AcademyProfile | null {
   useEffect(() => {
     let active = true;
     profileRequest()
-      .then((data) => { if (active) setProfile(data); })
+      .then((data) => { if (active) setProfile({ ...data,
+        next_cohort_start: data.intakes_managed ? data.next_intake?.starts_on ?? null : data.next_cohort_start,
+      }); })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);

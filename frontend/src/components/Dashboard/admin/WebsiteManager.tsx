@@ -292,7 +292,7 @@ export default function WebsiteManager() {
                 </Field>
               </FormGrid>
               <FormGrid>
-                <Field label="Next cohort starts" hint="The date on the homepage banner. Leave it empty to hide the banner.">
+                <Field label="Fallback cohort date" hint="Used only before managed intakes are configured. Course Intakes controls the automatic next-intake date.">
                   <TextInput type="date" value={profile.next_cohort_start} onChange={(event) => set('next_cohort_start', event.target.value)} />
                 </Field>
                 <Field label="Website" optional>

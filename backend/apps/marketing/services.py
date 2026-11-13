@@ -13,11 +13,11 @@ from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
-from django.utils.html import escape
 
 from apps.accounts.mail_delivery import classify_delivery_failure
 from apps.adminpanel.platform_settings import setting_value
 from apps.core.exceptions import DomainError, IllegalStateTransition
+from apps.core.email_layout import render_email
 from apps.enrollment.models import Enrollment
 from apps.payments.models import Payment
 from .models import EmailCampaign, EmailRecipient, EmailSuppression, EmailUnsubscribe
@@ -135,10 +135,12 @@ def build_email_content(campaign, recipient=None):
         text += "\n\nStop marketing emails: " + unsubscribe_url(recipient)
     else:
         text += "\n\n[Preview only. Real messages include a personal unsubscribe link.]"
-    html = "<html><body><h1>" + escape(campaign.subject) + "</h1><p>" + escape(text).replace("\n", "<br>") + "</p>"
-    if recipient:
-        html += '<p><a href="' + escape(unsubscribe_url(recipient)) + '">Unsubscribe from marketing emails</a></p>'
-    html += "</body></html>"
+    html = render_email(
+        title=campaign.subject, text=campaign.custom_text,
+        category="News from VaceUp", preview=recipient is None,
+        unsubscribe_url=unsubscribe_url(recipient) if recipient else "",
+        footer="You are receiving academy news and offers from VaceUp.",
+    )
     return campaign.subject, html, text
 
 

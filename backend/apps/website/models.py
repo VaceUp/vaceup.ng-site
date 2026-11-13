@@ -200,6 +200,10 @@ class Event(TimeStampedModel):
     )
     is_featured = models.BooleanField(default=False)
     is_published = models.BooleanField(default=False, db_index=True)
+    hosts = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name="hosted_events",
+        limit_choices_to={"role__in": ["admin", "instructor"], "is_active": True},
+    )
 
     class Meta:
         ordering = ("starts_at",)
@@ -343,6 +347,25 @@ class BlogPost(TimeStampedModel):
 
     class Meta:
         ordering = ("-published_at",)
+
+    def __str__(self):
+        return self.title
+
+
+class AcademyIntake(TimeStampedModel):
+    """Reusable teaching dates, independent of the course application window."""
+
+    title = models.CharField(max_length=150)
+    starts_on = models.DateField(db_index=True)
+    ends_on = models.DateField()
+    is_active = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
+    all_courses = models.BooleanField(default=False)
+    courses = models.ManyToManyField("courses.Course", blank=True, related_name="academy_intakes")
+    registration_url = models.URLField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ("starts_on", "pk")
 
     def __str__(self):
         return self.title

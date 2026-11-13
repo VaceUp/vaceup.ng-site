@@ -1,0 +1,12 @@
+{
+  "source": "frontend/src/app/globals.css",
+  "colors": {
+    "brand": "#000459",
+    "accent": "#FFC72C",
+    "surface": "#FFFFFF",
+    "page": "#F8FAFC",
+    "text": "#0A1128",
+    "muted": "#475569",
+    "line": "#E2E8F0"
+  }
+}

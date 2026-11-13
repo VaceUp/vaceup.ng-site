@@ -115,6 +115,7 @@
 }
 
 :root {
+  --measure-copy: 65ch;
   --bg-primary: #FFFFFF;
   --bg-secondary: #F8FAFC;
   --bg-tertiary: #F1F5F9;

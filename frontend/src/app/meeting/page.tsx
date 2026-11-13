@@ -10,6 +10,7 @@ import { formatWorkspaceDate } from '@/lib/workspace-api';
 import { openMeetingRoom, type Meeting, type MeetingRoomAccess } from '@/lib/meetings-api';
 import type { RoomChrome } from '@/components/live/LiveRoom';
 import { Button } from '@/components/ui/Button';
+import ReplayList from '@/components/live/ReplayList';
 
 // The room pulls in the WebRTC client, which only exists in a browser.
 const LiveRoom = dynamic(() => import('@/components/live/LiveRoom'), {
@@ -101,6 +102,7 @@ function MeetingRoute() {
 
   if (access) {
     const chrome: RoomChrome = {
+      recordingScope: { kind: 'meeting', id: String(id) },
       title: meeting.data?.title ?? 'Staff meeting',
       leftNote: 'This meeting is still booked. Go back in any time before it closes.',
       waitingNote: 'Nobody else has walked in yet. Your colleagues open this meeting from their own dashboard, and the invitation email leads to the same door.',
@@ -150,6 +152,7 @@ function MeetingRoute() {
                   : 'This meeting has finished. The room is closed.'}
               </p>
             )}
+            <ReplayList scope={{ kind: 'meeting', id: String(id) }} />
             {!closed && item.can_enter && (
               <Button
                 onClick={() => void enter()}

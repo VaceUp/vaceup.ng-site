@@ -36,6 +36,27 @@ const STATUS_TONE: Record<string, 'neutral' | 'live' | 'draft' | 'danger' | 'mut
 const statusLabel = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 const endpoint = (id: number) => `/marketing/campaigns/${id}/`;
 
+function EmailPreview({ subject, text }: { subject: string; text: string }) {
+  const [html, setHtml] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const preview = async () => {
+    setBusy(true); setError('');
+    try {
+      const result = await api.request<{ html: string }>('/marketing/campaigns/render-preview/', {
+        method: 'POST', body: JSON.stringify({ subject, custom_text: text }),
+      });
+      setHtml(result.html);
+    } catch (failure) { setError(failureMessage(failure)); }
+    finally { setBusy(false); }
+  };
+  return <div className={adminStyles.stack}>
+    <div><Action loading={busy} disabled={!subject.trim() || !text.trim()} onClick={() => void preview()}>{html ? 'Refresh email preview' : 'Preview email design'}</Action></div>
+    {error && <StatusNote tone="error">{error}</StatusNote>}
+    {html && <iframe className={adminStyles.emailFrame} title="Email design preview" sandbox="" srcDoc={html} />}
+  </div>;
+}
+
 function DeliveryReport({ campaign, onClose }: { campaign: Campaign; onClose: () => void }) {
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -155,10 +176,11 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
       <Field
         label="Message"
         required
-        hint="Plain text, so write full links. An unsubscribe link is added automatically, and the server controls the sending address."
+        hint="Separate paragraphs with a blank line. Use # for headings and - for lists. Links and unsubscribe details are formatted automatically."
       >
         <textarea className={controlClass} required rows={9} value={form.custom_text} onChange={(event) => setForm({ ...form, custom_text: event.target.value })} />
       </Field>
+      <EmailPreview subject={form.subject} text={form.custom_text} />
       <Field
         label="Audience"
         hint="Opted-out, suppressed and disabled accounts are always excluded. Only registered accounts are supported; newsletter leads are not included."
@@ -246,6 +268,7 @@ function DeliveryReview({ campaign, onClose, onQueued }: { campaign: Campaign; o
         <p className={adminStyles.rowTitle}>{campaign.subject}</p>
         <p className={adminStyles.factLabel}>Message</p>
         <div className={adminStyles.preview}>{campaign.custom_text}</div>
+        <EmailPreview subject={campaign.subject} text={campaign.custom_text} />
       </div>
       <div className={adminStyles.readout} role="status" aria-live="polite">
         <div>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import type { WebsiteEvent } from '@/lib/website-api';
+import { useAuth } from '@/lib/auth-context';
 
 const clockTime = (iso: string | null | undefined) => {
   if (!iso) return '';
@@ -17,6 +18,7 @@ const clockTime = (iso: string | null | undefined) => {
  * this panel only has to say whether the room is open and hand them to it.
  */
 export default function JoinBand({ event }: { event: WebsiteEvent }) {
+  const { user } = useAuth();
   if (!event.is_online || event.is_past) return null;
 
   const ready = event.join_ready ?? false;
@@ -44,7 +46,7 @@ export default function JoinBand({ event }: { event: WebsiteEvent }) {
           <h2 className="font-bold text-navy-950">Joining this event</h2>
           <p className="mt-1 text-sm text-navy-800">{sentence}</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            {joinable && ready && (
+            {(joinable || user?.role === 'admin' || user?.role === 'instructor') && ready && (
               <Link
                 href={seatHref}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gold-brand px-5 font-bold text-navy-950 hover:bg-gold-hover"
@@ -58,6 +60,7 @@ export default function JoinBand({ event }: { event: WebsiteEvent }) {
             >
               I cannot find my link
             </Link>
+            {event.live_platform === 'livekit' && <Link href={`${seatHref}&replays=1`}>Watch recordings</Link>}
           </div>
         </div>
       </div>

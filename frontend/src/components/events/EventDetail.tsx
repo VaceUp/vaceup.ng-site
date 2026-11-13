@@ -139,6 +139,7 @@ export default function EventDetail({ slug }: { slug: string }) {
                   )}
 
                   {shown.is_online && !shown.is_past && <JoinBand event={shown} />}
+                  {shown.is_online && shown.live_platform === 'livekit' && shown.is_past && <Link href={`/live/?event=${encodeURIComponent(shown.slug)}&replays=1`}>Watch event recordings</Link>}
 
                   {shown.is_past && (
                     <p className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">

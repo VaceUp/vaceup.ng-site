@@ -167,6 +167,15 @@
   --workspace-success: var(--color-teal-brand);
   --workspace-success-bg: color-mix(in oklab, var(--color-teal-brand) 12%, var(--color-white));
   --workspace-success-text: color-mix(in oklab, var(--color-teal-brand) 72%, var(--color-navy-950));
+  --recording-surface: var(--workspace-surface);
+  --recording-text: var(--workspace-text);
+  --recording-muted: var(--workspace-muted);
+  --recording-line: var(--workspace-line);
+  --recording-control: var(--workspace-control);
+  --recording-hover: var(--workspace-subtle);
+  --recording-active: var(--workspace-line);
+  --recording-focus: var(--workspace-focus);
+  --recording-accent: var(--workspace-focus);
 
   /* Code surface tokens. The practice editor renders its syntax palette from these.
      These alias primitives, not other semantic tokens: a custom property that
@@ -188,6 +197,30 @@
   --code-punctuation: var(--color-gray-700);
   --code-selection: var(--color-navy-100);
   --code-selection-text: var(--color-navy-950);
+}
+
+[data-workspace-theme] {
+  --recording-surface: var(--workspace-surface);
+  --recording-text: var(--workspace-text);
+  --recording-muted: var(--workspace-muted);
+  --recording-line: var(--workspace-line);
+  --recording-control: var(--workspace-control);
+  --recording-hover: var(--workspace-subtle);
+  --recording-active: var(--workspace-line);
+  --recording-focus: var(--workspace-focus);
+  --recording-accent: var(--workspace-focus);
+}
+
+[data-live-recordings] {
+  --recording-surface: var(--color-navy-950);
+  --recording-text: var(--color-navy-50);
+  --recording-muted: var(--color-navy-200);
+  --recording-line: var(--color-navy-800);
+  --recording-control: var(--color-navy-300);
+  --recording-hover: var(--color-navy-900);
+  --recording-active: var(--color-navy-800);
+  --recording-focus: var(--color-gold-brand);
+  --recording-accent: var(--color-gold-brand);
 }
 
 [data-workspace-theme="dark"] {

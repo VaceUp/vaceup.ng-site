@@ -7,6 +7,9 @@ import {
   ConnectionQuality, Room, RoomEvent, Track, type Participant, type RemoteParticipant,
 } from 'livekit-client';
 import { Button } from '@/components/ui/Button';
+import RoomRecordings from '@/components/live/RoomRecordings';
+import ReplayList from '@/components/live/ReplayList';
+import type { RecordingScope } from '@/lib/room-recordings';
 import { RoomSidePanel, type PanelPerson, type PanelTab } from '@/components/live/RoomSidePanel';
 import {
   CHAT_LIMIT, decodeRoomMessage, readRoomMetadata, ROOM_TOPIC, roomId, sendRoomMessage,
@@ -39,6 +42,7 @@ type Tile = {
  * screenshot open a room the viewer was never invited to.
  */
 export type RoomChrome = {
+  recordingScope?: RecordingScope;
   /** A human name for the call — the event title, the class title, the meeting title. */
   title: string;
   /** Shown after the person steps out, where they decide whether to go back. */
@@ -239,10 +243,11 @@ export default function LiveRoom({
 
   if (left) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-navy-950 px-6 py-12">
+      <div data-live-recordings className="flex min-h-screen items-center justify-center bg-navy-950 px-6 py-12">
         <div className="w-full max-w-md rounded-3xl bg-navy-900 p-8 text-center">
           <h1 className="text-xl font-bold text-white">You left the room</h1>
           <p className="mt-3 text-sm text-navy-200">{chrome.leftNote}</p>
+          {chrome.recordingScope && <ReplayList scope={chrome.recordingScope} />}
           <div className="mt-6 flex flex-col gap-3">
             <Button
               onClick={() => { setLeft(false); setSession((value) => value + 1); }}
@@ -420,6 +425,7 @@ function RoomSession({
   refreshAccess?: () => Promise<RoomAccess>;
 }) {
   const roomRef = useRef<Room | null>(null);
+  const leaveGuard = useRef<(() => boolean) | null>(null);
   // A retry may be dialling a credential the server only just minted, so the
   // live one is held here rather than read from the props again.
   const accessRef = useRef(access);
@@ -1032,6 +1038,7 @@ function RoomSession({
   };
 
   const leave = () => {
+    if (leaveGuard.current && !leaveGuard.current()) return;
     void roomRef.current?.disconnect();
     onLeave();
   };
@@ -1058,6 +1065,9 @@ function RoomSession({
           </p>
         </div>
       </header>
+
+      <RoomRecordings roomRef={roomRef} connected={phase === 'live'} isHost={access.is_host}
+        title={chrome.title} scope={chrome.recordingScope} leaveGuard={leaveGuard} />
 
       {soundNeeded && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-navy-800 px-4 py-2.5 sm:px-5">

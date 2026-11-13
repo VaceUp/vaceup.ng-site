@@ -116,6 +116,7 @@ function ClassroomRoute() {
 
   if (access) {
     const chrome: RoomChrome = {
+      recordingScope: { kind: 'class', id: String(id) },
       title: session.data?.title ?? 'Live class',
       leftNote: 'Your place is still held while this class is open. Come back any time before it ends.',
       waitingNote: 'Nobody else has walked in yet. Everyone enrolled opens this class from their own dashboard.',

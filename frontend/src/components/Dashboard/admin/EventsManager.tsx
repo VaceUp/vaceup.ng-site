@@ -9,7 +9,7 @@ import { formatWorkspaceDate, type WorkspacePage } from '@/lib/workspace-api';
 import { ConfirmDelete } from './AuthoringUI';
 import {
   Action, AdminList, AdminRow, AdminSection, CheckRow, Drawer, EmptyState, Field, FileField,
-  FormGrid, Pager, Pill, Skeleton, StatusNote, TextInput, Toolbar, controlClass, useToast,
+  FormGrid, Pager, Pill, Skeleton, StatusNote, TextInput, Toolbar, adminStyles, controlClass, useToast,
 } from './AdminUI';
 
 interface EventRow {
@@ -19,6 +19,7 @@ interface EventRow {
   live_platform: 'external' | 'livekit' | 'jitsi'; room_name: string; join_ready?: boolean;
   capacity: number | null; image_url: string; image: string; is_featured: boolean;
   is_published: boolean; seats_taken: number; registrations_count?: number;
+  hosts?: number[];
 }
 
 interface Registration {
@@ -57,6 +58,7 @@ const emptyDraft = () => ({
   starts_at: '', ends_at: '', location: '', is_online: false,
   live_platform: 'external' as 'external' | 'livekit' | 'jitsi', meeting_url: '', room_name: '',
   registration_url: '', capacity: '', image_url: '', is_featured: false, is_published: false,
+  hosts: [] as number[],
 });
 
 type Draft = ReturnType<typeof emptyDraft>;
@@ -104,6 +106,7 @@ export default function EventsManager() {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editing, setEditing] = useState<EventRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const colleagues = useWorkspaceResource<{ id: number; full_name: string; role: string }[]>(formOpen ? '/meetings/colleagues/' : null);
   const [cover, setCover] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
@@ -133,6 +136,7 @@ export default function EventsManager() {
       live_platform: row.live_platform || 'external', room_name: row.room_name || '',
       capacity: row.capacity === null ? '' : String(row.capacity), image_url: '',
       is_featured: row.is_featured, is_published: row.is_published,
+      hosts: row.hosts ?? [],
     });
     setFormError(''); setFieldErrors({}); setFormOpen(true);
   };
@@ -157,6 +161,8 @@ export default function EventsManager() {
     };
     if (draft.image_url) fields.image_url = draft.image_url.trim();
     Object.entries(fields).forEach(([key, value]) => body.append(key, String(value)));
+    if (draft.hosts.length) draft.hosts.forEach(id => body.append('hosts', String(id)));
+    else body.append('hosts', '');
     const builtInRoom = draft.is_online && isBuiltInRoom(draft.live_platform);
     body.append('live_platform', draft.is_online ? draft.live_platform : 'external');
     // A blank room name is not a mistake here: the server names the room after
@@ -509,6 +515,15 @@ export default function EventsManager() {
                   <option value="livekit">VaceUp Live Room — LiveKit (needs our keys)</option>
                 </select>
               </Field>
+              {draft.live_platform === 'livekit' && <fieldset className={adminStyles.group}>
+                <legend className={adminStyles.groupLabel}>Hosts and recording access</legend>
+                <p className={adminStyles.hint}>Choose the tutors running this event. Administrators always have host access.</p>
+                {colleagues.loading && <p role="status">Loading tutors...</p>}
+                {colleagues.error && <p role="alert">Tutors could not be loaded. Close and reopen the form to retry.</p>}
+                <div className={adminStyles.checkList}>{colleagues.data?.map(person => <CheckRow key={person.id} label={person.full_name} hint={person.role === 'instructor' ? 'Tutor' : 'Administrator'} checked={draft.hosts.includes(person.id)}
+                  onChange={event => set('hosts', event.target.checked ? [...draft.hosts, person.id] : draft.hosts.filter(id => id !== person.id))} />)}
+                </div>
+              </fieldset>}
               {draft.live_platform === 'external' && (
                 <Field label="Joining link" optional hint="Everyone who registered is sent the same link.">
                   <TextInput type="url" value={draft.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} placeholder="https://meet.google.com/…" />

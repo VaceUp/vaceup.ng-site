@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { getEvent, joinEvent, resendJoinLink, type EventAccess } from '@/lib/website-api';
 import { webUrl } from '@/lib/workspace-api';
+import type { RoomChrome } from '@/components/live/LiveRoom';
+import ReplayList from '@/components/live/ReplayList';
 
 // The room pulls in the WebRTC client, which only exists in a browser.
 const LiveRoom = dynamic(() => import('@/components/live/LiveRoom'), {
@@ -35,8 +37,9 @@ function LiveRoute() {
   const params = useSearchParams();
   const slug = params.get('event')?.trim() || '';
   const token = params.get('token')?.trim() || '';
+  const replayMode = params.get('replays') === '1';
   const { user, isLoading } = useAuth();
-  const isStaff = user?.role === 'admin';
+  const isStaff = user?.role === 'admin' || user?.role === 'instructor';
   const [access, setAccess] = useState<EventAccess | null>(null);
   const [eventName, setEventName] = useState('');
   const [message, setMessage] = useState('');
@@ -52,6 +55,11 @@ function LiveRoute() {
     // needs no seat link; everyone else proves the seat with their token.
     if (isLoading) {
       setState('checking');
+      return;
+    }
+    if (replayMode) {
+      setAccess(null);
+      setState('waiting');
       return;
     }
     if (!token && !isStaff) {
@@ -77,7 +85,7 @@ function LiveRoute() {
           : 'The room could not be opened right now. Try again in a moment.');
       });
     return () => { cancelled = true; };
-  }, [slug, token, isLoading, isStaff]);
+  }, [slug, token, isLoading, isStaff, replayMode]);
 
   const externalUrl = access?.provider === 'external' ? webUrl(access.url) : null;
 
@@ -98,7 +106,8 @@ function LiveRoute() {
     return () => { cancelled = true; };
   }, [slug]);
 
-  const chrome = {
+  const chrome: RoomChrome = {
+    recordingScope: { kind: 'event', id: slug, token },
     title: eventName || 'VaceUp Live Room',
     leftNote: 'Your seat is still held. Come back any time until the event ends.',
     waitingNote: 'You are the only one here so far. The room stays open and everyone you invited can walk in with their own link.',
@@ -134,8 +143,10 @@ function LiveRoute() {
     <main className="mx-auto max-w-xl px-6 py-16">
       <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-navy-950">
-          {access?.provider === 'external' ? 'Taking you to the meeting' : 'Your seat'}
+          {replayMode ? `${eventName || 'Event'} recordings` : access?.provider === 'external' ? 'Taking you to the meeting' : 'Your seat'}
         </h1>
+        {slug && (token || user) && <ReplayList scope={{ kind: 'event', id: slug, token }} />}
+        {replayMode && !token && !user && <p>Use your personal joining link from your confirmation email, then choose Watch recordings.</p>}
 
         {access?.provider === 'external' ? (
           <>
@@ -164,7 +175,7 @@ function LiveRoute() {
           <p role="status" className="mt-3 text-gray-700">Checking your seat…</p>
         ) : (
           <>
-            <p role="alert" className="mt-3 text-gray-700">{message}</p>
+            {message && <p role="alert" className="mt-3 text-gray-700">{message}</p>}
             {slug && <SeatLink slug={slug} />}
             <div className="mt-6">
               <Link

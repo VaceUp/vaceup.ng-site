@@ -55,7 +55,7 @@ export type RoomMessage =
   | { type: 'notes:batch'; from: string; text: string; at: number };
 
 /** What a raised hand is stored as, so someone joining late still sees it. */
-export type RoomMetadata = { hand?: boolean; handAt?: number };
+export type RoomMetadata = { hand?: boolean; handAt?: number; recording?: boolean };
 
 export const CHAT_LIMIT = 500;
 export const NOTES_LIMIT = 5_000;
@@ -107,10 +107,11 @@ export function decodeRoomMessage(payload: Uint8Array): RoomMessage | null {
 export function readRoomMetadata(metadata?: string): RoomMetadata {
   if (!metadata) return {};
   try {
-    const parsed = JSON.parse(metadata) as { hand?: unknown; handAt?: unknown };
+    const parsed = JSON.parse(metadata) as { hand?: unknown; handAt?: unknown; recording?: unknown };
     return {
       hand: parsed.hand === true,
       handAt: typeof parsed.handAt === 'number' ? parsed.handAt : undefined,
+      recording: parsed.recording === true,
     };
   } catch {
     return {};

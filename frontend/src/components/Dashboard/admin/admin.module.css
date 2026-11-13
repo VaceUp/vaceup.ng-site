@@ -728,6 +728,8 @@ textarea.control { min-block-size: calc(var(--spacing) * 24); line-height: var(-
   white-space: pre-line;
 }
 
+.emailFrame { inline-size: 100%; min-block-size: calc(var(--spacing) * 130); border: thin solid var(--workspace-line); border-radius: var(--radius-xl); background: var(--workspace-surface); }
+
 .readout {
   display: flex;
   flex-wrap: wrap;

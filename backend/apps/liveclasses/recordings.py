@@ -76,8 +76,8 @@ class RoomRecordingViewSet(viewsets.GenericViewSet):
         key = f"private/room-recordings/{recording_id}.{CONTENT_TYPES[values['content_type']]}"
         try:
             url = storage.presigned_upload_url(key, values["content_type"])
-        except (BotoCoreError, ClientError):
-            raise storage.StorageNotConfigured("Recording storage could not be reached. Keep the device copy and try publishing again.")
+        except (BotoCoreError, ClientError, ValueError):
+            raise storage.StorageNotConfigured("Recording storage could not prepare the upload. Download the device copy and ask an administrator to check storage settings.") from None
         recording = RoomRecording.objects.create(
             id=recording_id, **scope, created_by=request.user, key=key,
             title=values["title"], content_type=values["content_type"], size_bytes=values["size_bytes"],
@@ -99,8 +99,12 @@ class RoomRecordingViewSet(viewsets.GenericViewSet):
             return Response({"id": str(recording.pk), "status": "ready"})
         try:
             info = storage._client().head_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=recording.key)
-        except (BotoCoreError, ClientError):
-            return Response({"detail": "The upload could not be verified. Keep your device copy and retry publishing."}, status=409)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                return Response({"detail": "The recording has not reached storage. Keep your device copy and retry publishing."}, status=409)
+            raise storage.StorageNotConfigured("Recording storage could not verify the upload. Download the device copy and ask an administrator to check storage permissions.") from None
+        except (BotoCoreError, ValueError):
+            raise storage.StorageNotConfigured("Recording storage is temporarily unavailable. Keep your device copy and retry publishing.") from None
         if info.get("ContentLength") != recording.size_bytes or info.get("ContentType") != recording.content_type:
             return Response({"detail": "The recording upload is incomplete or has the wrong file type. Retry the upload."}, status=409)
         with transaction.atomic():
@@ -119,8 +123,12 @@ class RoomRecordingViewSet(viewsets.GenericViewSet):
         data.is_valid(raise_exception=True)
         scope = room_scope(data.validated_data, request.user)
         rows = RoomRecording.objects.filter(**scope, status="ready")
-        return Response({"recordings": [{
-            "id": str(row.pk), "title": row.title,
-            "created_at": row.created_at, "size_bytes": row.size_bytes,
-            "url": storage.presigned_download_url(row.key),
-        } for row in rows], "expires_in": 3600})
+        try:
+            recordings = [{
+                "id": str(row.pk), "title": row.title,
+                "created_at": row.created_at, "size_bytes": row.size_bytes,
+                "url": storage.presigned_download_url(row.key),
+            } for row in rows]
+        except (BotoCoreError, ClientError, ValueError):
+            raise storage.StorageNotConfigured("Recordings are temporarily unavailable. Please try again later.") from None
+        return Response({"recordings": recordings, "expires_in": 3600})

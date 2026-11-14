@@ -1,10 +1,10 @@
 """Configuration warnings surfaced by ``manage.py check``.
 
-These settings have each silently broken a whole production workflow: a
-bucket name without credentials (or an endpoint that is really a leftover
-comment) sends every image upload to object storage and fails, and a frontend
-base pointing at the API host makes every emailed link 404. All of them fall
-back safely, so the fix is a warning the operator can read and act on.
+These settings have each broken a whole production workflow: a bucket name
+without credentials, an endpoint that is really a leftover comment, or a
+frontend base pointing at the API host. Invalid endpoints disable private
+storage while public images can use their fallback. Warnings identify the
+configuration names to fix without printing their values.
 """
 from __future__ import annotations
 
@@ -30,14 +30,16 @@ def media_storage_check(app_configs, **kwargs):
     issues = []
     if _setting("AWS_S3_ENDPOINT_REJECTED", False):
         issues.append(Warning(
-            "AWS_S3_ENDPOINT_URL is set to something that is not a URL, so it was "
-            "ignored and requests go to AWS S3 rather than an R2/B2 endpoint.",
-            hint="Set it to https://<accountid>.r2.cloudflarestorage.com, or leave "
-                 "the line out entirely: an inline comment is read as the value.",
+            "AWS_S3_ENDPOINT_URL is invalid, so private object storage is disabled; "
+            "it will not fall back to AWS S3.",
+            hint="Set the HTTPS S3 API origin without a bucket path, credentials, "
+                 "placeholder or trailing comment. Leave it blank only for AWS S3, "
+                 "then restart the Python application.",
             id="core.W005",
         ))
     if (_setting("AWS_STORAGE_BUCKET_NAME") or _setting("AWS_ACCESS_KEY_ID")
-            or _setting("AWS_SECRET_ACCESS_KEY")) and not _setting("OBJECT_STORAGE_CONFIGURED", False):
+            or _setting("AWS_SECRET_ACCESS_KEY")) and not all(
+                _setting(name) for name in ("AWS_STORAGE_BUCKET_NAME", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")):
         issues.append(Warning(
             "Object storage is only partly configured, so media is kept on local "
             "disk and uploaded videos cannot be stored.",

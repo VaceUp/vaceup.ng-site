@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
+from apps.core.storage_config import endpoint_url as _endpoint_url, is_r2_endpoint
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -302,17 +303,15 @@ AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-1")
 AWS_S3_SIGNATURE_VERSION = "s3v4"  # required for pre-signed URLs
 # Set for S3-compatible providers (Cloudflare R2, Backblaze B2, Wasabi). Leave
 # blank for AWS S3. R2 reuses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
-def _endpoint_url(raw):
-    """A leftover .env.example comment is not an endpoint, so it counts as unset."""
-    value = str(raw).strip()
-    return value if value.lower().startswith(("http://", "https://")) else ""
-
-
 _AWS_S3_ENDPOINT_RAW = env("AWS_S3_ENDPOINT_URL", default="")
 AWS_S3_ENDPOINT_URL = _endpoint_url(_AWS_S3_ENDPOINT_RAW) or None
 # Reported by apps.core.checks: a value that was set but unusable must not be
 # dropped in silence, or the operator keeps a bucket they are never using.
 AWS_S3_ENDPOINT_REJECTED = bool(_AWS_S3_ENDPOINT_RAW.strip()) and AWS_S3_ENDPOINT_URL is None
+if is_r2_endpoint(AWS_S3_ENDPOINT_URL):
+    # R2 uses its account endpoint, an auto signing region and a path bucket.
+    AWS_S3_REGION_NAME = "auto"
+    AWS_S3_ADDRESSING_STYLE = "path"
 # Delivery hostname for PUBLIC objects only (R2: media.vaceup.ng). Private
 # media ignores it — see config/storages.PrivateMediaStorage.
 AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="").strip() or None
@@ -323,6 +322,7 @@ AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="").strip() or None
 # when the bucket AND both keys are present; anything else is local disk.
 OBJECT_STORAGE_CONFIGURED = bool(
     AWS_STORAGE_BUCKET_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+    and not AWS_S3_ENDPOINT_REJECTED
 )
 
 # --- Public images: Cloudinary (optional, highest priority) ------------------

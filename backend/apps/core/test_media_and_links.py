@@ -279,7 +279,7 @@ class StorageReportTests(TestCase):
         with override_settings(**{
             "AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "",
             "AWS_STORAGE_BUCKET_NAME": "", "OBJECT_STORAGE_CONFIGURED": False,
-            "AWS_S3_ENDPOINT_URL": None, "CLOUDINARY_CONFIGURED": True,
+            "AWS_S3_ENDPOINT_URL": None, "AWS_S3_ENDPOINT_REJECTED": False, "CLOUDINARY_CONFIGURED": True,
             **overrides,
         }):
             call_command("storage_report", stdout=out)
@@ -319,7 +319,7 @@ class StorageProbeTests(TestCase):
         from django.core.management import call_command
 
         out = StringIO()
-        with override_settings(OBJECT_STORAGE_CONFIGURED=False):
+        with override_settings(OBJECT_STORAGE_CONFIGURED=False, AWS_S3_ENDPOINT_URL=None, AWS_S3_ENDPOINT_REJECTED=False):
             call_command("storage_probe", stdout=out)
         output = out.getvalue()
         self.assertIn("FAIL", output)

@@ -12,12 +12,14 @@ password.
 from __future__ import annotations
 
 import uuid
+import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from apps.core.storage import StorageNotConfigured, connection_options
 
 PROBE_PREFIX = "_probe"
 
@@ -27,6 +29,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.MIGRATE_HEADING("Private bucket probe"))
+        try:
+            options = connection_options()
+        except StorageNotConfigured as error:
+            self.stdout.write(self.style.ERROR(f"FAIL  {error.detail}"))
+            return
         if not getattr(settings, "OBJECT_STORAGE_CONFIGURED", False):
             self.stdout.write(self.style.ERROR(
                 "FAIL  Object storage is not configured. Set AWS_ACCESS_KEY_ID, "
@@ -34,16 +41,19 @@ class Command(BaseCommand):
                 "environment, then restart the application."
             ))
             return
-        endpoint = settings.AWS_S3_ENDPOINT_URL or "https://s3.amazonaws.com (AWS default)"
-        self.stdout.write(f"  bucket    {settings.AWS_STORAGE_BUCKET_NAME}")
-        self.stdout.write(f"  endpoint  {endpoint}")
-        self.stdout.write(f"  region    {settings.AWS_S3_REGION_NAME}")
+        self.stdout.write("  provider  " + ("Cloudflare R2" if options["addressing_style"] == "path" else "AWS S3" if not options["endpoint_url"] else "S3-compatible service"))
+        self.stdout.write(f"  region    {options['region_name']}")
+        self.stdout.write(f"  addressing {options['addressing_style']}")
 
         from apps.core.storage import _client
 
         key = f"{PROBE_PREFIX}/{uuid.uuid4().hex}.txt"
         body = b"vaceup storage probe"
-        client = _client()
+        try:
+            client = _client()
+        except Exception as error:
+            self.stdout.write(self.style.ERROR(f"FAIL  Cannot initialize storage: {self._clean(error)}"))
+            return
         probed = False
         passed = True
         try:
@@ -66,7 +76,8 @@ class Command(BaseCommand):
         if passed:
             self.stdout.write(self.style.SUCCESS(
                 "\nPASS  The bucket accepts writes, reads and signed downloads. "
-                "If the browser still fails, the cause is the bucket's CORS rule."
+                "If the browser still fails, check its network error, bucket CORS, "
+                "website CSP and connection; this probe does not test browser permissions."
             ))
             self._cors_hint()
         else:
@@ -98,7 +109,7 @@ class Command(BaseCommand):
         parts = urlsplit(url)
         # Host and path only: the query string carries the signature.
         self.stdout.write(f"[{parts.scheme}://{parts.netloc}{parts.path}] ", ending="")
-        if not parts.path.startswith(f"/{settings.AWS_STORAGE_BUCKET_NAME}/"):
+        if connection_options()["addressing_style"] == "path" and not parts.path.startswith(f"/{settings.AWS_STORAGE_BUCKET_NAME}/"):
             self.stdout.write(self.style.WARNING(
                 "(the bucket is not the first path segment; "
                 "R2 needs path-style addressing) "
@@ -134,6 +145,25 @@ class Command(BaseCommand):
 
     @staticmethod
     def _clean(exc: Exception) -> str:
-        # Boto messages are safe; a signed URL in an error would not be.
+        # A presigned URL is a temporary credential. Drop its entire query and
+        # any URL userinfo, including when embedded in a library error message.
         text = str(exc).split("\n")[0]
-        return text.replace("&X-Amz-Signature=", "&signature=")[:400]
+        def redact_url(match):
+            try:
+                parsed = urlsplit(match.group(0))
+                host = parsed.hostname or "[invalid-host]"
+                if ":" in host:
+                    host = f"[{host}]"
+                if parsed.port:
+                    host += f":{parsed.port}"
+                return f"{parsed.scheme}://{host}{parsed.path}" + ("?[redacted]" if parsed.query else "")
+            except ValueError:
+                return "[redacted URL]"
+        text = re.sub(r'https?://[^\s<>"\']+', redact_url, text, flags=re.IGNORECASE)
+        # Also cover credential parameters printed without their enclosing URL.
+        text = re.sub(r"(?i)X-Amz-[A-Za-z-]+=[^\s&\"'<>]+", "[redacted]", text)
+        for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+            value = str(getattr(settings, name, "") or "")
+            if value:
+                text = text.replace(value, "[redacted]")
+        return text[:400]

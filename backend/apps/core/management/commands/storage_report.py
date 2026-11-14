@@ -7,6 +7,7 @@ in the file.
 """
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from apps.core.storage import StorageNotConfigured, connection_options
 
 AWS_SETTINGS = (
     ("AWS_ACCESS_KEY_ID", "access key id"),
@@ -27,25 +28,32 @@ class Command(BaseCommand):
             self.stdout.write(f"{setting:<28}{'set' if present else 'EMPTY'}  ({label})")
 
         endpoint = settings.AWS_S3_ENDPOINT_URL or ""
-        endpoint_state = "not set"
-        if endpoint:
-            endpoint_state = (
-                "set (Cloudflare R2)" if endpoint.endswith("r2.cloudflarestorage.com")
-                else "set (not an R2 host)"
-            )
+        options, configuration_error = None, None
+        try:
+            options = connection_options()
+        except StorageNotConfigured as error:
+            configuration_error = error.detail
+        endpoint_state = "REJECTED (private storage disabled)" if configuration_error else "blank (AWS S3)"
+        if endpoint and options:
+            endpoint_state = "set (Cloudflare R2)" if options["addressing_style"] == "path" else "set (S3-compatible service)"
         self.stdout.write(f"{'AWS_S3_ENDPOINT_URL':<28}{endpoint_state}")
-        self.stdout.write(f"{'AWS_S3_REGION_NAME':<28}{settings.AWS_S3_REGION_NAME}")
+        self.stdout.write(f"{'AWS_S3_REGION_NAME':<28}{options['region_name'] if options else 'unavailable until endpoint is corrected'}")
+        if options:
+            self.stdout.write(f"{'S3 addressing style':<28}{options['addressing_style']}")
 
-        private = "bucket" if settings.OBJECT_STORAGE_CONFIGURED else "local disk"
+        private = "bucket" if settings.OBJECT_STORAGE_CONFIGURED and not configuration_error else "local disk (recording publication unavailable)"
         if settings.CLOUDINARY_CONFIGURED:
             public = "Cloudinary"
-        elif settings.OBJECT_STORAGE_CONFIGURED:
+        elif settings.OBJECT_STORAGE_CONFIGURED and not configuration_error:
             public = "bucket"
         else:
             public = "local disk"
         self.stdout.write("")
         self.stdout.write(f"{'Private media':<28}{private}")
         self.stdout.write(f"{'Public images':<28}{public}")
+        self.stdout.write("This backend uses one active private S3 configuration. A blank endpoint selects AWS S3; an R2 endpoint selects R2.")
+        if configuration_error:
+            self.stdout.write(f"\nACTION: {configuration_error}")
 
         if missing:
             self.stdout.write("")

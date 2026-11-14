@@ -1,7 +1,7 @@
 """Recordings: host-only publication, verified uploads and scoped private replays."""
 from unittest.mock import patch
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import override_settings
@@ -170,3 +170,33 @@ class RoomRecordingTests(APITestCase):
         with patch("apps.core.storage.presigned_upload_url", side_effect=StorageNotConfigured()):
             self.assertEqual(self.upload().status_code, 503)
         self.assertFalse(RoomRecording.objects.exists())
+
+    def test_invalid_signing_configuration_returns_safe_service_error(self):
+        with patch("apps.core.storage.presigned_upload_url", side_effect=ValueError("Invalid endpoint: signed-secret")):
+            response = self.upload()
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("signed-secret", str(response.data))
+        self.assertFalse(RoomRecording.objects.exists())
+
+    def test_storage_permission_and_connection_failures_do_not_publish(self):
+        result = self.upload()
+        for error in (
+            ClientError({"Error": {"Code": "AccessDenied", "Message": "private-credential"}}, "HeadObject"),
+            ClientError({"Error": {"Code": "NoSuchBucket"}}, "HeadObject"),
+            EndpointConnectionError(endpoint_url="https://storage.example/?signature=private-credential"),
+        ):
+            with self.subTest(error=type(error).__name__):
+                self.client_store.head_object.side_effect = error
+                response = self.complete(result)
+                self.assertEqual(response.status_code, 503)
+                self.assertNotIn("private-credential", str(response.data))
+                self.assertEqual(RoomRecording.objects.get(pk=result.data["id"]).status, "uploading")
+
+    def test_replay_signing_failure_is_safe_and_does_not_change_published_recording(self):
+        result = self.upload()
+        self.assertEqual(self.complete(result).status_code, 200)
+        with patch("apps.core.storage.presigned_download_url", side_effect=ValueError("Invalid endpoint: private-credential")):
+            response = self.replays(user=self.student)
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("private-credential", str(response.data))
+        self.assertEqual(RoomRecording.objects.get(pk=result.data["id"]).status, "ready")

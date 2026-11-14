@@ -10,7 +10,7 @@ This source overlay follows the challenge/intake release. It preserves the hoste
 - Recording publication distinguishes a missing upload from storage permission/connection failures. Failed verification never publishes a replay; signing failures return a safe service error.
 - Storage diagnostics explain the active provider and redact signed URL queries and configured credentials from probe errors.
 
-These changes do not establish that the hosted credentials, permissions or bucket CORS are correct. The separate hosted backend-wide HTTP 500 still needs its cPanel Python traceback; local startup succeeds.
+These changes do not establish that the hosted credentials, permissions or bucket CORS are correct. During investigation the hosted backend initially returned HTTP 500, then recovered: `/healthz/` returned 200 and the signed-out account endpoint returned 401. Its earlier failure cause remains unconfirmed; inspect the cPanel Python traceback if it recurs. Local startup also succeeds.
 
 ## Install and check the hosted application
 

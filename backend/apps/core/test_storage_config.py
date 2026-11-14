@@ -60,11 +60,16 @@ class EndpointValidationTests(SimpleTestCase):
         environment = {name: os.environ[name] for name in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP") if name in os.environ}
         environment.update({"DJANGO_SETTINGS_MODULE": "config.settings_test", "SECRET_KEY": "storage-startup-test-key-not-a-real-secret",
             "DEBUG": "False", "ALLOWED_HOSTS": "testserver", "VACEUP_INFRASTRUCTURE": "database", "REDIS_URL": "", "SENTRY_DSN": "",
+            # Production settings read these before settings_test replaces MySQL
+            # with SQLite. Never depend on a developer .env or CI credentials.
+            "DB_NAME": "storage_fixture", "DB_USER": "unused_fixture", "DB_PASSWORD": "unused_fixture", "DB_HOST": "127.0.0.1", "DB_PORT": "3306",
             "CELERY_BROKER_URL": "memory://", "CELERY_RESULT_BACKEND": "cache+memory://",
             "AWS_ACCESS_KEY_ID": "fake-key", "AWS_SECRET_ACCESS_KEY": "fake-secret", "AWS_STORAGE_BUCKET_NAME": "test-bucket",
             "AWS_S3_ENDPOINT_URL": "https://<accountid>.r2.cloudflarestorage.com", "CLOUDINARY_URL": "", "CLOUDINARY_CLOUD_NAME": "",
             "CLOUDINARY_API_KEY": "", "CLOUDINARY_API_SECRET": ""})
-        script = "import django,json;django.setup();from django.conf import settings;from config.storages import public_media_storage;print(json.dumps({'rejected':settings.AWS_S3_ENDPOINT_REJECTED,'configured':settings.OBJECT_STORAGE_CONFIGURED,'public_storage':type(public_media_storage()).__name__}))"
+        # Disable dotenv loading only in the child process. The user's file is
+        # untouched, and this fixture exercises the same clean setup as CI.
+        script = "import environ;environ.Env.read_env=lambda *args,**kwargs:None;import django,json;django.setup();from django.conf import settings;from config.storages import public_media_storage;print(json.dumps({'rejected':settings.AWS_S3_ENDPOINT_REJECTED,'configured':settings.OBJECT_STORAGE_CONFIGURED,'public_storage':type(public_media_storage()).__name__}))"
         result = subprocess.run([sys.executable, "-c", script], cwd=Path(settings.BASE_DIR), env=environment, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, "Isolated Django startup failed; provider configuration and captured stderr are withheld.")
         self.assertEqual(json.loads(result.stdout), {"rejected": True, "configured": False, "public_storage": "LocalPublicStorage"})

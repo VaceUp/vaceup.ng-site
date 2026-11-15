@@ -125,13 +125,15 @@ def round_readiness(round):
     # AI-assisted grading is an operator choice. Only a round that will be
     # machine-graded needs a configured, calibrated provider before opening;
     # manual rounds score through audited administrator corrections instead.
+    # The message names the exact switch so a blocked opening is never a
+    # dead end.
     if getattr(settings, "CHALLENGE_AI_ENABLED", False):
         try:
             require_configuration()
         except AssessmentUnavailable:
-            errors.append("Configure and enable the assessment provider before opening registration.")
+            errors.append("AI-assisted grading is enabled but the assessment provider is not fully configured (GROQ_API_KEY, CHALLENGE_GROQ_MODEL, CHALLENGE_AI_DAILY_TOKEN_LIMIT). Finish the provider settings, or set CHALLENGE_AI_ENABLED=false to grade this round manually.")
         if not getattr(settings, "CHALLENGE_ASSESSMENT_CALIBRATED", False):
-            errors.append("Complete the representative assessment and capacity review before opening registration.")
+            errors.append("AI-assisted grading is enabled but the representative assessment and capacity review is not complete. After the review set CHALLENGE_ASSESSMENT_CALIBRATED=true, or set CHALLENGE_AI_ENABLED=false to grade this round manually.")
     if not round.rules.strip() or not round.hashtag.strip() or not round.linkedin_handle.strip() or not round.instagram_handle.strip():
         errors.append("Publish the rules, hashtag and official LinkedIn and Instagram handles first.")
     categories = list(round.categories.filter(enabled=True))

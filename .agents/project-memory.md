@@ -21,5 +21,6 @@ Durable log of product decisions and mid-code changes. Newest first. Every agent
 
 **Open**
 - The "Edit Data Analysis" HTTP 400 was never root-caused (the old UI hid the server body). Retry the category save after the error-surfacing change and record the real cause here.
-- Deploy pending on the server: delta ZIP `vaceup-backend-2026-11-15-challenge-setup.zip` (extract over the 2026-11-14 challenges backend, restart; no migration) plus the frontend pipeline. Rendered pixels of the rebuilt challenge page not yet visually inspected.
+- 2026-11-15/16: user still hit the calibration readiness error on Open registration — cause: server env has `CHALLENGE_AI_ENABLED=true` with a working Groq key while `CHALLENGE_ASSESSMENT_CALIBRATED=false` (or the delta zip was not yet extracted; the message text distinguishes the two). Unblocked by setting `CHALLENGE_AI_ENABLED=false` + restart, and the two readiness messages now name their exact resolution flag.
+- Deploy pending on the server: rebuilt delta ZIP `vaceup-backend-2026-11-15-challenge-setup.zip` (extract over the 2026-11-14 challenges backend, restart; no migration) plus the frontend pipeline. Rendered pixels of the rebuilt challenge page not yet visually inspected.
 - User wants to "discuss some more beautiful stuff" after this round lands — next design session.

@@ -6,6 +6,14 @@ nothing else in the application root is touched. This release builds on the
 server that already carries it). **No migration and no new environment
 variable.** Restart the Python application after extracting.
 
+**This build supersedes the earlier 2026-11-15 zip of the same name.** The
+only difference is the wording of the two AI-grading readiness messages,
+which now name the exact switch to flip. If a blocked opening still shows
+the old short text ("Complete the representative assessment and capacity
+review before opening registration."), this zip has not been extracted yet
+— or the server environment still has `CHALLENGE_AI_ENABLED=true`, which is
+what makes the gate fire at all.
+
 ## What this release does
 
 **1. Draft-stage challenge setup is no longer compulsory.** An administrator
@@ -23,7 +31,11 @@ required the Groq provider and the calibration attestation apply only when
 a round opens for registration without any provider configuration and is
 graded manually through the audited administrator corrections flow
 (Review / correct in the scorebook: quality points, engagement points and
-disqualifications, each with a reason).
+disqualifications, each with a reason). When the gate does fire, each message
+now names its resolution: finish the provider settings or set
+`CHALLENGE_AI_ENABLED=false` to grade manually; complete the representative
+assessment review and set `CHALLENGE_ASSESSMENT_CALIBRATED=true`, or switch
+to manual grading.
 
 **3. A manually graded round can freeze.** `freeze_round` retires
 `awaiting_configuration` assessment and engagement-extraction jobs as

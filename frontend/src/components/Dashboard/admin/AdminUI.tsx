@@ -255,11 +255,14 @@ export function StatusNote({ tone = 'info', children }: { tone?: 'info' | 'ok' |
 
 /* ---------------------------------------------------------------- drawer */
 
-export function Drawer({ open, title, description, onClose, footer, children }: {
+export function Drawer({ open, title, description, onClose, footer, children, variant = 'sheet' }: {
   open: boolean; title: string; description?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode;
+  /** 'sheet' docks to the side edge; 'modal' floats centered over the page. */
+  variant?: 'sheet' | 'modal';
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const headingId = useId();
+  const wrapper = variant === 'modal' ? styles.modal : styles.drawer;
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return undefined;
@@ -277,8 +280,8 @@ export function Drawer({ open, title, description, onClose, footer, children }: 
   }, [open]);
   if (!open) return null;
   return (
-    <NativeDialog ref={ref} className={styles.drawer} aria-labelledby={headingId} onCancel={(event) => { event.preventDefault(); onClose(); }}>
-      <div className={styles.drawerInner}>
+    <NativeDialog ref={ref} className={wrapper} aria-labelledby={headingId} onCancel={(event) => { event.preventDefault(); onClose(); }}>
+      <div className={variant === 'modal' ? styles.modalInner : styles.drawerInner}>
         <header className={styles.drawerHead}>
           <div>
             <h2 id={headingId} className={styles.drawerTitle}>{title}</h2>

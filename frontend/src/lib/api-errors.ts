@@ -2,6 +2,14 @@
 export function apiErrorMessage(data: unknown, status: number): string {
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const error = data as Record<string, unknown>;
+    // Non-JSON bodies (a proxy or firewall block page, a plain-text error)
+    // arrive as raw text: show a readable snippet so the real cause is visible
+    // instead of a bare "error 400".
+    const raw = typeof error.raw === 'string' ? error.raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    if (raw) {
+      const snippet = raw.length > 220 ? `${raw.slice(0, 220)}...` : raw;
+      return `The server answered HTTP ${status} with: ${snippet}`;
+    }
     const nested = error.error as { detail?: unknown } | undefined;
     const detail = error.detail ?? nested?.detail ?? error.message;
     if (typeof detail === 'string' && detail.trim()) return detail;
@@ -15,7 +23,7 @@ export function apiErrorMessage(data: unknown, status: number): string {
       return entries.filter((entry): entry is string => typeof entry === 'string')
         .map((entry) => label ? `${label}: ${entry}` : entry);
     });
-    if (messages.length) return messages.join(' ');
+    if (messages.length) return messages.join(' · ');
   }
   if (status === 400) return 'Your request could not be accepted. Check the form and try again. If it continues, contact support and mention error 400.';
   if (status === 429) return 'Too many attempts. Please wait a moment before trying again.';

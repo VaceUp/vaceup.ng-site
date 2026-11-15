@@ -149,7 +149,13 @@ export async function challengeRequest<T>(path: string, options: RequestInit = {
     redirect: 'error',
     headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Challenge-Token': token } : {}), ...options.headers },
   });
-  const data: unknown = response.status === 204 ? undefined : await response.json().catch(() => undefined);
+  let data: unknown;
+  if (response.status === 204) data = undefined;
+  else {
+    // Keep non-JSON error bodies so the surfaced message names the real cause.
+    const raw = await response.text().catch(() => '');
+    try { data = raw ? JSON.parse(raw) : undefined; } catch { data = { raw }; }
+  }
   if (!response.ok) throw new Error(apiErrorMessage(data, response.status));
   return data as T;
 }

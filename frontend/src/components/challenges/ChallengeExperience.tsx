@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpen, CalendarDays, Check, Clock3, Mail, RefreshCw, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CalendarDays, Check, Clock3, Mail, RefreshCw, Trophy } from 'lucide-react';
 import {
   challengeApi, challengeDate, challengeFailure, engagementSource,
   type ChallengeCategory, type ChallengeEvidence, type ChallengePortal, type ChallengeRound, type ChallengeResult,
@@ -12,6 +12,8 @@ import { Action, ChallengeDates, ChallengeField, ChallengeNote, ChallengeWeights
 const sessionKey = (slug: string) => `vaceup_challenge_session:${slug}`;
 const isPast = (value: string) => new Date(value).getTime() < Date.now();
 const countLabel = (value: number | null | undefined) => value === null || value === undefined ? 'Unavailable' : value.toLocaleString();
+
+type GuestStep = 'intro' | 'tracks' | 'join';
 
 function readSession(slug: string): string {
   try { return sessionStorage.getItem(sessionKey(slug)) || ''; } catch { return ''; }
@@ -36,6 +38,7 @@ export default function ChallengeExperience() {
   const [makePublic, setMakePublic] = useState(false);
   const [accessOnly, setAccessOnly] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState<GuestStep>('intro');
   const boot = useRef<Promise<{ rounds: ChallengeRound[]; round: ChallengeRound | null; token: string; verificationError?: string }> | null>(null);
 
   const loadPortal = useCallback(async (access: string) => {
@@ -70,14 +73,14 @@ export default function ChallengeExperience() {
     void boot.current.then(async (data) => {
       if (!live) return;
       setRounds(data.rounds); setRound(data.round); setCategory(data.round?.categories.find((item) => item.enabled !== false) ?? null);
-      if (data.verificationError) { setError(data.verificationError); setAccessOnly(true); }
+      if (data.verificationError) { setError(data.verificationError); setAccessOnly(true); setStep('join'); }
       if (data.token) await loadPortal(data.token);
     }).catch((failure) => { if (live) setError(challengeFailure(failure)); }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [loadPortal]);
 
   const chooseRound = async (slug: string) => {
-    setLoading(true); setError(''); setNotice(''); setPortal(null); setToken('');
+    setLoading(true); setError(''); setNotice(''); setPortal(null); setToken(''); setStep('intro');
     try {
       const chosen = await challengeApi.round(slug);
       setRound(chosen); setCategory(chosen.categories.find((item) => item.enabled !== false) ?? null);
@@ -102,8 +105,15 @@ export default function ChallengeExperience() {
 
   const signOut = () => {
     if (round) { try { sessionStorage.removeItem(sessionKey(round.slug)); } catch { /* Session storage may be unavailable. */ } }
-    setToken(''); setPortal(null); setNotice('You have left your challenge portal on this device. Use your personal email link to return.');
+    setToken(''); setPortal(null); setStep('intro');
+    setNotice('You have left your challenge portal on this device. Use your personal email link to return.');
   };
+
+  const stepMeta: Array<{ key: GuestStep; label: string; reachable: boolean }> = [
+    { key: 'intro', label: 'The challenge', reachable: true },
+    { key: 'tracks', label: 'Pick your track', reachable: true },
+    { key: 'join', label: 'Join in', reachable: accessOnly || !!category },
+  ];
 
   return <div className={styles.root}>
     <section className={styles.hero} aria-labelledby="challenge-title"><div className={`${styles.container} ${styles.heroInner}`}>
@@ -122,32 +132,74 @@ export default function ChallengeExperience() {
         {loading ? <div className={`${styles.panel} ${styles.empty}`} role="status"><Clock3 className={styles.largeIcon} aria-hidden="true" /><h2>Loading your challenge</h2><p className={styles.muted}>Getting the latest round details and your saved entry.</p></div>
           : !round ? <div className={`${styles.panel} ${styles.empty}`}><Trophy className={styles.largeIcon} aria-hidden="true" /><h2>The next challenge is on its way</h2><p className={styles.muted}>Published rounds and their project briefs will appear here. Explore our events while you wait.</p><Link href="/events" className={styles.link}>Explore events<ArrowUpRight className={styles.icon} aria-hidden="true" /></Link></div>
           : portal && token ? <ParticipantPortal portal={portal} token={token} onRefresh={() => loadPortal(token)} onLeave={signOut} />
-            : <div className={styles.layout}>
-              <div className={styles.stack}>
-                {round.status === 'published' && <PublishedResults round={round} />}
-                <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="challenge-briefs"><div className={styles.tight}><p className={styles.eyebrow}>Start with your strength</p><h2 id="challenge-briefs">Choose your challenge</h2><p className={styles.muted}>Choose a category, then verify your email to receive its complete project brief and personal portal.</p></div>
-                  <ul className={styles.categoryList}>{round.categories.filter((item) => item.enabled !== false).map((item) => <li key={item.id}><button type="button" className={styles.category} aria-pressed={category?.id === item.id} onClick={() => setCategory(item)}><span className={`${styles.row} ${styles.between}`}><strong>{item.name}</strong>{category?.id === item.id && <Check className={styles.icon} aria-hidden="true" />}</span><span className={styles.muted}>{item.brief?.split('\n')[0] || 'Your full brief is delivered after email verification.'}</span></button></li>)}</ul>
-                  {category && <CategoryBrief category={category} />}
-                </section>
-                <RoundRules round={round} />
-              </div>
-              <aside className={styles.stack}>
-                <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="challenge-register"><div className={styles.tight}><Mail className={styles.largeIcon} aria-hidden="true" /><h2 id="challenge-register">{accessOnly ? 'Return to your entry' : 'Make it your challenge'}</h2><p className={styles.muted}>{accessOnly ? 'Enter the email you registered with. We will email a personal link if an entry exists.' : 'Register with your email. You do not need an academy account or a course enrolment.'}</p></div>
-                  <form className={styles.stack} onSubmit={register}>
-                    {!accessOnly && <><ChallengeField label="Full name"><input className={styles.control} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={150} disabled={busy} /></ChallengeField><ChallengeField label="Phone number"><input className={styles.control} type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required maxLength={40} disabled={busy} /></ChallengeField></>}
-                    <ChallengeField label="Email address"><input className={styles.control} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={busy} maxLength={254} /></ChallengeField>
-                    {!accessOnly && <><div className={styles.note}><BookOpen className={styles.icon} aria-hidden="true" /><span>Selected category: <strong>{category?.name || 'Choose a category first'}</strong></span></div><label className={styles.check}><input type="checkbox" required checked={acceptRules} onChange={(event) => setAcceptRules(event.target.checked)} disabled={busy} /><span>I have read the challenge rules and agree to submit my own work for assessment.</span></label><label className={styles.check}><input type="checkbox" checked={makePublic} onChange={(event) => setMakePublic(event.target.checked)} disabled={busy} /><span>You may show my name and project in the published results. This is optional.</span></label></>}
-                    <Action type="submit" intent="primary" loading={busy} disabled={!accessOnly && (!round.registration_open || !category)}>{accessOnly ? 'Email my personal link' : 'Register for this challenge'}</Action>
-                    {!accessOnly && !round.registration_open && <p className={styles.muted}>Registration is currently closed. Registered participants can still return using their personal link.</p>}
-                  </form>
-                  <Action onClick={() => { setAccessOnly(!accessOnly); setNotice(''); setError(''); }} disabled={busy}>{accessOnly ? 'Register a new entry' : 'Already registered? Get your link'}</Action>
-                  <p className={styles.muted}>Your challenge access stays separate from your VaceUp learning account. Never share your personal email link.</p>
-                </section>
-                <section className={`${styles.panel} ${styles.stack}`}><h2>How judging works</h2><ChallengeWeights mode={round.mode} /></section>
-              </aside>
+            : <div className={styles.stack}>
+              <nav aria-label="Registration steps"><ol className={styles.stepper}>{stepMeta.map((item, index) => <li key={item.key}><button type="button" disabled={!item.reachable || loading} aria-current={step === item.key ? 'step' : undefined} onClick={() => setStep(item.key)}><span className={styles.count} aria-hidden="true">{index + 1}</span>{item.label}</button></li>)}</ol></nav>
+              {step === 'intro' && <GuestIntro round={round} onChoose={() => setStep('tracks')} onAccess={() => { setAccessOnly(true); setStep('join'); }} />}
+              {step === 'tracks' && <GuestTracks round={round} category={category} onPick={setCategory} onBack={() => setStep('intro')} onContinue={() => { setAccessOnly(false); setStep('join'); }} />}
+              {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic}
+                onAccessOnly={(value) => { setAccessOnly(value); if (!value && !category) setStep('tracks'); }}
+                setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic}
+                onBack={() => { setStep(accessOnly ? 'intro' : 'tracks'); }} onSubmit={register} />}
             </div>}
       </div>
     </div>
+  </div>;
+}
+
+function GuestIntro({ round, onChoose, onAccess }: { round: ChallengeRound; onChoose: () => void; onAccess: () => void }) {
+  return <div className={styles.stepFlow}>
+    {round.status === 'published' && <PublishedResults round={round} />}
+    <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="how-it-works"><div className={styles.tight}><p className={styles.eyebrow}>Three steps</p><h2 id="how-it-works">How the challenge works</h2></div>
+      <ul className={styles.cards}>
+        <li className={styles.card}><span className={styles.number} aria-hidden="true">1</span><div className={styles.tight}><h3>Pick your track</h3><p className={styles.muted}>Choose one of five categories. Registering sends that category&apos;s full project brief straight to your inbox.</p></div></li>
+        <li className={styles.card}><span className={styles.number} aria-hidden="true">2</span><div className={styles.tight}><h3>Create and publish</h3><p className={styles.muted}>Build the project from your brief, then publish your work publicly on LinkedIn or Instagram with the official hashtag and a short video walkthrough.</p></div></li>
+        <li className={styles.card}><span className={styles.number} aria-hidden="true">3</span><div className={styles.tight}><h3>Submit your evidence</h3><p className={styles.muted}>Upload the actual project files and your public post link before the deadline. Judging looks at your work, not just your caption.</p></div></li>
+      </ul>
+      <div className={styles.ctaRow}>
+        <Action intent="primary" onClick={onChoose}>Choose your category<ArrowRight className={styles.icon} aria-hidden="true" /></Action>
+        <Action onClick={onAccess}>I already registered</Action>
+        {!round.registration_open && round.status !== 'published' && <p className={styles.muted}>Registration is currently closed. You can still read the briefs and prepare.</p>}
+      </div>
+    </section>
+    <section className={`${styles.panel} ${styles.stack}`}><h2>How judging works</h2><ChallengeWeights mode={round.mode} /></section>
+    <RoundRules round={round} />
+  </div>;
+}
+
+function GuestTracks({ round, category, onPick, onBack, onContinue }: { round: ChallengeRound; category: ChallengeCategory | null; onPick: (category: ChallengeCategory) => void; onBack: () => void; onContinue: () => void }) {
+  return <div className={styles.stepFlow}>
+    <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="pick-track"><div className={styles.tight}><p className={styles.eyebrow}>Step 2</p><h2 id="pick-track">Choose your challenge</h2><p className={styles.muted}>Every participant enters one category. Select yours to read its brief — the complete version arrives by email after you verify your address.</p></div>
+      <ul className={styles.cards}>{round.categories.filter((item) => item.enabled !== false).map((item) => <li key={item.id}><button type="button" className={styles.category} aria-pressed={category?.id === item.id} onClick={() => onPick(item)}><span className={`${styles.row} ${styles.between}`}><strong>{item.name}</strong>{category?.id === item.id && <Check className={styles.icon} aria-hidden="true" />}</span><span className={styles.muted}>{item.brief?.split('\n')[0] || 'Your full brief is delivered after email verification.'}</span><span className={styles.pick}>{category?.id === item.id ? 'Selected' : 'Select this track'}</span></button></li>)}</ul>
+      {category && <CategoryBrief category={category} />}
+      <div className={styles.ctaRow}>
+        <Action onClick={onBack}><ArrowLeft className={styles.icon} aria-hidden="true" />Back</Action>
+        <Action intent="primary" onClick={onContinue} disabled={!category}>{category ? `Continue with ${category.name}` : 'Select a track to continue'}<ArrowRight className={styles.icon} aria-hidden="true" /></Action>
+      </div>
+    </section>
+  </div>;
+}
+
+function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, onBack, onSubmit }: {
+  round: ChallengeRound; category: ChallengeCategory | null; accessOnly: boolean; busy: boolean;
+  email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean;
+  onAccessOnly: (value: boolean) => void; setEmail: (value: string) => void; setFullName: (value: string) => void; setPhone: (value: string) => void;
+  setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; onBack: () => void; onSubmit: (event: FormEvent) => void;
+}) {
+  return <div className={styles.stepFlow}>
+    <section className={`${styles.panel} ${styles.stack} ${styles.narrow}`} aria-labelledby="join-step">
+      <div className={styles.tight}><p className={styles.eyebrow}>Step 3</p><h2 id="join-step">{accessOnly ? 'Return to your entry' : 'Make it your challenge'}</h2><p className={styles.muted}>{accessOnly ? 'Enter the email you registered with. We will email a personal link if an entry exists.' : 'Register with your email. You do not need an academy account or a course enrolment.'}</p></div>
+      {!accessOnly && category && <div className={styles.note}><BookOpen className={styles.icon} aria-hidden="true" /><span>Your track: <strong>{category.name}</strong></span><Action size="sm" onClick={() => onAccessOnly(false)} className={styles.changeLink}>Change</Action></div>}
+      <form className={styles.stack} onSubmit={onSubmit}>
+        {!accessOnly && <><ChallengeField label="Full name"><input className={styles.control} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={150} disabled={busy} /></ChallengeField><ChallengeField label="Phone number"><input className={styles.control} type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required maxLength={40} disabled={busy} /></ChallengeField></>}
+        <ChallengeField label="Email address"><input className={styles.control} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={busy} maxLength={254} /></ChallengeField>
+        {!accessOnly && <><label className={styles.check}><input type="checkbox" required checked={acceptRules} onChange={(event) => setAcceptRules(event.target.checked)} disabled={busy} /><span>I have read the challenge rules and agree to submit my own work for assessment.</span></label><label className={styles.check}><input type="checkbox" checked={makePublic} onChange={(event) => setMakePublic(event.target.checked)} disabled={busy} /><span>You may show my name and project in the published results. This is optional.</span></label></>}
+        <Action type="submit" intent="primary" loading={busy} disabled={!accessOnly && (!round.registration_open || !category)}>{accessOnly ? 'Email my personal link' : 'Register for this challenge'}</Action>
+        {!accessOnly && !round.registration_open && <p className={styles.muted}>Registration is currently closed. Registered participants can still return using their personal link.</p>}
+      </form>
+      <Action onClick={() => onAccessOnly(!accessOnly)} disabled={busy}>{accessOnly ? 'Register a new entry' : 'Already registered? Get your link'}</Action>
+      <p className={styles.muted}>Your challenge access stays separate from your VaceUp learning account. Never share your personal email link.</p>
+      <Action onClick={onBack} disabled={busy}><ArrowLeft className={styles.icon} aria-hidden="true" />Back</Action>
+    </section>
   </div>;
 }
 
@@ -183,6 +235,21 @@ function ParticipantPortal({ portal, token, onRefresh, onLeave }: { portal: Chal
   const assessment = portal.assessment_status || portal.submission?.assessment_status || 'queued';
   const status = !portal.submission ? 'Your project is waiting for you' : ['ready', 'completed', 'assessed', 'succeeded'].includes(assessment) ? 'Project assessment complete' : ['processing', 'running'].includes(assessment) ? 'Your project is being assessed' : ['review', 'needs_review', 'review_required', 'failed'].includes(assessment) ? 'Your submission needs attention' : 'Your project is saved in the assessment queue';
 
+  type PortalTab = 'overview' | 'project' | 'engagement' | 'results';
+  const tabs: PortalTab[] = round.mode === 'hybrid' ? ['overview', 'project', 'engagement'] : ['overview', 'project'];
+  if (round.status === 'published') tabs.push('results');
+  const [tab, setTab] = useState<PortalTab>('overview');
+  const tabLabels: Record<PortalTab, string> = { overview: 'Overview', project: 'Your project', engagement: 'Engagement evidence', results: 'Results' };
+
+  const onTabKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const index = tabs.indexOf(tab);
+    const next = tabs[event.key === 'ArrowRight' ? (index + 1) % tabs.length : (index - 1 + tabs.length) % tabs.length];
+    setTab(next);
+    document.getElementById(`portal-tab-${next}`)?.focus();
+  };
+
   useEffect(() => {
     if (syncedSubmission.current === portal.submission?.id) return;
     syncedSubmission.current = portal.submission?.id;
@@ -200,12 +267,21 @@ function ParticipantPortal({ portal, token, onRefresh, onLeave }: { portal: Chal
 
   return <div className={styles.stack}>
     <div className={`${styles.row} ${styles.between}`}><div className={styles.tight}><p className={styles.eyebrow}>Your personal workspace</p><h2 className={styles.metric}>Welcome, {portal.registration.full_name.split(' ')[0]}</h2><p className={styles.muted}>{category.name} · {portal.registration.email}</p></div><div className={styles.row}><Action disabled={busy || uploadBusy} onClick={() => { setBusy(true); void onRefresh().catch((failure) => setError(challengeFailure(failure))).finally(() => setBusy(false)); }} leftIcon={<RefreshCw className={styles.icon} />}>Refresh status</Action><Action onClick={onLeave} disabled={busy || uploadBusy}>Leave portal</Action></div></div>
-    {message && <ChallengeNote success>{message}</ChallengeNote>}{error && <ChallengeNote error>{error}</ChallengeNote>}
-    <ChallengeNote><div className={styles.tight}><strong>{status}</strong><p>{portal.submission?.participant_message || (!portal.submission ? 'Read your brief, create your project and submit it below.' : 'Your entry is saved. Scores and rankings stay private until the results are approved and published.')}</p></div></ChallengeNote>
-    {round.status === 'published' && <PublishedResults round={round} personal={portal.result} />}
-    <div className={styles.layout}><div className={styles.stack}>
-      <section className={`${styles.panel} ${styles.stack}`}><div className={styles.row}><BookOpen className={styles.icon} aria-hidden="true" /><h2>Your selected brief</h2></div><CategoryBrief category={category} /></section>
-      <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="project-submission"><h2 id="project-submission">{portal.submission ? 'Your project submission' : 'Submit your project'}</h2><p className={styles.muted}>Project deadline: {challengeDate(round.submission_closes_at)}. Updating your project creates a new submission for assessment.</p>
+    <div className={styles.tablist} role="tablist" aria-label="Your challenge portal sections" onKeyDown={onTabKeys}>
+      {tabs.map((item) => <button key={item} type="button" role="tab" id={`portal-tab-${item}`} className={styles.tab} aria-selected={tab === item} aria-controls="portal-panel" tabIndex={tab === item ? 0 : -1} onClick={() => setTab(item)}>{tabLabels[item]}</button>)}
+    </div>
+    <div id="portal-panel" role="tabpanel" aria-labelledby={`portal-tab-${tab}`} className={styles.stack}>
+      {message && <ChallengeNote success>{message}</ChallengeNote>}{error && <ChallengeNote error>{error}</ChallengeNote>}
+      {tab === 'overview' && <div className={styles.stack}>
+        <ChallengeNote><div className={styles.tight}><strong>{status}</strong><p>{portal.submission?.participant_message || (!portal.submission ? 'Read your brief, create your project and submit it under Your project.' : 'Your entry is saved. Scores and rankings stay private until the results are approved and published.')}</p></div></ChallengeNote>
+        <section className={`${styles.panel} ${styles.stack}`}><div className={styles.row}><BookOpen className={styles.icon} aria-hidden="true" /><h2>Your selected brief</h2></div><CategoryBrief category={category} /></section>
+        <div className={styles.layout}>
+          <section className={`${styles.panel} ${styles.stack}`}><h2>Your timeline</h2><ChallengeDates round={round} /></section>
+          <section className={`${styles.panel} ${styles.stack}`}><h2>Your judging breakdown</h2><ChallengeWeights mode={round.mode} /></section>
+        </div>
+        <RoundRules round={round} />
+      </div>}
+      {tab === 'project' && <section className={`${styles.panel} ${styles.stack}`} aria-labelledby="project-submission"><h2 id="project-submission">{portal.submission ? 'Your project submission' : 'Submit your project'}</h2><p className={styles.muted}>Project deadline: {challengeDate(round.submission_closes_at)}. Updating your project creates a new submission for assessment.</p>
         {closed && <ChallengeNote>The project submission window has closed. Your saved entry is available below.</ChallengeNote>}
         {!!portal.submission?.evidence?.length && <EvidenceLinks token={token} files={portal.submission.evidence} />}
         <form className={styles.stack} onSubmit={submit}>
@@ -218,9 +294,10 @@ function ParticipantPortal({ portal, token, onRefresh, onLeave }: { portal: Chal
           </div></fieldset>
           <div className={styles.row}><Action type="submit" intent="primary" loading={busy} disabled={closed || uploadBusy}>{portal.submission ? 'Update my submission' : 'Submit my project'}</Action>{portal.submission?.post_url && <a href={portal.submission.post_url} className={styles.link} target="_blank" rel="noopener noreferrer">Open public post<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}</div>
         </form>
-      </section>
-      {round.mode === 'hybrid' && <EngagementEvidence portal={portal} token={token} onRefresh={onRefresh} />}
-    </div><aside className={styles.stack}><section className={`${styles.panel} ${styles.stack}`}><h2>Your timeline</h2><ChallengeDates round={round} /></section><section className={`${styles.panel} ${styles.stack}`}><h2>Your judging breakdown</h2><ChallengeWeights mode={round.mode} /></section><RoundRules round={round} /></aside></div>
+      </section>}
+      {tab === 'engagement' && <EngagementEvidence portal={portal} token={token} onRefresh={onRefresh} />}
+      {tab === 'results' && <PublishedResults round={round} personal={portal.result} />}
+    </div>
   </div>;
 }
 

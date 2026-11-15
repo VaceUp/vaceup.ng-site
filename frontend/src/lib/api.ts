@@ -64,7 +64,11 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      // Keep the raw body when it is not JSON (proxy/WAF pages, plain-text
+      // errors) so the surfaced message names the real cause, not "error 400".
+      const raw = await response.text().catch(() => '');
+      let errorData: unknown = {};
+      try { errorData = raw ? JSON.parse(raw) : {}; } catch { errorData = { raw }; }
       throw new ApiError(apiErrorMessage(errorData, response.status), response.status, errorData);
     }
 

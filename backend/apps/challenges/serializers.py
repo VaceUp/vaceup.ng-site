@@ -48,12 +48,17 @@ class CategorySerializer(serializers.ModelSerializer):
         return bool(obj.brief_pdf_key)
 
     def validate_requirements(self, value):
-        if not isinstance(value, list) or len(value) > 30 or any(not isinstance(item, str) or not item.strip() or len(item) > 2000 for item in value):
+        # Deliverables may be written incrementally while preparing a round;
+        # completeness is enforced by round_readiness before registration opens.
+        if not isinstance(value, list) or len(value) > 100 or any(not isinstance(item, str) or not item.strip() or len(item) > 4000 for item in value):
             raise serializers.ValidationError("Use a list of clear deliverable descriptions.")
         return value
 
     def validate_rubric(self, value):
-        return validate_rubric(value) if value else value
+        # The field hook keeps only shape checks. Whether a rubric must total
+        # exactly 100 points is decided in validate(), where the round status
+        # is known: drafts may save partial rubrics, published rounds may not.
+        return validate_rubric_draft(value) if value else value
 
     def validate(self, attrs):
         round = attrs.get("round", self.instance.round if self.instance else None)
@@ -63,6 +68,8 @@ class CategorySerializer(serializers.ModelSerializer):
             locked = set(attrs) - {"email_instructions"}
             if not self.instance or any(getattr(self.instance, key) != attrs[key] for key in locked):
                 raise serializers.ValidationError("Published category requirements and rubrics are locked. Clone a new round to change them.")
+            if "rubric" in attrs and attrs["rubric"]:
+                validate_rubric(attrs["rubric"])
         return attrs
 
 
@@ -86,16 +93,45 @@ class RoundSerializer(serializers.ModelSerializer):
         return attrs
 
 
+def validate_rubric_draft(value):
+    """Draft-stage rubrics may be partial work in progress.
+
+    Shape is still enforced (stable ids, positive points, no duplicates) so the
+    saved draft is always loadable; completeness is judged only by
+    round_readiness when registration is about to open.
+    """
+    if not isinstance(value, list) or not value or len(value) > 30:
+        raise serializers.ValidationError("Add your criteria as a list; you can save a partial rubric while the round is a draft.")
+    seen = set()
+    for criterion in value:
+        if not isinstance(criterion, dict) or not re.fullmatch(r"[a-z][a-z0-9_]{0,49}", str(criterion.get("id", ""))):
+            raise serializers.ValidationError("Each criterion needs a unique lowercase id.")
+        if criterion["id"] in seen:
+            raise serializers.ValidationError("Criterion ids must be unique within a rubric.")
+        try:
+            points = Decimal(str(criterion.get("max_points", "")))
+        except (InvalidOperation, ValueError, TypeError):
+            raise serializers.ValidationError("Criterion max_points must be a number.")
+        if not points.is_finite() or points <= 0 or points > 100:
+            raise serializers.ValidationError("Criterion max_points must be a positive number up to 100.")
+        seen.add(criterion["id"])
+    return value
+
+
 def round_readiness(round):
     errors = []
     from django.conf import settings
     from .assessment import AssessmentUnavailable, require_configuration
-    try:
-        require_configuration()
-    except AssessmentUnavailable:
-        errors.append("Configure and enable the assessment provider before opening registration.")
-    if not getattr(settings, "CHALLENGE_ASSESSMENT_CALIBRATED", False):
-        errors.append("Complete the representative assessment and capacity review before opening registration.")
+    # AI-assisted grading is an operator choice. Only a round that will be
+    # machine-graded needs a configured, calibrated provider before opening;
+    # manual rounds score through audited administrator corrections instead.
+    if getattr(settings, "CHALLENGE_AI_ENABLED", False):
+        try:
+            require_configuration()
+        except AssessmentUnavailable:
+            errors.append("Configure and enable the assessment provider before opening registration.")
+        if not getattr(settings, "CHALLENGE_ASSESSMENT_CALIBRATED", False):
+            errors.append("Complete the representative assessment and capacity review before opening registration.")
     if not round.rules.strip() or not round.hashtag.strip() or not round.linkedin_handle.strip() or not round.instagram_handle.strip():
         errors.append("Publish the rules, hashtag and official LinkedIn and Instagram handles first.")
     categories = list(round.categories.filter(enabled=True))

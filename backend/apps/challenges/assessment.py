@@ -515,6 +515,11 @@ def freeze_round(round, actor):
         raise ValidationError("The final collection window has not closed.")
     rows = compute_scorebook(locked)
     relevant_kinds = ["quality_assessment"] + (["engagement_extract"] if locked.mode == "hybrid" else [])
+    if not getattr(settings, "CHALLENGE_AI_ENABLED", False):
+        # A manually graded round has no provider to unblock waiting jobs; retire
+        # them so administrator corrections become the single scoring path.
+        ChallengeJob.objects.filter(round=locked, kind__in=relevant_kinds, status="awaiting_configuration").update(
+            status="cancelled", error="manual_grading", completed_at=timezone.now())
     if ChallengeJob.objects.filter(round=locked, kind__in=relevant_kinds, status__in=["queued", "processing", "awaiting_configuration", "waiting_budget"]).exists():
         raise ValidationError("Relevant assessment jobs are still pending or waiting for configuration.")
     if any(row["status"] in ("awaiting_assessment", "needs_review") or "winner_boundary_tie_requires_resolution" in row["flags"] for row in rows):

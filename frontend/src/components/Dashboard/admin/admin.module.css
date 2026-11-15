@@ -12,10 +12,12 @@
 
 .page *,
 .drawer *,
+.modal *,
 .toast * { min-inline-size: 0; }
 
 .page :is(input, select, textarea, button, a, summary):focus-visible,
-.drawer :is(input, select, textarea, button, a):focus-visible {
+.drawer :is(input, select, textarea, button, a):focus-visible,
+.modal :is(input, select, textarea, button, a):focus-visible {
   outline: calc(var(--spacing) / 2) solid var(--workspace-focus);
   outline-offset: var(--spacing);
 }
@@ -955,6 +957,37 @@ textarea.control { min-block-size: calc(var(--spacing) * 24); line-height: var(-
 .drawerFoot { border-block-end: 0; }
 .drawerTitle { font-size: var(--text-lg); font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
 .drawerBody { overflow-y: auto; padding: calc(var(--spacing) * 6); display: grid; gap: calc(var(--spacing) * 5); align-content: start; }
+
+/* ---------- centered modal variant ---------- */
+
+/* Same skeleton as the drawer, but the dialog floats centered over the page
+   instead of docking to the edge. Head, body and foot classes are shared. */
+.modal {
+  inline-size: min(100%, calc(var(--spacing) * 220));
+  max-inline-size: calc(var(--spacing) * 220);
+  max-block-size: calc(100dvh - var(--spacing) * 8);
+  margin: auto;
+  padding: 0;
+  border: thin solid var(--workspace-line);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  background: var(--workspace-surface);
+  color: var(--workspace-text);
+  box-shadow: 0 24px 64px -24px rgb(0 4 89 / 0.5);
+}
+
+.modal[open]::backdrop { background: rgb(0 4 89 / 0.55); }
+
+.modalInner {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-block-size: inherit;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.modal .drawerHead { border-block-start: 0; border-start-start-radius: inherit; border-start-end-radius: inherit; }
+.modal .drawerFoot { border-block-end: 0; border-end-start-radius: inherit; border-end-end-radius: inherit; }
 
 /* ---------- toasts ---------- */
 

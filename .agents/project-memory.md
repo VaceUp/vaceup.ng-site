@@ -2,6 +2,11 @@
 
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
+## 2026-11-16 — November round opens with AI grading enabled
+
+**Decision**
+- The user set `CHALLENGE_ASSESSMENT_CALIBRATED=true` and registration for the November round now opens — they chose the AI-graded path over manual grading (operator attestation made without the representative assessment review; their call, recorded here so every agent knows this round is machine-graded).
+
 ## 2026-11-15 — Challenge round: setup leniency, AI optional, centered dialogs, rebuilt public page
 
 **Decision**
@@ -21,6 +26,6 @@ Durable log of product decisions and mid-code changes. Newest first. Every agent
 
 **Open**
 - The "Edit Data Analysis" HTTP 400 was never root-caused (the old UI hid the server body). Retry the category save after the error-surfacing change and record the real cause here.
-- 2026-11-15/16: user still hit the calibration readiness error on Open registration — cause: server env has `CHALLENGE_AI_ENABLED=true` with a working Groq key while `CHALLENGE_ASSESSMENT_CALIBRATED=false` (or the delta zip was not yet extracted; the message text distinguishes the two). Unblocked by setting `CHALLENGE_AI_ENABLED=false` + restart, and the two readiness messages now name their exact resolution flag.
-- Deploy pending on the server: rebuilt delta ZIP `vaceup-backend-2026-11-15-challenge-setup.zip` (extract over the 2026-11-14 challenges backend, restart; no migration) plus the frontend pipeline. Rendered pixels of the rebuilt challenge page not yet visually inspected.
+- Rendered pixels of the rebuilt challenge page not yet visually inspected in a browser.
+- Operational watchlist now that the round runs AI-graded: `process_challenges` cron every minute (it also delivers registration brief emails), Groq daily token budget (180k default), early sanity check of AI scores against real submissions, and freeze requires every submitted entry scored via correction or disqualified.
 - User wants to "discuss some more beautiful stuff" after this round lands — next design session.

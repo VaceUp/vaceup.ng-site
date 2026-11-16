@@ -1,7 +1,7 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, FileCheck2, Upload } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AlertCircle, BarChart3, Check, CheckCircle2, Code2, FileCheck2, Headset, Palette, PenTool, Shapes, Upload } from 'lucide-react';
 import { Action } from '@/components/Dashboard/admin/AuthoringUI';
 import { challengeAdminApi, challengeApi, challengeDate, challengeFailure, uploadChallengeEvidence, type ChallengeEvidence, type ChallengeRound } from '@/lib/challenge-api';
 import { formatBytes } from '@/lib/upload';
@@ -13,6 +13,50 @@ export { Action, styles };
 export function ChallengeNote({ children, error, success }: { children: ReactNode; error?: boolean; success?: boolean }) {
   const Icon = error ? AlertCircle : CheckCircle2;
   return <div className={cn(styles.note, error && styles.error, success && styles.success)} role={error ? 'alert' : 'status'}><Icon className={styles.icon} aria-hidden="true" /><div>{children}</div></div>;
+}
+
+/** One small, consistent pictograph per challenge track. */
+export function CategoryIcon({ name, className }: { name?: string; className?: string }) {
+  const key = (name || '').toLowerCase();
+  const Icon = key.includes('data') ? BarChart3
+    : key.includes('web') || key.includes('develop') ? Code2
+      : key.includes('graphic') ? Palette
+        : key.includes('ui') || key.includes('ux') ? PenTool
+          : key.includes('virtual') || key.includes('assist') ? Headset
+            : Shapes;
+  return <span className={cn(styles.categoryIcon, className)} aria-hidden="true"><Icon className={styles.icon} /></span>;
+}
+
+/** A commitment as a selectable card, not a bare checkbox: the whole row is
+ * the target, the state is unmistakable, and the native input stays in the
+ * accessibility tree. */
+export function CheckCard({ checked, onChange, disabled, required, title, description }: {
+  checked: boolean; onChange: (value: boolean) => void; disabled?: boolean; required?: boolean;
+  title: string; description?: string;
+}) {
+  return <label className={cn(styles.checkCard, checked && styles.checkCardOn)}>
+    <input type="checkbox" className="sr-only" checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} required={required} />
+    <span className={styles.checkCardBox} aria-hidden="true">{checked && <Check className={styles.icon} />}</span>
+    <span className={styles.checkCardText}><strong>{title}</strong>{description && <span className={styles.muted}>{description}</span>}</span>
+  </label>;
+}
+
+/** Scroll-triggered entrance: content is visible without JavaScript and under
+ * prefers-reduced-motion; the gentle rise plays once, the first time it is seen. */
+export function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { setShown(true); return undefined; }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) { setShown(true); observer.disconnect(); }
+    }, { rootMargin: '0px 0px -8% 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return <div ref={ref} className={cn(styles.reveal, shown && styles.revealed, className)} style={delay ? { transitionDelay: `${delay}ms` } : undefined}>{children}</div>;
 }
 
 export function ChallengeField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Download, RefreshCw, Trophy } from 'lucide-react';
 import { downloadApiFile } from '@/lib/api-pages';
@@ -51,6 +51,7 @@ export default function ChallengesManager() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [scorePage, setScorePage] = useState(1);
+  const scorebookAnchor = useRef<HTMLDivElement>(null);
   useEffect(() => { setScorePage(1); }, [query, selected?.slug]);
 
   const reload = useCallback(async () => {
@@ -65,7 +66,12 @@ export default function ChallengesManager() {
     setSelected(round); setBook(null); setBookBusy(true); setError('');
     try { setBook(await challengeAdminApi.scorebook(round.slug)); }
     catch (failure) { setError(challengeFailure(failure)); }
-    finally { setBookBusy(false); }
+    finally {
+      setBookBusy(false);
+      // The management section renders below the fold; bring it into view so
+      // the button visibly does its job instead of appearing idle.
+      requestAnimationFrame(() => scorebookAnchor.current?.scrollIntoView({ block: 'start' }));
+    }
   };
   const refreshBook = async () => { if (selected) { const updated = await challengeAdminApi.scorebook(selected.slug); setBook(updated); setSelected(updated.round); } };
   const exportBook = async (format: 'csv' | 'xlsx') => {
@@ -99,6 +105,7 @@ export default function ChallengesManager() {
         {selected.status !== 'draft' && <StatusNote>Published briefs and rubrics are locked for this round to keep the rules consistent for participants.</StatusNote>}
         <details open={selected.status === 'draft'}><summary>Review category briefs and rubrics</summary>{!selected.categories.length ? <EmptyState title="Add the first project brief" description="Participants need a complete brief before they can register." /> : <AdminList label="Category briefs">{selected.categories.map((category) => <AdminRow key={category.id} title={category.name} meta={`${category.enabled === false ? 'Disabled' : 'Available'} · ${category.rubric?.length ?? 0} criteria`} description={category.brief?.split('\n')[0]} actions={<Action size="sm" disabled={selected.status !== 'draft'} onClick={() => setCategoryEdit(category)}>Edit brief</Action>} />)}</AdminList>}</details>
       </AdminSection>
+      <div ref={scorebookAnchor} />
       <AdminSection title="Participant scorebook" description="Quality points are out of 100. Scores remain provisional until final collection and approval. Blank metrics stay unavailable." actions={<><Action disabled={bookBusy || busy} onClick={() => void openScorebook(selected)} leftIcon={<RefreshCw className={styles.icon} />}>Refresh scorebook</Action><Action disabled={!book || busy} onClick={() => void exportBook('csv')} leftIcon={<Download className={styles.icon} />}>CSV</Action><Action disabled={!book || busy} onClick={() => void exportBook('xlsx')}>XLSX</Action></>}>
         {bookBusy ? <Skeleton rows={4} /> : !book ? <StatusNote>Load the scorebook to review participants and assessment exceptions.</StatusNote> : <div className={styles.stack}>
           <div className={styles.grid}><div className={styles.summary}><strong className={styles.metric}>{book.rows.length}</strong><span className={styles.muted}>Participant entries</span></div><div className={styles.summary}><strong className={styles.metric}>{exceptions}</strong><span className={styles.muted}>Entries needing a status or flag review</span></div></div>

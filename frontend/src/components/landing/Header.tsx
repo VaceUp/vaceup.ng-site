@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SITE, SOCIAL_LINKS } from '@/lib/site-config';
@@ -22,6 +22,8 @@ const NAV_LINKS = [
 export const Header = () => {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const firstMenuLink = useRef<HTMLAnchorElement>(null);
 
   // Auto-close the mobile menu whenever the route changes
   useEffect(() => {
@@ -34,6 +36,23 @@ export const Header = () => {
     return () => {
       document.body.style.overflow = '';
     };
+  }, [isMobileMenuOpen]);
+
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setIsMobileMenuOpen(false);
+    if (restoreFocus) toggleRef.current?.focus();
+  }, []);
+
+  // Escape closes the menu; Tab stays inside the open panel.
+  const onMenuKeys = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu(true);
+    }
+  };
+
+  useEffect(() => {
+    if (isMobileMenuOpen) firstMenuLink.current?.focus();
   }, [isMobileMenuOpen]);
 
   const isActive = (href: string) =>
@@ -80,9 +99,11 @@ export const Header = () => {
         </div>
       </div>
 
-      {/* Main navigation */}
-      <div className="w-full border-b border-gray-200 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+      {/* Main navigation. Solid background on purpose: backdrop-filter on a
+          sticky bar is what made the nav visibly detach and "jump" mid-scroll
+          on mobile; an opaque bar scrolls cleanly on cheap devices. */}
+      <div className="w-full border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 sm:py-3">
           {/* Brand Logo */}
           <Link href="/" aria-label="VaceUp home">
             <img src="/logo.webp" alt="VaceUp Digital Academy" className="h-9 w-9 object-contain" />
@@ -129,25 +150,31 @@ export const Header = () => {
           {/* Mobile Hamburger Button */}
           <button
             type="button"
+            ref={toggleRef}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-expanded={isMobileMenuOpen}
-            aria-label="Toggle navigation menu"
-            className="sm:hidden text-gray-700 hover:text-gold-brand p-2"
+            aria-controls="mobile-menu"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            className="sm:hidden -mr-1.5 grid h-11 w-11 place-items-center rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gold-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-brand transition-colors"
           >
             <i className={cnMenuIcon(isMobileMenuOpen)} aria-hidden="true" />
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu — auto-closes on navigation */}
+      {/* Mobile Menu — auto-closes on navigation, Escape, or link activation */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden border-t border-gray-200 bg-white shadow-lg animate-slide-down">
-          <nav className="flex flex-col px-6 py-4">
-            {NAV_LINKS.map((link) => (
+        <div
+          id="mobile-menu"
+          className="sm:hidden border-t border-gray-200 bg-white shadow-lg animate-slide-down max-h-[calc(100dvh-64px)] overflow-y-auto"
+        >
+          <nav aria-label="Mobile navigation" className="flex flex-col px-6 py-4" onKeyDown={onMenuKeys}>
+            {NAV_LINKS.map((link, index) => (
               <Link
                 key={link.label}
                 href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
+                ref={index === 0 ? firstMenuLink : undefined}
+                onClick={() => closeMenu()}
                 className={`py-3 border-b border-gray-50 font-semibold transition-colors ${
                   isActive(link.href) ? 'text-gold-brand' : 'text-gray-700 hover:text-gold-brand'
                 }`}
@@ -158,14 +185,14 @@ export const Header = () => {
             <div className="flex flex-col gap-3 pt-4 pb-2">
               <Link
                 href="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => closeMenu()}
                 className="rounded-lg bg-gray-100 px-5 py-3 text-sm font-semibold text-gray-700 text-center"
               >
                 Sign In
               </Link>
               <Link
                 href="/apply"
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={() => closeMenu()}
                 className="rounded-lg bg-gold-brand px-5 py-3 text-sm font-bold text-navy-950 text-center shadow-md active:scale-95 transition-transform"
               >
                 Enroll Now

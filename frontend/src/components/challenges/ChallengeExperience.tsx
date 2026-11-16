@@ -38,6 +38,7 @@ export default function ChallengeExperience() {
   const [acceptRules, setAcceptRules] = useState(false);
   const [makePublic, setMakePublic] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [confirmation, setConfirmation] = useState<{ name: string; email: string; category: string } | null>(null);
   const [accessOnly, setAccessOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<GuestStep>('intro');
@@ -100,7 +101,10 @@ export default function ChallengeExperience() {
       const response = accessOnly
         ? await challengeApi.access(round.slug, email.trim())
         : await challengeApi.register({ round_slug: round.slug, category_id: category!.id, full_name: fullName.trim(), email: email.trim(), phone: phone.trim(), accept_rules: acceptRules, make_public: makePublic, marketing_opt_in: marketingOptIn });
-      setNotice(response.detail || 'Check your inbox for your personal challenge link. Check spam as well.');
+      if (accessOnly) setNotice(response.detail || 'Check your inbox for your personal challenge link. Check spam as well.');
+      // Registration gets its own confirmation screen; a quiet note at the top
+      // of a still-filled form leaves people unsure anything happened.
+      else setConfirmation({ name: fullName.trim().split(' ')[0] || 'there', email: email.trim(), category: category!.name });
     } catch (failure) { setError(challengeFailure(failure)); }
     finally { setBusy(false); }
   };
@@ -151,7 +155,11 @@ export default function ChallengeExperience() {
               {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic} marketingOptIn={marketingOptIn}
                 onAccessOnly={(value) => { setAccessOnly(value); if (!value && !category) setStep('tracks'); }}
                 setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic} setMarketingOptIn={setMarketingOptIn}
-                onBack={() => { setStep(accessOnly ? 'intro' : 'tracks'); }} onChangeTrack={() => { setAccessOnly(false); setStep('tracks'); }} onSubmit={register} />}
+                onBack={() => { setStep(accessOnly ? 'intro' : 'tracks'); }} onChangeTrack={() => { setAccessOnly(false); setStep('tracks'); }} onSubmit={register}
+                confirmation={confirmation}
+                onOverview={() => { setConfirmation(null); setStep('intro'); }}
+                onResend={() => { setConfirmation(null); setAccessOnly(true); }}
+                onAnother={() => { setConfirmation(null); setFullName(''); setPhone(''); setEmail(''); setAcceptRules(false); setMakePublic(false); setMarketingOptIn(false); }} />}
             </div>}
       </div>
     </div>
@@ -192,12 +200,14 @@ function GuestTracks({ round, category, onPick, onBack, onContinue }: { round: C
   </div>;
 }
 
-function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, marketingOptIn, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, setMarketingOptIn, onBack, onChangeTrack, onSubmit }: {
+function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, marketingOptIn, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, setMarketingOptIn, onBack, onChangeTrack, onSubmit, confirmation, onOverview, onResend, onAnother }: {
   round: ChallengeRound; category: ChallengeCategory | null; accessOnly: boolean; busy: boolean;
   email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean; marketingOptIn: boolean;
   onAccessOnly: (value: boolean) => void; setEmail: (value: string) => void; setFullName: (value: string) => void; setPhone: (value: string) => void;
   setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; setMarketingOptIn: (value: boolean) => void; onBack: () => void; onChangeTrack: () => void; onSubmit: (event: FormEvent) => void;
+  confirmation: { name: string; email: string; category: string } | null; onOverview: () => void; onResend: () => void; onAnother: () => void;
 }) {
+  if (confirmation) return <RegistrationConfirmation round={round} confirmation={confirmation} onOverview={onOverview} onResend={onResend} onAnother={onAnother} />;
   return <div className={styles.stepFlow}>
     <section className={`${styles.panel} ${styles.stack} ${styles.narrow}`} aria-labelledby="join-step">
       <header className={styles.joinHeader}>
@@ -241,10 +251,52 @@ function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, 
 }
 
 function CategoryBrief({ category }: { category: ChallengeCategory }) {
+  const rubricTotal = (category.rubric ?? []).reduce((sum, item) => sum + Number(item.max_points || 0), 0);
   return <div className={`${styles.stack} ${styles.separator}`}><h3>{category.name}: your brief</h3><p className={styles.body}>{category.brief || 'Register and verify your email to receive the full project brief for this category.'}</p>
     {!!category.requirements?.length && <div className={styles.tight}><h3>What to submit</h3><ul className={styles.list}>{category.requirements.map((item, index) => <li key={`${index}-${item}`}><Check className={styles.icon} aria-hidden="true" /><span>{item}</span></li>)}</ul></div>}
     {category.brief_download_url && <a className={styles.link} href={category.brief_download_url} target="_blank" rel="noopener noreferrer">Download your project brief<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}
-    {!!category.rubric?.length && <details><summary>Assessment criteria</summary><ul className={styles.list}>{category.rubric.map((item) => <li key={item.id}><span>{item.label}{item.description ? `: ${item.description}` : ''}</span><strong>{item.max_points} points</strong></li>)}</ul></details>}
+    {!!category.rubric?.length && <details className={styles.rubricDetails}><summary>Assessment criteria · {rubricTotal} points</summary>
+      <ul className={styles.rubric}>{category.rubric.map((item) => <li key={item.id} className={styles.criterion}>
+        <div className={styles.criterionHead}><span className={styles.criterionLabel}>{item.label}</span><span className={styles.pointsPill}>{Number(item.max_points)} points</span></div>
+        {item.description && <p className={styles.criterionBody}>{item.description}</p>}
+      </li>)}</ul>
+    </details>}
+  </div>;
+}
+
+function RegistrationConfirmation({ round, confirmation, onOverview, onResend, onAnother }: {
+  round: ChallengeRound; confirmation: { name: string; email: string; category: string };
+  onOverview: () => void; onResend: () => void; onAnother: () => void;
+}) {
+  return <div className={styles.stepFlow}>
+    <section className={`${styles.panel} ${styles.stack} ${styles.narrow}`} aria-labelledby="registered-title">
+      <div className={styles.confirmHero}>
+        <span className={styles.confirmBadge}><Check className={styles.icon} aria-hidden="true" /></span>
+        <div className={styles.tight}>
+          <p className={styles.eyebrow}>Registration received</p>
+          <h2 id="registered-title">You are in, {confirmation.name}</h2>
+        </div>
+      </div>
+      <div className={styles.trackBar}>
+        <CategoryIcon name={confirmation.category} />
+        <div className={styles.trackBarText}><strong>{confirmation.category}</strong><span className={styles.muted}>Your selected track</span></div>
+      </div>
+      <ChallengeNote success><div className={styles.tight}><strong>We emailed {confirmation.email}</strong><p>The {confirmation.category} project brief and your personal challenge link are on their way. Nothing after a few minutes? Check spam, then resend the link below.</p></div></ChallengeNote>
+      <div className={styles.tight}>
+        <h3>What happens next</h3>
+        <ol className={styles.list}>
+          <li><span className={styles.number}>1</span><span>Verify your email — the personal link in the message opens your private participant portal.</span></li>
+          <li><span className={styles.number}>2</span><span>Create your project — the full brief, deliverables and rubric are in the email and in your portal. Submission closes {challengeDate(round.submission_closes_at)}.</span></li>
+          <li><span className={styles.number}>3</span><span>Publish and submit — upload the actual project files with your public post link before the deadline.</span></li>
+        </ol>
+      </div>
+      <div className={styles.ctaRow}>
+        <Action intent="primary" onClick={onOverview}>Back to the challenge overview</Action>
+        <Action onClick={onResend}>Resend my personal link</Action>
+        <Action onClick={onAnother}>Register another participant</Action>
+      </div>
+      <p className={styles.muted}>Keep your personal email link private — it is the key to your entry.</p>
+    </section>
   </div>;
 }
 

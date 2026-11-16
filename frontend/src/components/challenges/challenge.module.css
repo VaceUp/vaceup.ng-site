@@ -185,4 +185,22 @@ textarea.control { min-block-size: calc(var(--spacing) * 28); resize: vertical; 
 .tab[aria-selected="true"] { color: var(--workspace-text); border-block-end-color: var(--workspace-focus); }
 .tab:focus-visible { outline: calc(var(--spacing) / 2) solid var(--workspace-focus); outline-offset: calc(var(--spacing) * -1); }
 
+.confirmHero { display: flex; align-items: center; gap: calc(var(--spacing) * 4); }
+.confirmBadge { display: grid; flex: none; place-items: center; inline-size: calc(var(--spacing) * 14); block-size: calc(var(--spacing) * 14); border-radius: var(--radius-full); background: var(--workspace-success-bg); color: var(--workspace-success-text); animation: challengePop 460ms var(--challenge-ease, ease) both; }
+.confirmBadge .icon { inline-size: calc(var(--spacing) * 7); block-size: calc(var(--spacing) * 7); }
+@keyframes challengePop { 0% { opacity: 0; transform: scale(0.6); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+
 @media (width < theme(--breakpoint-md)) { .ctaRow > :is(p, span) { flex-basis: 100%; } }
+
+/* ---------------------------------------------------------------- rubric */
+
+/* Criteria read as cards: label heading, points pill that never wraps into a
+   sliver column, description body. Shared by the track preview and the portal. */
+.rubricDetails { margin-block-start: calc(var(--spacing) * 2); }
+.rubricDetails summary { min-block-size: calc(var(--spacing) * 11); }
+.rubric { display: grid; gap: calc(var(--spacing) * 3); margin: calc(var(--spacing) * 4) 0 0; padding: 0; list-style: none; }
+.criterion { display: grid; gap: calc(var(--spacing) * 2); padding: calc(var(--spacing) * 4); border: thin solid var(--workspace-line); border-radius: var(--radius-lg); background: var(--workspace-page); }
+.criterionHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(var(--spacing) * 2) calc(var(--spacing) * 4); }
+.criterionLabel { font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.pointsPill { flex: none; display: inline-flex; align-items: center; padding: calc(var(--spacing) * 1) calc(var(--spacing) * 3); border: thin solid color-mix(in oklab, var(--workspace-focus) 35%, transparent); border-radius: var(--radius-full); background: var(--workspace-subtle); color: var(--workspace-focus); font-size: var(--text-xs); font-weight: var(--font-weight-bold); white-space: nowrap; }
+.criterionBody { margin: 0; color: var(--workspace-muted); font-size: var(--text-sm); line-height: var(--leading-relaxed); }

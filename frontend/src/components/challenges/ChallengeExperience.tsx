@@ -37,6 +37,7 @@ export default function ChallengeExperience() {
   const [phone, setPhone] = useState('');
   const [acceptRules, setAcceptRules] = useState(false);
   const [makePublic, setMakePublic] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [accessOnly, setAccessOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<GuestStep>('intro');
@@ -98,7 +99,7 @@ export default function ChallengeExperience() {
     try {
       const response = accessOnly
         ? await challengeApi.access(round.slug, email.trim())
-        : await challengeApi.register({ round_slug: round.slug, category_id: category!.id, full_name: fullName.trim(), email: email.trim(), phone: phone.trim(), accept_rules: acceptRules, make_public: makePublic });
+        : await challengeApi.register({ round_slug: round.slug, category_id: category!.id, full_name: fullName.trim(), email: email.trim(), phone: phone.trim(), accept_rules: acceptRules, make_public: makePublic, marketing_opt_in: marketingOptIn });
       setNotice(response.detail || 'Check your inbox for your personal challenge link. Check spam as well.');
     } catch (failure) { setError(challengeFailure(failure)); }
     finally { setBusy(false); }
@@ -147,9 +148,9 @@ export default function ChallengeExperience() {
               })}</ol></nav>
               {step === 'intro' && <GuestIntro round={round} onChoose={() => setStep('tracks')} onAccess={() => { setAccessOnly(true); setStep('join'); }} />}
               {step === 'tracks' && <GuestTracks round={round} category={category} onPick={setCategory} onBack={() => setStep('intro')} onContinue={() => { setAccessOnly(false); setStep('join'); }} />}
-              {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic}
+              {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic} marketingOptIn={marketingOptIn}
                 onAccessOnly={(value) => { setAccessOnly(value); if (!value && !category) setStep('tracks'); }}
-                setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic}
+                setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic} setMarketingOptIn={setMarketingOptIn}
                 onBack={() => { setStep(accessOnly ? 'intro' : 'tracks'); }} onChangeTrack={() => { setAccessOnly(false); setStep('tracks'); }} onSubmit={register} />}
             </div>}
       </div>
@@ -191,11 +192,11 @@ function GuestTracks({ round, category, onPick, onBack, onContinue }: { round: C
   </div>;
 }
 
-function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, onBack, onChangeTrack, onSubmit }: {
+function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, marketingOptIn, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, setMarketingOptIn, onBack, onChangeTrack, onSubmit }: {
   round: ChallengeRound; category: ChallengeCategory | null; accessOnly: boolean; busy: boolean;
-  email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean;
+  email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean; marketingOptIn: boolean;
   onAccessOnly: (value: boolean) => void; setEmail: (value: string) => void; setFullName: (value: string) => void; setPhone: (value: string) => void;
-  setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; onBack: () => void; onChangeTrack: () => void; onSubmit: (event: FormEvent) => void;
+  setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; setMarketingOptIn: (value: boolean) => void; onBack: () => void; onChangeTrack: () => void; onSubmit: (event: FormEvent) => void;
 }) {
   return <div className={styles.stepFlow}>
     <section className={`${styles.panel} ${styles.stack} ${styles.narrow}`} aria-labelledby="join-step">
@@ -226,6 +227,7 @@ function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, 
           <legend>Your commitments</legend>
           <CheckCard checked={acceptRules} onChange={setAcceptRules} disabled={busy} required title="I accept the challenge rules" description="I have read the rules and agree to submit my own work for assessment." />
           <CheckCard checked={makePublic} onChange={setMakePublic} disabled={busy} title="Show my name in the published results" description="Optional. Public results name only participants who agree." />
+          <CheckCard checked={marketingOptIn} onChange={setMarketingOptIn} disabled={busy} title="Email me academy news and offers" description="Optional. Tech academy adverts, course launches and future challenge updates. Unsubscribe any time." />
         </fieldset>}
         <Action type="submit" intent="primary" className={styles.ctaWide} loading={busy} disabled={!accessOnly && (!round.registration_open || !category)}>{accessOnly ? 'Email my personal link' : 'Register for this challenge'}</Action>
         {!accessOnly && !round.registration_open && <p className={styles.muted}>Registration is currently closed. Registered participants can still return using their personal link.</p>}

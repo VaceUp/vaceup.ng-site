@@ -164,7 +164,7 @@ export const challengeApi = {
   rounds: async () => arrayOf(await challengeRequest<ChallengeRound[] | { results: ChallengeRound[] }>('/rounds/')),
   round: (slug: string) => challengeRequest<ChallengeRound>(`/rounds/${pathPart(slug)}/`),
   results: (slug: string) => challengeRequest<{ results: ChallengeResult[] }>(`/rounds/${pathPart(slug)}/results/`),
-  register: (body: { round_slug: string; category_id: ChallengeId; full_name: string; email: string; phone: string; accept_rules: boolean; make_public: boolean }) =>
+  register: (body: { round_slug: string; category_id: ChallengeId; full_name: string; email: string; phone: string; accept_rules: boolean; make_public: boolean; marketing_opt_in: boolean }) =>
     challengeRequest<{ detail: string }>('/register/', { method: 'POST', body: JSON.stringify(body) }),
   access: (round_slug: string, email: string) => challengeRequest<{ detail: string }>('/access/', { method: 'POST', body: JSON.stringify({ round_slug, email }) }),
   verify: (token: string) => challengeRequest<{ access_token: string; round_slug?: string }>('/verify/', { method: 'POST', body: JSON.stringify({ token }) }),

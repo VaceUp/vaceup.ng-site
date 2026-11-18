@@ -2,6 +2,18 @@
 
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
+## 2026-11-18 — Production 500 root cause found: foreign zip corrupted the backend folder
+
+**Decision**
+- The user extracted another application's zip into the VaceUp backend folder on the server, which is the actual cause of the persistent 500s (both apps stopped working). Recovery is a clean-slate restore, not a delta overlay — deltas cannot remove foreign files.
+- Recovery artifact: `vaceup-backend-2026-11-18-full.zip` (415 files, complete source tree, live `.env` excluded, `.env.production` included as reference; sha256 8bbdfe023a8b0ef7c42570c55db0e36371127acef28371b17680dc488ea3ab11). Runbook: `RECOVERY-RUNBOOK-2026-11-18.md` (backup first, inspect `.env` for VaceUp markers, empty folder, extract full zip, restore `.env`, pip install, migrate, check, challenge_email_selftest, restart).
+- Mobile build paused per user while the server is recovered; the Android Gradle build had also hit a 78-minute Maven Central download stall (react-android AAR) and needs one more retry after resume — EAS builds sidestep the local network issue entirely.
+
+**Open**
+- User to run the recovery on cPanel and report: whether the server `.env` still held VaceUp values (if not, rebuild from `.env.production` + their secrets), and whether the frontend folder was also overwritten (frontend redeploys from the GitHub pipeline).
+- Android emulator verification resumes after the recovery (install APK, launch, screenshot).
+- The earlier cross-device 500 diagnosis (error.tsx boundaries) stays deployed as a safety net but was not the root cause.
+
 ## 2026-11-18 — Mobile app started (React Native/Expo, Android + iOS)
 
 **Decision**

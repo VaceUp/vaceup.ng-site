@@ -47,6 +47,7 @@ export default function ChallengesManager() {
   const [bookBusy, setBookBusy] = useState(false);
   const [categoryEdit, setCategoryEdit] = useState<ChallengeCategory | 'new' | null>(null);
   const [correction, setCorrection] = useState<ChallengeScoreRow | null>(null);
+  const [registrationAction, setRegistrationAction] = useState<{ row: ChallengeScoreRow; action: 'disqualify' | 'reinstate' | 'delete' } | null>(null);
   const [confirm, setConfirm] = useState<{ round: ChallengeRound; action: 'open' | 'close' | 'freeze' | 'publish' } | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
@@ -111,7 +112,7 @@ export default function ChallengesManager() {
           <div className={styles.grid}><div className={styles.summary}><strong className={styles.metric}>{book.rows.length}</strong><span className={styles.muted}>Participant entries</span></div><div className={styles.summary}><strong className={styles.metric}>{exceptions}</strong><span className={styles.muted}>Entries needing a status or flag review</span></div></div>
           {!!book.blockers?.length && <StatusNote tone="error"><strong>Resolve before freezing:</strong><ul>{book.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></StatusNote>}
           <Field label="Search participants"><TextInput type="search" placeholder="Name, email, category or status" value={query} onChange={(event) => setQuery(event.target.value)} /></Field>
-          {!rows.length ? <EmptyState title={book.rows.length ? 'No matching entries' : 'No participants yet'} description={book.rows.length ? 'Try a different name, category or status.' : 'Registrations and project submissions will appear here after the round opens.'} /> : <div className={styles.tableWrap} tabIndex={0} aria-label="Participant scorebook, scroll horizontally for all columns"><table className={styles.table}><caption>Scroll horizontally to review scores, evidence sources and actions. Counts are not added across daily snapshots.</caption><thead><tr><th scope="col">Participant</th><th scope="col">Category</th><th scope="col">Quality /100</th><th scope="col">Likes / Comments</th><th scope="col">Engagement /20</th><th scope="col">Total /100</th><th scope="col">Status</th><th scope="col">Review</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.registration_id}><th scope="row"><span>{row.name}</span>{row.email && <p className={styles.muted}>{row.email}</p>}{row.rank && <span className={styles.pill}>Rank {row.rank}{row.winner ? book.frozen ? ' · Category winner' : ' · Leading category' : ''}</span>}</th><td>{row.category}</td><td>{points(row.quality_points)}</td><td><span>{row.likes ?? 'Unavailable'} / {row.comments ?? 'Unavailable'}</span><p className={styles.muted}>{engagementSource(row.engagement_source)}</p>{row.observed_at && <p className={styles.muted}>{challengeDate(row.observed_at)}</p>}</td><td>{selected.mode === 'quality_only' ? 'Not scored' : points(row.engagement_points)}</td><td><strong>{points(row.total)}</strong></td><td><Pill tone={row.flags.length ? 'danger' : 'neutral'}>{row.status.replaceAll('_', ' ')}</Pill>{row.flags.length > 0 && <p className={styles.muted}>{row.flags.join('; ')}</p>}</td><td><div className={styles.tight}>{row.post_url && <a className={styles.link} href={row.post_url} target="_blank" rel="noopener noreferrer">Open public post<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}<Action size="sm" disabled={book.frozen || selected.status === 'published' || !row.submission_id} onClick={() => setCorrection(row)}>Review / correct</Action></div></td></tr>)}</tbody></table></div>}
+          {!rows.length ? <EmptyState title={book.rows.length ? 'No matching entries' : 'No participants yet'} description={book.rows.length ? 'Try a different name, category or status.' : 'Registrations and project submissions will appear here after the round opens.'} /> : <div className={styles.tableWrap} tabIndex={0} aria-label="Participant scorebook, scroll horizontally for all columns"><table className={styles.table}><caption>Scroll horizontally to review scores, evidence sources and actions. Counts are not added across daily snapshots.</caption><thead><tr><th scope="col">Participant</th><th scope="col">Category</th><th scope="col">Quality /100</th><th scope="col">Likes / Comments</th><th scope="col">Engagement /20</th><th scope="col">Total /100</th><th scope="col">Status</th><th scope="col">Review</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.registration_id}><th scope="row"><span>{row.name}</span>{row.email && <p className={styles.muted}>{row.email}</p>}{row.rank && <span className={styles.pill}>Rank {row.rank}{row.winner ? book.frozen ? ' · Category winner' : ' · Leading category' : ''}</span>}</th><td>{row.category}</td><td>{points(row.quality_points)}</td><td><span>{row.likes ?? 'Unavailable'} / {row.comments ?? 'Unavailable'}</span><p className={styles.muted}>{engagementSource(row.engagement_source)}</p>{row.observed_at && <p className={styles.muted}>{challengeDate(row.observed_at)}</p>}</td><td>{selected.mode === 'quality_only' ? 'Not scored' : points(row.engagement_points)}</td><td><strong>{points(row.total)}</strong></td><td><Pill tone={row.flags.length ? 'danger' : 'neutral'}>{row.status.replaceAll('_', ' ')}</Pill>{row.flags.length > 0 && <p className={styles.muted}>{row.flags.join('; ')}</p>}</td><td><div className={styles.tight}>{row.post_url && <a className={styles.link} href={row.post_url} target="_blank" rel="noopener noreferrer">Open public post<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}<Action size="sm" disabled={book.frozen || selected.status === 'published' || !row.submission_id} onClick={() => setCorrection(row)}>Review / correct</Action><Action size="sm" intent={row.status === 'disqualified' ? 'neutral' : 'danger'} disabled={book.frozen || selected.status === 'published'} onClick={() => setRegistrationAction({ row, action: row.status === 'disqualified' ? 'reinstate' : 'disqualify' })}>{row.status === 'disqualified' ? 'Reinstate' : 'Disqualify'}</Action><Action size="sm" intent="danger" onClick={() => setRegistrationAction({ row, action: 'delete' })}>Delete</Action></div></td></tr>)}</tbody></table></div>}
           {rows.length > 50 && <Pager label="Challenge participants" page={scorePage} count={rows.length} hasNext={scorePage * 50 < rows.length} onPrev={() => setScorePage((page) => Math.max(1, page - 1))} onNext={() => setScorePage((page) => page + 1)} />}
           <p className={styles.muted}>Scores remain private until results are published. A participant’s evidence and public observations keep their original source and capture time. An unavailable public count is not a verified zero.</p>
         </div>}
@@ -121,6 +122,7 @@ export default function ChallengesManager() {
     {edit && <RoundEditor round={edit === 'new' ? undefined : edit} onClose={() => setEdit(null)} onSaved={async (saved) => { setEdit(null); setMessage(`“${saved.title}” was saved${saved.status === 'draft' ? ' as a private draft' : ''}.`); await reload(); setSelected(saved); }} />}
     {categoryEdit && selected && <CategoryEditor category={categoryEdit === 'new' ? undefined : categoryEdit} round={selected} onClose={() => setCategoryEdit(null)} onSaved={async () => { setCategoryEdit(null); setMessage('The category brief and rubric were saved.'); await reload(); }} />}
     {correction && selected && <CorrectionEditor row={correction} round={selected} onClose={() => setCorrection(null)} onSaved={async () => { setCorrection(null); setMessage('The correction was saved with an audit reason.'); await refreshBook(); }} />}
+    {registrationAction && selected && <RegistrationActionDrawer round={selected} row={registrationAction.row} action={registrationAction.action} onClose={() => setRegistrationAction(null)} onSaved={async (done) => { const kind = registrationAction.action; setRegistrationAction(null); setMessage(done === 'delete' ? 'The registration and its evidence were permanently deleted.' : done === 'disqualify' ? 'The entry was disqualified and the participant will be emailed.' : 'The entry was reinstated.'); await refreshBook(); }} />}
     {confirm && <RoundActionConfirmation round={confirm.round} action={confirm.action} onClose={() => setConfirm(null)} onSaved={async () => { const action = confirm.action; setConfirm(null); setMessage(action === 'publish' ? 'Approved results are now published.' : action === 'freeze' ? 'A fixed scorebook has been saved. Review it before publishing results.' : action === 'open' ? 'The challenge round is open for registration.' : 'The round has been closed to submissions.'); await reload(); await refreshBook(); }} />}
   </div>;
 }
@@ -219,6 +221,42 @@ function CorrectionEditor({ row, round, onClose, onSaved }: { row: ChallengeScor
     <Field label="Reason and evidence for this correction" required><textarea className={controlClass} required minLength={10} rows={6} value={reason} onChange={(event) => setReason(event.target.value)} disabled={busy} /></Field>
     <div className={styles.row}><Action type="submit" intent={disqualified ? 'danger' : 'primary'} loading={busy}>{disqualified ? 'Save disqualification' : 'Save audited correction'}</Action><Action disabled={busy} onClick={onClose}>Cancel</Action></div>
   </form></Drawer>;
+}
+
+function RegistrationActionDrawer({ round, row, action, onClose, onSaved }: {
+  round: ChallengeRound; row: ChallengeScoreRow; action: 'disqualify' | 'reinstate' | 'delete';
+  onClose: () => void; onSaved: (done: 'disqualify' | 'reinstate' | 'delete') => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const labels = { disqualify: 'Disqualify entry', reinstate: 'Reinstate entry', delete: 'Delete registration permanently' } as const;
+  const word = action === 'delete' ? 'DELETE' : action === 'disqualify' ? 'DISQUALIFY' : 'REINSTATE';
+  const descriptions = {
+    disqualify: 'The entry stops being scored, portal access is cut immediately and the participant is emailed your reason.',
+    reinstate: 'The entry becomes eligible again while the round is open. The participant is not emailed automatically.',
+    delete: 'This irreversibly removes the registration, every submission, all uploaded files and every session. There is no archive.',
+  } as const;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      if (action === 'delete') await challengeAdminApi.deleteRegistration(row.registration_id);
+      else await challengeAdminApi.registrationAction(row.registration_id, action, reason.trim());
+      await onSaved(action);
+    } catch (failure) { setError(challengeFailure(failure)); } finally { setBusy(false); }
+  };
+  return <Drawer variant="modal" open title={`${labels[action]} — ${row.name}`} description={descriptions[action]} onClose={() => { if (!busy) onClose(); }}>
+    <form className={styles.stack} onSubmit={submit}>{error && <StatusNote tone="error">{error}</StatusNote>}
+      <StatusNote>Round: {round.title} · Status: {row.status.replaceAll('_', ' ')}</StatusNote>
+      {action === 'delete' && <>
+        <StatusNote tone="error"><strong>Permanent deletion.</strong> This cannot be undone and leaves no record. Prefer disqualification when the entry should remain auditable.</StatusNote>
+        <Field label={`Type ${word} to confirm`} required><TextInput value={confirm} onChange={(event) => setConfirm(event.target.value)} required autoComplete="off" disabled={busy} /></Field>
+      </>}
+      {action !== 'delete' && <Field label="Reason for the audit record" required hint="Disqualifications are emailed to the participant; reinstatements stay internal."><textarea className={controlClass} required minLength={10} rows={4} value={reason} onChange={(event) => setReason(event.target.value)} disabled={busy} /></Field>}
+      <div className={styles.row}><Action type="submit" intent={action === 'reinstate' ? 'primary' : 'danger'} loading={busy} disabled={action === 'delete' && confirm !== word}>{labels[action]}</Action><Action disabled={busy} onClick={onClose}>Cancel</Action></div>
+    </form>
+  </Drawer>;
 }
 
 function RoundActionConfirmation({ round, action, onClose, onSaved }: { round: ChallengeRound; action: 'open' | 'close' | 'freeze' | 'publish'; onClose: () => void; onSaved: () => Promise<void> }) {

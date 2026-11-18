@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CalendarDays, Check, Clock3, Mail, RefreshCw, Trophy } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CalendarDays, Check, Clock3, KeyRound, Mail, RefreshCw, Trophy } from 'lucide-react';
 import {
   challengeApi, challengeDate, challengeFailure, engagementSource,
   type ChallengeCategory, type ChallengeEvidence, type ChallengePortal, type ChallengeRound, type ChallengeResult,
 } from '@/lib/challenge-api';
 import { Action, CategoryIcon, ChallengeDates, ChallengeField, ChallengeNote, ChallengeWeights, CheckCard, EvidenceLinks, EvidenceUpload, Reveal, styles } from './ChallengeUI';
 import { RulesReader } from './RulesReader';
+import { JsonLd, challengeEventJsonLd } from '@/lib/seo';
 
 const sessionKey = (slug: string) => `vaceup_challenge_session:${slug}`;
 const isPast = (value: string) => new Date(value).getTime() < Date.now();
@@ -16,11 +17,14 @@ const countLabel = (value: number | null | undefined) => value === null || value
 
 type GuestStep = 'intro' | 'tracks' | 'join';
 
+// localStorage, not sessionStorage: returning to the same browser reopens the
+// portal without another email. There is still no permanent account - the
+// session token itself expires with the round, server-side.
 function readSession(slug: string): string {
-  try { return sessionStorage.getItem(sessionKey(slug)) || ''; } catch { return ''; }
+  try { return window.localStorage.getItem(sessionKey(slug)) || ''; } catch { return ''; }
 }
 function saveSession(slug: string, token: string) {
-  try { sessionStorage.setItem(sessionKey(slug), token); } catch { /* The active tab can continue without persistent storage. */ }
+  try { window.localStorage.setItem(sessionKey(slug), token); } catch { /* The active tab can continue without persistent storage. */ }
 }
 
 export default function ChallengeExperience() {
@@ -38,7 +42,8 @@ export default function ChallengeExperience() {
   const [acceptRules, setAcceptRules] = useState(false);
   const [makePublic, setMakePublic] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ name: string; email: string; category: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ name: string; email: string; category: string; accessCode: string | null } | null>(null);
+  const [accessCode, setAccessCode] = useState('');
   const [accessOnly, setAccessOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<GuestStep>('intro');
@@ -97,6 +102,17 @@ export default function ChallengeExperience() {
   const register = async (event: FormEvent) => {
     event.preventDefault(); if (!round || (!category && !accessOnly)) return;
     setBusy(true); setError(''); setNotice('');
+    // Returning participants skip the email round-trip entirely: email plus
+    // their saved six-digit code opens the portal on the spot.
+    if (accessOnly && accessCode.trim().length === 6) {
+      try {
+        const verified = await challengeApi.accessCode(round.slug, email.trim(), accessCode.trim());
+        await loadPortal(verified.access_token);
+        setAccessCode('');
+      } catch (failure) { setError(challengeFailure(failure)); }
+      finally { setBusy(false); }
+      return;
+    }
     try {
       const response = accessOnly
         ? await challengeApi.access(round.slug, email.trim())
@@ -104,15 +120,15 @@ export default function ChallengeExperience() {
       if (accessOnly) setNotice(response.detail || 'Check your inbox for your personal challenge link. Check spam as well.');
       // Registration gets its own confirmation screen; a quiet note at the top
       // of a still-filled form leaves people unsure anything happened.
-      else setConfirmation({ name: fullName.trim().split(' ')[0] || 'there', email: email.trim(), category: category!.name });
+      else setConfirmation({ name: fullName.trim().split(' ')[0] || 'there', email: email.trim(), category: category!.name, accessCode: response.access_code ?? null });
     } catch (failure) { setError(challengeFailure(failure)); }
     finally { setBusy(false); }
   };
 
   const signOut = () => {
-    if (round) { try { sessionStorage.removeItem(sessionKey(round.slug)); } catch { /* Session storage may be unavailable. */ } }
+    if (round) { try { window.localStorage.removeItem(sessionKey(round.slug)); } catch { /* Session storage may be unavailable. */ } }
     setToken(''); setPortal(null); setStep('intro');
-    setNotice('You have left your challenge portal on this device. Use your personal email link to return.');
+    setNotice('You have left your challenge portal on this device. Use your personal email link or your access code to return.');
   };
 
   const stepMeta: Array<{ key: GuestStep; label: string; reachable: boolean }> = [
@@ -123,6 +139,7 @@ export default function ChallengeExperience() {
   const activeIndex = stepMeta.findIndex((item) => item.key === step);
 
   return <div className={styles.root}>
+    {round && <JsonLd data={challengeEventJsonLd(round)} />}
     <section className={styles.hero} aria-labelledby="challenge-title"><div className={`${styles.container} ${styles.heroInner}`}>
       <div><p className={styles.eyebrow}><Trophy className={styles.icon} aria-hidden="true" />VaceUp community challenge</p>
         <h1 id="challenge-title" className={styles.title}>{round?.title || 'Build something worth sharing.'}</h1>
@@ -152,14 +169,14 @@ export default function ChallengeExperience() {
               })}</ol></nav>
               {step === 'intro' && <GuestIntro round={round} onChoose={() => setStep('tracks')} onAccess={() => { setAccessOnly(true); setStep('join'); }} />}
               {step === 'tracks' && <GuestTracks round={round} category={category} onPick={setCategory} onBack={() => setStep('intro')} onContinue={() => { setAccessOnly(false); setStep('join'); }} />}
-              {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic} marketingOptIn={marketingOptIn}
+              {step === 'join' && <GuestJoin round={round} category={category} accessOnly={accessOnly} busy={busy} email={email} fullName={fullName} phone={phone} acceptRules={acceptRules} makePublic={makePublic} marketingOptIn={marketingOptIn} accessCode={accessCode}
                 onAccessOnly={(value) => { setAccessOnly(value); if (!value && !category) setStep('tracks'); }}
-                setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic} setMarketingOptIn={setMarketingOptIn}
+                setEmail={setEmail} setFullName={setFullName} setPhone={setPhone} setAcceptRules={setAcceptRules} setMakePublic={setMakePublic} setMarketingOptIn={setMarketingOptIn} setAccessCode={setAccessCode}
                 onBack={() => { setStep(accessOnly ? 'intro' : 'tracks'); }} onChangeTrack={() => { setAccessOnly(false); setStep('tracks'); }} onSubmit={register}
                 confirmation={confirmation}
                 onOverview={() => { setConfirmation(null); setStep('intro'); }}
                 onResend={() => { setConfirmation(null); setAccessOnly(true); }}
-                onAnother={() => { setConfirmation(null); setFullName(''); setPhone(''); setEmail(''); setAcceptRules(false); setMakePublic(false); setMarketingOptIn(false); }} />}
+                onAnother={() => { setConfirmation(null); setFullName(''); setPhone(''); setEmail(''); setAcceptRules(false); setMakePublic(false); setMarketingOptIn(false); setAccessCode(''); }} />}
             </div>}
       </div>
     </div>
@@ -200,12 +217,13 @@ function GuestTracks({ round, category, onPick, onBack, onContinue }: { round: C
   </div>;
 }
 
-function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, marketingOptIn, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, setMarketingOptIn, onBack, onChangeTrack, onSubmit, confirmation, onOverview, onResend, onAnother }: {
+function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, acceptRules, makePublic, marketingOptIn, accessCode, onAccessOnly, setEmail, setFullName, setPhone, setAcceptRules, setMakePublic, setMarketingOptIn, setAccessCode, onBack, onChangeTrack, onSubmit, confirmation, onOverview, onResend, onAnother }: {
   round: ChallengeRound; category: ChallengeCategory | null; accessOnly: boolean; busy: boolean;
-  email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean; marketingOptIn: boolean;
+  email: string; fullName: string; phone: string; acceptRules: boolean; makePublic: boolean; marketingOptIn: boolean; accessCode: string;
   onAccessOnly: (value: boolean) => void; setEmail: (value: string) => void; setFullName: (value: string) => void; setPhone: (value: string) => void;
-  setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; setMarketingOptIn: (value: boolean) => void; onBack: () => void; onChangeTrack: () => void; onSubmit: (event: FormEvent) => void;
-  confirmation: { name: string; email: string; category: string } | null; onOverview: () => void; onResend: () => void; onAnother: () => void;
+  setAcceptRules: (value: boolean) => void; setMakePublic: (value: boolean) => void; setMarketingOptIn: (value: boolean) => void; setAccessCode: (value: string) => void;
+  onBack: () => void; onChangeTrack: () => void; onSubmit: (event: FormEvent) => void;
+  confirmation: { name: string; email: string; category: string; accessCode: string | null } | null; onOverview: () => void; onResend: () => void; onAnother: () => void;
 }) {
   if (confirmation) return <RegistrationConfirmation round={round} confirmation={confirmation} onOverview={onOverview} onResend={onResend} onAnother={onAnother} />;
   return <div className={styles.stepFlow}>
@@ -226,7 +244,10 @@ function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, 
       </div>}
       <form className={styles.stack} onSubmit={onSubmit}>
         {accessOnly
-          ? <ChallengeField label="Email address"><input className={styles.control} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={busy} maxLength={254} /></ChallengeField>
+          ? <>
+            <ChallengeField label="Email address"><input className={styles.control} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={busy} maxLength={254} /></ChallengeField>
+            <ChallengeField label="Access code (optional)" hint="The six-digit code from your registration confirmation or access email. With it, this button opens your portal right now; without it, we email you a fresh link."><input className={styles.control} inputMode="numeric" autoComplete="one-time-code" value={accessCode} onChange={(event) => setAccessCode(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} maxLength={6} disabled={busy} /></ChallengeField>
+          </>
           : <fieldset className={styles.joinGroup}>
             <legend>Your details</legend>
             <ChallengeField label="Full name"><input className={styles.control} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={150} disabled={busy} /></ChallengeField>
@@ -239,7 +260,7 @@ function GuestJoin({ round, category, accessOnly, busy, email, fullName, phone, 
           <CheckCard checked={makePublic} onChange={setMakePublic} disabled={busy} title="Show my name in the published results" description="Optional. Public results name only participants who agree." />
           <CheckCard checked={marketingOptIn} onChange={setMarketingOptIn} disabled={busy} title="Email me academy news and offers" description="Optional. Tech academy adverts, course launches and future challenge updates. Unsubscribe any time." />
         </fieldset>}
-        <Action type="submit" intent="primary" className={styles.ctaWide} loading={busy} disabled={!accessOnly && (!round.registration_open || !category)}>{accessOnly ? 'Email my personal link' : 'Register for this challenge'}</Action>
+        <Action type="submit" intent="primary" className={styles.ctaWide} loading={busy} disabled={!accessOnly && (!round.registration_open || !category)}>{accessOnly ? (accessCode.trim().length === 6 ? 'Open my portal now' : 'Email my personal link') : 'Register for this challenge'}</Action>
         {!accessOnly && !round.registration_open && <p className={styles.muted}>Registration is currently closed. Registered participants can still return using their personal link.</p>}
       </form>
       <div className={styles.joinAside}>
@@ -265,7 +286,7 @@ function CategoryBrief({ category }: { category: ChallengeCategory }) {
 }
 
 function RegistrationConfirmation({ round, confirmation, onOverview, onResend, onAnother }: {
-  round: ChallengeRound; confirmation: { name: string; email: string; category: string };
+  round: ChallengeRound; confirmation: { name: string; email: string; category: string; accessCode: string | null };
   onOverview: () => void; onResend: () => void; onAnother: () => void;
 }) {
   return <div className={styles.stepFlow}>
@@ -282,6 +303,7 @@ function RegistrationConfirmation({ round, confirmation, onOverview, onResend, o
         <div className={styles.trackBarText}><strong>{confirmation.category}</strong><span className={styles.muted}>Your selected track</span></div>
       </div>
       <ChallengeNote success><div className={styles.tight}><strong>We emailed {confirmation.email}</strong><p>The {confirmation.category} project brief and your personal challenge link are on their way. Nothing after a few minutes? Check spam, then resend the link below.</p></div></ChallengeNote>
+      {confirmation.accessCode && <div className={styles.note}><KeyRound className={styles.icon} aria-hidden="true" /><span>Your access code: <strong>{confirmation.accessCode}</strong> — together with your email it reopens this portal on any device, without another email. Save it now; it works until the round ends.</span></div>}
       <div className={styles.tight}>
         <h3>What happens next</h3>
         <ol className={styles.list}>

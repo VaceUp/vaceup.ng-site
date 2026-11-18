@@ -1,5 +1,6 @@
 """Hashed, expiring challenge credentials that never authenticate an LMS user."""
 import hashlib
+import hmac
 import secrets
 from datetime import timedelta
 
@@ -17,12 +18,39 @@ def token_digest(value):
 
 def issue_token(registration, kind):
     value = secrets.token_urlsafe(32)
-    hours = getattr(settings, "CHALLENGE_VERIFY_TTL_HOURS", 48) if kind == "verify" else getattr(settings, "CHALLENGE_SESSION_TTL_HOURS", 24)
+    now = timezone.now()
+    if kind == "verify":
+        expires = now + timedelta(hours=getattr(settings, "CHALLENGE_VERIFY_TTL_HOURS", 48))
+    else:
+        # Sessions live for the round, not for a day: access ends when the
+        # results have been out for two weeks, so a monthly challenge never
+        # leaves a permanent portal behind.
+        anchored = registration.round.results_publish_at + timedelta(days=14)
+        expires = max(now + timedelta(hours=24), min(now + timedelta(days=90), anchored))
     ParticipantToken.objects.create(
         registration=registration, token_hash=token_digest(value), kind=kind,
-        access_version=registration.access_version, expires_at=timezone.now() + timedelta(hours=hours),
+        access_version=registration.access_version, expires_at=expires,
     )
     return value
+
+
+def issue_access_code(registration):
+    """Six-digit portal code; only its hash is stored, the plain code is
+    returned once (confirmation screen or access email) and never logged."""
+    code = "".join(str(secrets.randbelow(10)) for _ in range(6))
+    registration.access_code_hash = token_digest(f"{registration.pk}:{code}")
+    registration.save(update_fields=["access_code_hash", "updated_at"])
+    return code
+
+
+def verify_access_code(registration, code):
+    """Email plus code becomes a session - no email round-trip required."""
+    if not registration.access_code_hash or len(code) != 6 or not code.isdigit():
+        raise AuthenticationFailed("That code does not match this registration. Request a fresh access email.")
+    candidate = token_digest(f"{registration.pk}:{code.strip()}")
+    if not hmac.compare_digest(candidate, registration.access_code_hash):
+        raise AuthenticationFailed("That code does not match this registration. Request a fresh access email.")
+    return issue_token(registration, "session")
 
 
 def participant(request):

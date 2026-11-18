@@ -161,6 +161,7 @@ class RegisterSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=40, min_length=5)
     accept_rules = serializers.BooleanField()
     make_public = serializers.BooleanField(default=False)
+    marketing_opt_in = serializers.BooleanField(default=False)
 
     def validate_email(self, value):
         return value.strip().lower()

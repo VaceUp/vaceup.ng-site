@@ -34,10 +34,23 @@ def eligible_users():
     )
 
 
+def _still_eligible(candidate):
+    """Re-check the recipient at delivery time; consent may have changed."""
+    if candidate.user_id:
+        return eligible_users().filter(pk=candidate.user_id, email__iexact=candidate.email).exists()
+    from apps.challenges.models import ChallengeRegistration
+    registered = ChallengeRegistration.objects.filter(
+        email__iexact=candidate.email, marketing_opt_in=True, disqualified=False,
+    ).exclude(email="")
+    return registered.exists() and not EmailSuppression.objects.filter(email__iexact=candidate.email).exists()
+
+
 def get_campaign_recipients(campaign):
+    """LMS-user audiences. Challenge guest segments resolve in campaign_rows."""
     users = eligible_users()
     enrolled = Enrollment.objects.filter(student=OuterRef("pk"), status__in=["active", "completed"])
     paid = Payment.objects.filter(student=OuterRef("pk"), status="success")
+    from apps.challenges.models import ChallengeRegistration
     audience = campaign.audience_filter
     if audience == "never_purchased":
         users = users.filter(~Exists(paid))
@@ -54,16 +67,61 @@ def get_campaign_recipients(campaign):
         users = users.filter(Q(last_login__lt=cutoff) | Q(last_login__isnull=True, date_joined__lt=cutoff))
     elif audience == "new_users":
         users = users.filter(date_joined__gte=timezone.now() - timedelta(days=7))
+    elif audience in ("challenge_participants", "challenge_students"):
+        raise DomainError("Challenge audiences collect guest emails; resolve them through campaign_rows.")
     elif audience != "all_users":
         raise DomainError("Choose a supported audience and save the draft again.")
+    if campaign.exclude_challenge_participants:
+        # Lifecycle stop/start: a challenge registrant leaves the general
+        # prospect mailings and receives the participant segments instead.
+        users = users.filter(~Exists(ChallengeRegistration.objects.filter(email__iexact=OuterRef("email"))))
     if campaign.exclude_purchased:
         users = users.filter(~Exists(paid))
     return users.order_by("pk")
 
 
+def challenge_registration_audience(campaign, *, students):
+    """Guest emails from the challenge pipeline: opt-in, verified, eligible.
+
+    Participants who later pay for a course move to the student segment, so the
+    participant segment stops matching them the moment a payment succeeds.
+    """
+    from apps.challenges.models import ChallengeRegistration
+    from apps.payments.models import Payment
+    query = ChallengeRegistration.objects.filter(
+        marketing_opt_in=True, email_verified_at__isnull=False, disqualified=False,
+    ).exclude(email="").filter(
+        ~Exists(EmailSuppression.objects.filter(email__iexact=OuterRef("email"))),
+    )
+    if campaign.target_challenge_rounds.exists():
+        query = query.filter(round__in=campaign.target_challenge_rounds.all())
+    if campaign.target_challenge_categories.exists():
+        query = query.filter(category__in=campaign.target_challenge_categories.all())
+    paid_elsewhere = Payment.objects.filter(student__email__iexact=OuterRef("email"), status="success")
+    if students:
+        query = query.filter(Exists(paid_elsewhere))
+    else:
+        query = query.filter(~Exists(paid_elsewhere))
+    return query.order_by("pk")
+
+
+def campaign_rows(campaign):
+    """Unified audience as (user_id_or_None, email) rows, deduplicated by email."""
+    if campaign.audience_filter in ("challenge_participants", "challenge_students"):
+        registrations = challenge_registration_audience(
+            campaign, students=campaign.audience_filter == "challenge_students")
+        seen, output = set(), []
+        for registration in registrations:
+            email = registration.email.lower()
+            if email not in seen:
+                seen.add(email)
+                output.append((None, email))
+        return output
+    return list(get_campaign_recipients(campaign).values_list("pk", "email"))
+
 def audience_preview(campaign):
     # A signed content revision prevents confirming an older campaign edit.
-    users = list(get_campaign_recipients(campaign).values_list("pk", "email")[:10001])
+    users = list(campaign_rows(campaign)[:10001])
     if len(users) > 10000:
         raise DomainError("Split this audience into smaller campaigns (maximum 10,000 recipients).")
     count = len(users)
@@ -90,7 +148,7 @@ def schedule_campaign(campaign_id, confirmation, scheduled_at=None):
         confirmed = signing.loads(confirmation, salt="marketing-audience", max_age=600)
     except (signing.BadSignature, TypeError):
         raise DomainError("Review the audience again; confirmation has expired.")
-    users = list(get_campaign_recipients(campaign).values_list("pk", "email")[:10001])
+    users = list(campaign_rows(campaign)[:10001])
     if confirmed != {"id": campaign.pk, "revision": campaign.updated_at.isoformat(), "count": len(users),
                      "audience": hashlib.sha256(json.dumps(users).encode()).hexdigest()}:
         raise IllegalStateTransition("The campaign or audience changed. Review recipients again.")
@@ -189,7 +247,7 @@ def process_queue(limit=25, max_seconds=45):
             continue
         EmailCampaign.objects.filter(pk=campaign.pk, status="scheduled").update(status="sending", sent_at=now)
         values = {"status": "sent", "sent_at": now, "failure_reason": ""}
-        if not eligible_users().filter(pk=candidate.user_id, email__iexact=candidate.email).exists():
+        if not _still_eligible(candidate):
             values = {"status": "skipped", "failure_reason": "Recipient inactive, changed address or opted out."}
         else:
             try:
@@ -219,8 +277,11 @@ def handle_unsubscribe(token):
     recipient = EmailRecipient.objects.filter(unsubscribe_token=token).exclude(unsubscribe_token="").first()
     if not recipient:
         raise DomainError("This unsubscribe link is invalid.")
-    EmailUnsubscribe.objects.update_or_create(user_id=recipient.user_id, defaults={
-        "marketing_emails": False, "promotional_offers": False, "unsubscribe_token": uuid.uuid4().hex,
-    })
+    if recipient.user_id:
+        EmailUnsubscribe.objects.update_or_create(user_id=recipient.user_id, defaults={
+            "marketing_emails": False, "promotional_offers": False, "unsubscribe_token": uuid.uuid4().hex,
+        })
+    # Guest recipients have no account preferences; the email-level
+    # suppression list is the durable opt-out for them.
     EmailSuppression.objects.get_or_create(email=recipient.email, reason="unsubscribed", defaults={"user_id": recipient.user_id})
     EmailRecipient.objects.filter(pk=recipient.pk).update(unsubscribed_at=timezone.now())

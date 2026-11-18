@@ -8,6 +8,7 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 import { downloadEventIcs } from '@/lib/calendar';
 import { trackMeta } from '@/lib/meta-pixel';
 import { formatEventWindow, getEvent, type WebsiteEvent } from '@/lib/website-api';
+import { JsonLd, eventJsonLd } from '@/lib/seo';
 import RegisterButton from './RegisterButton';
 import JoinBand from './JoinBand';
 
@@ -56,6 +57,7 @@ export default function EventDetail({ slug }: { slug: string }) {
       : `${shown.seats_taken}`
     : '';
 
+
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -67,7 +69,9 @@ export default function EventDetail({ slug }: { slug: string }) {
   };
 
   return (
-    <main>
+    <>
+      {shown && <JsonLd data={eventJsonLd(shown)} />}
+      <main>
       <div className="mx-auto max-w-5xl px-6 py-8">
         <Link href="/events" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-navy-900 underline underline-offset-4 hover:text-navy-950">
           <LordIconComponent src={LordIcons.arrowLeft} size={18} />
@@ -200,5 +204,6 @@ export default function EventDetail({ slug }: { slug: string }) {
         </>
       )}
     </main>
+    </>
   );
 }

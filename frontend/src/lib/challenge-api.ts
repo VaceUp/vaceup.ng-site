@@ -165,8 +165,10 @@ export const challengeApi = {
   round: (slug: string) => challengeRequest<ChallengeRound>(`/rounds/${pathPart(slug)}/`),
   results: (slug: string) => challengeRequest<{ results: ChallengeResult[] }>(`/rounds/${pathPart(slug)}/results/`),
   register: (body: { round_slug: string; category_id: ChallengeId; full_name: string; email: string; phone: string; accept_rules: boolean; make_public: boolean; marketing_opt_in: boolean }) =>
-    challengeRequest<{ detail: string }>('/register/', { method: 'POST', body: JSON.stringify(body) }),
-  access: (round_slug: string, email: string) => challengeRequest<{ detail: string }>('/access/', { method: 'POST', body: JSON.stringify({ round_slug, email }) }),
+    challengeRequest<{ detail: string; email_status: string; access_code?: string }>('/register/', { method: 'POST', body: JSON.stringify(body) }),
+  access: (round_slug: string, email: string) => challengeRequest<{ detail: string; access_code?: string }>('/access/', { method: 'POST', body: JSON.stringify({ round_slug, email }) }),
+  accessCode: (round_slug: string, email: string, code: string) =>
+    challengeRequest<{ access_token: string; registration: ChallengePortal['registration'] }>('/access-code/', { method: 'POST', body: JSON.stringify({ round_slug, email, code }) }),
   verify: (token: string) => challengeRequest<{ access_token: string; round_slug?: string }>('/verify/', { method: 'POST', body: JSON.stringify({ token }) }),
   portal: (token: string) => challengeRequest<ChallengePortal>('/portal/', {}, token),
   submit: (token: string, body: { post_url: string; explanation: string; evidence_ids: ChallengeId[]; checklist_confirmed: boolean }) =>
@@ -198,6 +200,10 @@ export const challengeAdminApi = {
   action: (id: ChallengeId, action: string, body: unknown = {}) => api.request<ChallengeRound>(`${BASE}/admin/rounds/${pathPart(id)}/${action}/`, { method: 'POST', body: JSON.stringify(body) }),
   correction: (roundId: ChallengeId, registrationId: ChallengeId, body: unknown) => api.request(`${BASE}/admin/rounds/${pathPart(roundId)}/overrides/`, { method: 'POST', body: JSON.stringify({ registration_id: registrationId, ...body as object }) }),
   download: (id: ChallengeId) => api.request<{ url: string }>(`${BASE}/admin/assets/${pathPart(id)}/download/`),
+  registrationAction: (registrationId: ChallengeId, action: 'disqualify' | 'reinstate', reason: string) =>
+    api.request<{ detail: string }>(`${BASE}/admin/registrations/${pathPart(registrationId)}/`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
+  deleteRegistration: (registrationId: ChallengeId) =>
+    api.request<{ detail: string }>(`${BASE}/admin/registrations/${pathPart(registrationId)}/`, { method: 'DELETE' }),
 };
 
 function evidenceContentType(file: File): string {

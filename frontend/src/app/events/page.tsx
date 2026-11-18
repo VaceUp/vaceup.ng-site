@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { downloadEventIcs } from '@/lib/calendar';
 import { SITE } from '@/lib/site-config';
 import { formatEventWindow, getPublishedEvents, type WebsiteEvent } from '@/lib/website-api';
+import { JsonLd, eventsItemListJsonLd } from '@/lib/seo';
 
 export default function EventsPage() {
   return (
@@ -83,6 +84,8 @@ function EventsList() {
     event.capacity ? `${event.seats_taken}/${event.capacity} seats filled` : `${event.seats_taken} registered`;
 
   return (
+    <>
+      {!!upcoming.length && <JsonLd data={eventsItemListJsonLd(upcoming)} />}
     <div className="min-h-screen bg-white">
       <main>
         <section className="py-20 bg-navy-950">
@@ -384,5 +387,6 @@ function EventsList() {
         )}
       </main>
     </div>
+    </>
   );
 }

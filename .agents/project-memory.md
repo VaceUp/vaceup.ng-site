@@ -2,6 +2,28 @@
 
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
+## 2026-11-18 — Challenge lifecycle: access codes, marketing segments, admin actions, SEO
+
+**Decision**
+- Challenge portal access must NOT require an email round-trip and must NOT expire daily, but there is still no permanent portal: session tokens now live until two weeks after results publication, and every registrant gets a hashed six-digit access code (shown once on the confirmation screen and in the brief email) that reopens the portal with just email + code on any device. The browser keeps the session in localStorage.
+- Registration is also an email-collection funnel: a marketing opt-in checkbox gates the new campaign segments. Challenge participants (opted-in, verified, not disqualified) and challenge-participants-who-became-students are selectable audiences by round and category in the marketing composer; a campaign flag excludes registered participants from general prospect mailings (stop/start lifecycle). Participants who pay move to the student segment automatically.
+- Learner lifecycle emails: congratulations on course completion; weekly-cron progress reminders for stalled learners (14-day throttle per learner).
+- Admins get a per-row Disqualify (reason required, participant is emailed, sessions killed immediately) and a hard permanent Delete (typed DELETE confirm; cascades everything and best-effort deletes storage objects; refuses when audited score corrections exist).
+- Challenges and events must be searchable: /challenge/ is now indexable with real metadata, sitemap.xml + robots.txt are generated, and Event JSON-LD (dates, free offer, online attendance) is injected for the round and public events.
+- The opaque "500" on other devices gets a readable error boundary (app/error.tsx + global-error.tsx) showing the real error text and a reference — ask the user for that text next time a device fails.
+
+**Changed**
+- challenges: auth.py (round-scoped sessions, access code issue/verify), views.py (AccessCodeView, AdminRegistrationActionView, access code in register/access flows), urls.py, emails.py (brief PDF link + access code + disqualification notice), jobs.py (disqualification_email kind), models + migrations 0003-0004, management/commands/challenge_email_selftest.py.
+- marketing: models/serializers/services (challenge segment audiences, guest recipients with nullable user + per-email uniqueness, suppression respected, delivery-time re-check), migration 0003.
+- enrollment: emails.py (congratulations + reminder), models + migration (last_progress_reminder_at), management command send_progress_reminders.
+- frontend: confirmation shows the access code; access form takes the code; ChallengesManager has Disqualify/Reinstate/Delete per row; MarketingManager has challenge segments; lib/seo.tsx + app/sitemap.ts + app/robots.ts + app/error.tsx + app/global-error.tsx; JSON-LD in the challenge and events pages.
+
+**Open**
+- The cross-device 500 needs the real error text from error.tsx once deployed — record it here when the user reports it.
+- Ops checklist for email: process_challenges cron every minute (brief emails), process_marketing_queue cron (campaigns), send_progress_reminders cron (weekly), marketing_sending_enabled ON in Platform Settings, challenge_email_selftest before assuming non-delivery.
+- Rendered-pixel inspection of the marketing composer with segments not yet done.
+- User wants to "discuss some more beautiful stuff" — pending design session.
+
 ## 2026-11-16 — November round opens with AI grading enabled
 
 **Decision**

@@ -42,6 +42,8 @@ class Enrollment(TimeStampedModel):
     )
     enrolled_at = models.DateTimeField(default=timezone.now)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Claim stamp for the weekly progress-reminder command; also throttles it.
+    last_progress_reminder_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -75,7 +77,8 @@ class Enrollment(TimeStampedModel):
 
         # Auto-complete once the whole course is finished.
         finished = self.progress_percent >= HUNDRED
-        if finished and self.status == self.Status.ACTIVE:
+        newly_completed = finished and self.status == self.Status.ACTIVE
+        if newly_completed:
             self.status = self.Status.COMPLETED
             self.completed_at = timezone.now()
 
@@ -88,6 +91,11 @@ class Enrollment(TimeStampedModel):
                     "updated_at",
                 ]
             )
+        if save and newly_completed:
+            # A milestone email must never break lesson completion; the sender
+            # logs its own failures instead of raising.
+            from .emails import send_completion_congratulations
+            send_completion_congratulations(self)
         return self.progress_percent
 
 

@@ -1,9 +1,9 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from .views import (
-    AccessView, AdminAssetDownloadView, AdminCategoryViewSet, AdminRoundViewSet, EngagementView,
-    PortalView, PublicRoundViewSet, RegisterView, SubmissionView, UploadCompleteView, UploadDownloadView,
-    UploadView, VerifyView,
+    AccessCodeView, AccessView, AdminAssetDownloadView, AdminCategoryViewSet, AdminRegistrationActionView,
+    AdminRoundViewSet, EngagementView, PortalView, PublicRoundViewSet, RegisterView, SubmissionView,
+    UploadCompleteView, UploadDownloadView, UploadView, VerifyView,
 )
 
 router = DefaultRouter()
@@ -13,6 +13,8 @@ router.register("admin/categories", AdminCategoryViewSet, basename="challenge-ad
 
 urlpatterns = [path("challenges/", include([
     path("register/", RegisterView.as_view()), path("access/", AccessView.as_view()),
+    path("access-code/", AccessCodeView.as_view()),
+    path("admin/registrations/<uuid:pk>/", AdminRegistrationActionView.as_view()),
     path("verify/", VerifyView.as_view()), path("portal/", PortalView.as_view()),
     path("uploads/", UploadView.as_view()), path("uploads/<uuid:asset_id>/complete/", UploadCompleteView.as_view()),
     path("uploads/<uuid:asset_id>/download/", UploadDownloadView.as_view()),

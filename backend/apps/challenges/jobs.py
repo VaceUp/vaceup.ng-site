@@ -287,9 +287,23 @@ def process_one():
             outcome = extract_snapshot(job)
         elif job.kind == "public_observation":
             outcome = observe_public_post(job)
-        elif job.kind == "brief_email":
-            from apps.challenges.emails import deliver_challenge_email
-            outcome = "sent" if deliver_challenge_email(job) is not False else "skipped"
+        elif job.kind in ("brief_email", "disqualification_email"):
+            from apps.challenges.emails import deliver_challenge_email, deliver_disqualification_email
+            result = deliver_disqualification_email(job) if job.kind == "disqualification_email" else deliver_challenge_email(job)
+            if result is False:
+                # Delivery failed; treat it like a retryable error so the job
+                # re-queues instead of silently completing as "skipped".
+                if job.attempts < MAX_ATTEMPTS:
+                    job.status, job.error = "queued", "email_delivery_failed"
+                    job.run_after = timezone.now() + timedelta(seconds=min(3600, 60 * 2 ** (job.attempts - 1)))
+                else:
+                    job.status, job.error = "failed", "email_delivery_failed"
+                job.completed_at = timezone.now() if job.status == "failed" else None
+                ChallengeJob.objects.filter(pk=job.pk, claim_id=job.claim_id, status="processing").update(
+                    status=job.status, error=job.error, attempts=job.attempts,
+                    run_after=job.run_after, completed_at=job.completed_at, updated_at=timezone.now())
+                return job.status
+            outcome = "sent"
         else:
             raise ValueError("unsupported_job_kind")
     except assessment.AssessmentUnavailable:

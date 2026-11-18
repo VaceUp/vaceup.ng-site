@@ -75,19 +75,40 @@ class EmailCampaign(TimeStampedModel):
         SPECIFIC_COURSES = "specific_courses", _("Specific Courses")
         INACTIVE_USERS = "inactive_users", _("Inactive Users (30+ days)")
         NEW_USERS = "new_users", _("New Users (last 7 days)")
+        CHALLENGE_PARTICIPANTS = "challenge_participants", _("Challenge participants (guest emails)")
+        CHALLENGE_STUDENTS = "challenge_students", _("Challenge participants who became students")
         CUSTOM = "custom", _("Custom Query")
-    
+
     audience_filter = models.CharField(
         max_length=30,
         choices=AudienceFilter.choices,
         default=AudienceFilter.NEVER_PURCHASED,
     )
-    
+
     # Specific courses for SPECIFIC_COURSES filter
     target_courses = models.ManyToManyField(
         "courses.Course",
         blank=True,
         related_name="email_campaigns",
+    )
+
+    # Challenge segments: empty selections mean every round / category.
+    target_challenge_rounds = models.ManyToManyField(
+        "challenges.ChallengeRound",
+        blank=True,
+        related_name="email_campaigns",
+    )
+    target_challenge_categories = models.ManyToManyField(
+        "challenges.RoundCategory",
+        blank=True,
+        related_name="email_campaigns",
+    )
+
+    # Lifecycle stop/start: registered challenge participants leave the general
+    # prospect mailings (this flag) and receive the participant segments instead.
+    exclude_challenge_participants = models.BooleanField(
+        default=False,
+        help_text="General audiences skip anyone already registered for a challenge round.",
     )
     
     # Custom user query (for CUSTOM filter)
@@ -197,9 +218,13 @@ class EmailRecipient(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="recipients",
     )
+    # Null for guest recipients collected outside LMS accounts, e.g. challenge
+    # registrations; delivery, tracking and suppression work per email either way.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="email_recipients",
     )
     email = models.EmailField()
@@ -256,8 +281,8 @@ class EmailRecipient(TimeStampedModel):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["campaign", "user"],
-                name="unique_campaign_recipient",
+                fields=["campaign", "email"],
+                name="unique_campaign_recipient_email",
             )
         ]
 

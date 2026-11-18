@@ -87,9 +87,15 @@ class ChallengeRegistration(TimeStampedModel):
     phone = models.CharField(max_length=40)
     accept_rules = models.BooleanField(default=False)
     make_public = models.BooleanField(default=False)
+    # Explicit consent to receive academy marketing; challenge segments never
+    # include a registration that did not opt in.
+    marketing_opt_in = models.BooleanField(default=False)
     accepted_rules_version = models.PositiveIntegerField(default=1)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     access_version = models.PositiveIntegerField(default=1)
+    # Hashed convenience code: with their email it reopens the portal from any
+    # device without a fresh email. The plain code exists only at issue time.
+    access_code_hash = models.CharField(max_length=64, blank=True)
     disqualified = models.BooleanField(default=False)
     disqualification_reason = models.TextField(blank=True)
 

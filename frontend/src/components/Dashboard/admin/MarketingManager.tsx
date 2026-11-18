@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { api } from '@/lib/api';
 import { failureMessage, managementList, managedCourses, type ManagedCourse } from '@/lib/course-management';
 import { useWorkspaceResource } from '@/lib/use-workspace-resource';
+import { challengeAdminApi, type ChallengeId, type ChallengeRound } from '@/lib/challenge-api';
 import { formatWorkspaceDate } from '@/lib/workspace-api';
 import { ConfirmDelete } from './AuthoringUI';
 import {
@@ -14,6 +15,7 @@ import {
 interface Campaign {
   id: number; name: string; subject: string; custom_text: string; from_name: string; reply_to: string;
   audience_filter: string; target_courses: number[]; exclude_purchased: boolean; status: string;
+  target_challenge_rounds: number[]; target_challenge_categories: number[]; exclude_challenge_participants: boolean;
   total_recipients: number; sent_count: number; failed_count: number; scheduled_at: string | null;
 }
 
@@ -25,6 +27,8 @@ const audiences = [
   ['never_enrolled', 'Accounts without an active or completed enrolment'], ['free_only', 'Free-course learners only'],
   ['paid_only', 'Paid-course learners'], ['specific_courses', 'Learners in selected courses'],
   ['inactive_users', 'Inactive for at least 30 days'], ['new_users', 'Registered in the last 7 days'],
+  ['challenge_participants', 'Challenge participants (guest emails, opted in)'],
+  ['challenge_students', 'Challenge participants who became students'],
 ];
 
 const audienceLabel = (value: string) => audiences.find(([key]) => key === value)?.[1] ?? value;
@@ -124,9 +128,13 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
     from_name: campaign?.from_name ?? 'VaceUp Team', reply_to: campaign?.reply_to ?? '',
     audience_filter: campaign?.audience_filter ?? 'never_purchased',
     target_courses: campaign?.target_courses ?? [], exclude_purchased: campaign?.exclude_purchased ?? false,
+    target_challenge_rounds: (campaign?.target_challenge_rounds ?? []) as ChallengeId[], target_challenge_categories: (campaign?.target_challenge_categories ?? []) as ChallengeId[],
+    exclude_challenge_participants: campaign?.exclude_challenge_participants ?? false,
   });
   const [courses, setCourses] = useState<ManagedCourse[]>([]);
   const [coursesError, setCoursesError] = useState('');
+  const [rounds, setRounds] = useState<ChallengeRound[]>([]);
+  const [roundsError, setRoundsError] = useState('');
   const [error, setError] = useState('');
 
   const loadCourses = useCallback(async () => {
@@ -134,6 +142,15 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
     try { setCourses(await managedCourses()); } catch (err) { setCoursesError(failureMessage(err)); }
   }, []);
   useEffect(() => { void loadCourses(); }, [loadCourses]);
+
+  const loadRounds = useCallback(async () => {
+    setRoundsError('');
+    try { setRounds(await challengeAdminApi.rounds()); } catch (err) { setRoundsError(failureMessage(err)); }
+  }, []);
+  useEffect(() => { void loadRounds(); }, [loadRounds]);
+
+  const isChallengeAudience = form.audience_filter.startsWith('challenge_');
+  const challengeCategories = rounds.flatMap((round) => round.categories.map((category) => ({ ...category, roundTitle: round.title })));
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -150,6 +167,8 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
         body: JSON.stringify({
           ...form,
           target_courses: form.audience_filter === 'specific_courses' ? form.target_courses : [],
+          target_challenge_rounds: isChallengeAudience ? form.target_challenge_rounds : [],
+          target_challenge_categories: isChallengeAudience ? form.target_challenge_categories : [],
         }),
       });
       await onSaved();
@@ -189,6 +208,37 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
           {audiences.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </Field>
+      {isChallengeAudience && <fieldset className={adminStyles.group}>
+        <legend className={adminStyles.groupLabel}>Which rounds and categories?</legend>
+        <p className={adminStyles.hint}>Leave both lists empty to reach every opted-in participant of every round.</p>
+        {roundsError && <StatusNote tone="error">
+          The challenge rounds could not be loaded. <Action className={adminStyles.inlineActions} onClick={() => void loadRounds()}>Try again</Action>
+        </StatusNote>}
+        {rounds.length > 0 && <div className={adminStyles.checkList}>
+          {rounds.map((round) => <CheckRow
+            key={round.id}
+            label={`Round: ${round.title}`}
+            checked={form.target_challenge_rounds.includes(round.id)}
+            onChange={(event) => setForm({
+              ...form,
+              target_challenge_rounds: event.target.checked
+                ? [...form.target_challenge_rounds, round.id]
+                : form.target_challenge_rounds.filter((id) => id !== round.id),
+            })}
+          />)}
+          {challengeCategories.map((category) => <CheckRow
+            key={`${category.roundTitle}-${category.id}`}
+            label={`${category.name} (${category.roundTitle})`}
+            checked={form.target_challenge_categories.includes(category.id)}
+            onChange={(event) => setForm({
+              ...form,
+              target_challenge_categories: event.target.checked
+                ? [...form.target_challenge_categories, category.id]
+                : form.target_challenge_categories.filter((id) => id !== category.id),
+            })}
+          />)}
+        </div>}
+      </fieldset>}
       {form.audience_filter === 'specific_courses' && <fieldset className={adminStyles.group}>
         <legend className={adminStyles.groupLabel}>Which courses?</legend>
         {coursesError && <StatusNote tone="error">
@@ -209,12 +259,19 @@ function CampaignForm({ campaign, saving, onSaving, onSaved }: {
           />)}
         </div>}
       </fieldset>}
-      <CheckRow
+      {!isChallengeAudience && <CheckRow
         label="Exclude accounts with any successful payment"
         hint="Useful for offers aimed at people who have not bought yet."
         checked={form.exclude_purchased}
         onChange={(event) => setForm({ ...form, exclude_purchased: event.target.checked })}
-      />
+      />}
+      {!isChallengeAudience && <CheckRow
+        label="Exclude registered challenge participants"
+        hint="Lifecycle stop/start: anyone already registered for a challenge round receives the participant segments instead of these prospect mailings."
+        checked={form.exclude_challenge_participants}
+        onChange={(event) => setForm({ ...form, exclude_challenge_participants: event.target.checked })}
+      />}
+      {isChallengeAudience && <p className={adminStyles.hint}>Only participants who ticked the marketing opt-in, verified their email and were not disqualified are included. Participants who pay for a course move to the challenge-students segment automatically.</p>}
     </fieldset>
   </form>;
 }

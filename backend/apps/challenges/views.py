@@ -10,6 +10,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.db.models import OuterRef, Subquery
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -25,7 +26,7 @@ from rest_framework.views import APIView
 from apps.core import storage
 from apps.core.permissions import IsAdmin
 from apps.core.throttling import DatabaseAnonRateThrottle
-from .auth import participant, verify_token
+from .auth import issue_access_code, participant, verify_access_code, verify_token
 from .models import (
     AssessmentRun, BriefDocument, ChallengeJob, ChallengeRegistration, ChallengeRound,
     ChallengeSubmission, EngagementSnapshot, EvidenceAsset, RoundCategory, ScoreOverride, SocialPostClaim,
@@ -59,10 +60,27 @@ def private_response(data, status=200):
     return response
 
 
-def queue_email(registration):
+def send_email_now(registration, *, access_code=None):
+    """Send the brief email immediately (same pattern as meetings/events).
+
+    A ChallengeJob is also queued as a retry safety net — if the direct send
+    hits a transient SMTP error the cron will attempt it again. The access
+    code travels in the job metadata only until the email has gone out.
+    """
+    from apps.challenges.emails import send_challenge_brief
+    import logging
+    logger = logging.getLogger("apps.challenges")
+    try:
+        send_challenge_brief(registration, access_code=access_code)
+    except Exception:
+        logger.exception(
+            "challenge_email kind=brief_email stage=direct_send registration=%s", registration.pk
+        )
+    # Belt-and-suspenders: queue for cron retry regardless of direct send outcome.
     ChallengeJob.objects.create(
         kind="brief_email", registration=registration, round=registration.round,
         dedupe_key=f"brief:{registration.pk}:{uuid.uuid4()}",
+        metadata={"access_code": access_code} if access_code else {},
     )
 
 
@@ -80,16 +98,18 @@ class RegisterView(PublicView):
         category = get_object_or_404(RoundCategory, pk=values["category_id"], round=round, enabled=True)
         existing = ChallengeRegistration.objects.filter(round=round, email=values["email"]).first()
         if existing:
-            queue_email(existing)
+            _reg, access_code = existing, issue_access_code(existing)
+            transaction.on_commit(lambda: send_email_now(_reg, access_code=access_code))
         else:
             if round.registrations.count() >= getattr(settings, "CHALLENGE_MAX_REGISTRATIONS", 10000):
                 raise ValidationError("This challenge has reached its registration capacity.")
             registration = ChallengeRegistration.objects.create(
                 round=round, category=category, full_name=values["full_name"], email=values["email"], phone=values["phone"],
-                accept_rules=True, make_public=values["make_public"], accepted_rules_version=round.rules_version,
+                accept_rules=True, make_public=values["make_public"], marketing_opt_in=values["marketing_opt_in"], accepted_rules_version=round.rules_version,
             )
-            queue_email(registration)
-        return private_response({"detail": "Check your registration email for your personal challenge link and selected category brief. Existing registrations keep their original category.", "email_status": "queued"}, status=202)
+            _reg, access_code = registration, issue_access_code(registration)
+            transaction.on_commit(lambda: send_email_now(_reg, access_code=access_code))
+        return private_response({"detail": "Check your registration email for your personal challenge link and selected category brief. Existing registrations keep their original category.", "email_status": "queued", "access_code": access_code}, status=202)
 
 
 class AccessView(PublicView):
@@ -99,9 +119,10 @@ class AccessView(PublicView):
         email = serializers.EmailField().run_validation(request.data.get("email")).lower()
         slug = serializers.SlugField().run_validation(request.data.get("round_slug"))
         registration = ChallengeRegistration.objects.filter(round__slug=slug, email=email).exclude(round__status="draft").first()
+        access_code = issue_access_code(registration) if registration else None
         if registration:
-            queue_email(registration)
-        return private_response({"detail": "If this email registered for the round, a personal access link has been queued for that inbox.", "email_status": "queued"}, status=202)
+            send_email_now(registration, access_code=access_code)
+        return private_response({"detail": "If this email registered for the round, a personal access link has been queued for that inbox.", "email_status": "queued", "access_code": access_code}, status=202)
 
 
 class VerifyView(PublicView):
@@ -110,6 +131,63 @@ class VerifyView(PublicView):
     def post(self, request):
         registration, token = verify_token(request.data.get("token"))
         return private_response({"access_token": token, "registration": RegistrationSerializer(registration).data})
+
+
+class AccessCodeView(PublicView):
+    """Email plus personal code opens the portal without a fresh email."""
+    throttle_classes = [ChallengeAccessThrottle]
+
+    @transaction.atomic
+    def post(self, request):
+        email = serializers.EmailField().run_validation(request.data.get("email")).lower()
+        slug = serializers.SlugField().run_validation(request.data.get("round_slug"))
+        code = serializers.RegexField(regex=r"^[0-9]{6}$").run_validation(request.data.get("code"))
+        registration = get_object_or_404(
+            ChallengeRegistration.objects.select_related("round", "category"),
+            round__slug=slug, email=email,
+        )
+        token = verify_access_code(registration, code)
+        return private_response({"access_token": token, "registration": RegistrationSerializer(registration).data})
+
+
+class AdminRegistrationActionView(APIView):
+    """Audited disqualification and irreversible deletion of a registration."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        registration = get_object_or_404(
+            ChallengeRegistration.objects.select_related("round", "category"), pk=pk)
+        action = serializers.ChoiceField(choices=["disqualify", "reinstate"]).run_validation(request.data.get("action"))
+        reason = serializers.CharField(min_length=10, max_length=2000).run_validation(request.data.get("reason"))
+        with transaction.atomic():
+            registration.access_version += 1  # every live session and link dies now
+            registration.disqualified = action == "disqualify"
+            registration.disqualification_reason = reason if registration.disqualified else ""
+            registration.save(update_fields=["disqualified", "disqualification_reason", "access_version", "updated_at"])
+            if registration.disqualified:
+                ChallengeJob.objects.create(
+                    kind="disqualification_email", registration=registration, round=registration.round,
+                    dedupe_key=f"disqualify:{registration.pk}:{uuid.uuid4()}", metadata={"reason": reason},
+                )
+        return private_response({"registration": RegistrationSerializer(registration).data,
+                                 "detail": "Entry disqualified and the participant will be emailed." if registration.disqualified
+                                 else "Entry reinstated. The participant can submit again while the round is open."})
+
+    def delete(self, request, pk):
+        registration = get_object_or_404(ChallengeRegistration.objects.prefetch_related("assets"), pk=pk)
+        # Best-effort removal of verified evidence from object storage; the
+        # database rows go regardless. Quarantine remnants have no owner data.
+        from apps.core import storage
+        for asset in registration.assets.all():
+            try:
+                storage._client().delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=asset.key)
+            except Exception:
+                pass
+        try:
+            registration.delete()
+        except ProtectedError:
+            raise ValidationError("This registrant has audited score corrections attached. Delete those corrections first, then delete the registration.")
+        return private_response({"detail": "The registration and all its evidence were permanently deleted."})
 
 
 class PortalView(PublicView):

@@ -2,6 +2,23 @@
 
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
+## 2026-11-18 — Mobile app started (React Native/Expo, Android + iOS)
+
+**Decision**
+- The mobile app is Expo (TypeScript) + expo-router in `mobile/` — one codebase for Android and iOS, EAS cloud builds for the stores, tokens in expo-secure-store, push via expo-notifications (token captured on Home; backend storage endpoint ships with the notifications milestone).
+- v1 scope mirrors the web contract: auth (login/register/verify-then-sign-in), home dashboard stats, course catalog + detail + enroll, lesson screen with mark-complete and video links, notifications inbox, profile, and the challenge portal via email + access code (same guest identity as web).
+- Deferred by design: in-app assessments/quizzes, messaging, Paystack checkout (paid courses open the website for now), tutor tools.
+- API base URL lives in app.json `expo.extra.apiBaseUrl`; `EXPO_PUBLIC_API_URL` overrides for local development.
+
+**Changed**
+- `mobile/` — Expo SDK 58 app: lib/api.ts (JWT pair, silent refresh, same error flattening), lib/storage.ts (secure store), state/auth.ts (zustand), constants/theme.ts (navy/gold tokens), components/ui.tsx kit, screens for all routes above, __tests__/api.test.ts (8 tests), jest.config.js, README with EAS build steps.
+
+**Open**
+- Android emulator verification pending: first Gradle build failed on a 78-minute Maven Central download stall of react-android AAR; a retry is running. EAS build sidesteps this entirely if the local network keeps stalling.
+- iOS builds require Apple Developer access (EAS), not runnable from this Windows machine.
+- Rendered-pixel inspection of the marketing composer with segments not yet done.
+- User wants to "discuss some more beautiful stuff" — pending design session.
+
 ## 2026-11-18 — Challenge lifecycle: access codes, marketing segments, admin actions, SEO
 
 **Decision**

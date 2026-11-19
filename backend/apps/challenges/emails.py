@@ -54,7 +54,7 @@ def send_challenge_brief(registration, *, access_code=None, job=None):
         "Earlier updates are optional. We do not require private analytics or your social account password.\n\n"
     ) if round.mode == "hybrid" else ""
     brief_line = (
-        f"Download your project brief (PDF, valid for seven days): {brief_url}\n\n"
+        f"Download your brief materials (dataset or PDF, link valid for seven days): {brief_url}\n\n"
         if brief_url else ""
     )
     access_instructions = (

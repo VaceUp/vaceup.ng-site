@@ -90,7 +90,7 @@ def send_challenge_brief(registration, *, access_code=None, job=None):
         category="Monthly skills challenge",
         cta_label="Open my challenge",
         cta_url=portal,
-        secondary_label="Download the brief (PDF)" if brief_url else "",
+        secondary_label="Download the brief materials" if brief_url else "",
         secondary_url=brief_url,
         details=[
             ("Category", category.name),

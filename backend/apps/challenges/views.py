@@ -604,11 +604,16 @@ class AdminCategoryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="upload-brief")
     def upload_brief(self, request, pk=None):
         category = self.get_object()
-        if category.round.status != "draft":
-            raise ValidationError("Published briefs are locked for this round.")
+        if category.round.status in ("frozen", "published"):
+            raise ValidationError("The round is frozen or published; briefs can no longer be corrected.")
         name = serializers.CharField(max_length=200).run_validation(request.data.get("name"))
-        content_type = serializers.ChoiceField(choices=["application/pdf"]).run_validation(request.data.get("content_type"))
-        size = serializers.IntegerField(min_value=1, max_value=10 * 1024 ** 2).run_validation(request.data.get("size_bytes"))
+        # Brief materials include datasets: Excel, CSV and ZIP alongside PDF.
+        content_type = serializers.ChoiceField(choices=[
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv", "application/csv", "application/zip",
+        ]).run_validation(request.data.get("content_type"))
+        size = serializers.IntegerField(min_value=1, max_value=20 * 1024 ** 2).run_validation(request.data.get("size_bytes"))
         name, extension = validate_upload_name(name, content_type, "project", size)
         asset_id = uuid.uuid4()
         key = f"private/challenges/incoming/brief-{asset_id}{extension}"
@@ -620,8 +625,8 @@ class AdminCategoryViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def complete_brief(self, request, pk=None):
         category = self.get_object()
-        if category.round.status != "draft":
-            raise ValidationError("Published briefs are locked for this round.")
+        if category.round.status in ("frozen", "published"):
+            raise ValidationError("The round is frozen or published; briefs can no longer be corrected.")
         asset_id = serializers.UUIDField().run_validation(request.data.get("id"))
         asset = get_object_or_404(BriefDocument.objects.select_for_update(), pk=asset_id, category=category)
         try:

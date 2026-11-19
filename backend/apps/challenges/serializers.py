@@ -65,9 +65,13 @@ class CategorySerializer(serializers.ModelSerializer):
         if self.instance and "round" in attrs and attrs["round"].pk != self.instance.round_id:
             raise serializers.ValidationError("Categories cannot be moved between rounds.")
         if round and round.status != "draft":
-            locked = set(attrs) - {"email_instructions"}
+            # Brief text, deliverables and email instructions stay correctable
+            # while a round runs - a dataset or material that failed to upload
+            # must reach participants. The rubric and scoring-relevant fields
+            # stay locked: a running round never changes how entries are judged.
+            locked = set(attrs) - {"email_instructions", "brief", "requirements"}
             if not self.instance or any(getattr(self.instance, key) != attrs[key] for key in locked):
-                raise serializers.ValidationError("Published category requirements and rubrics are locked. Clone a new round to change them.")
+                raise serializers.ValidationError("The rubric and category identity are locked for a running round. The brief text and deliverables can still be corrected.")
             if "rubric" in attrs and attrs["rubric"]:
                 validate_rubric(attrs["rubric"])
         return attrs

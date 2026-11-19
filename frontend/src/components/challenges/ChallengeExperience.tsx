@@ -275,7 +275,7 @@ function CategoryBrief({ category }: { category: ChallengeCategory }) {
   const rubricTotal = (category.rubric ?? []).reduce((sum, item) => sum + Number(item.max_points || 0), 0);
   return <div className={`${styles.stack} ${styles.separator}`}><h3>{category.name}: your brief</h3><p className={styles.body}>{category.brief || 'Register and verify your email to receive the full project brief for this category.'}</p>
     {!!category.requirements?.length && <div className={styles.tight}><h3>What to submit</h3><ul className={styles.list}>{category.requirements.map((item, index) => <li key={`${index}-${item}`}><Check className={styles.icon} aria-hidden="true" /><span>{item}</span></li>)}</ul></div>}
-    {category.brief_download_url && <a className={styles.link} href={category.brief_download_url} target="_blank" rel="noopener noreferrer">Download your project brief<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}
+    {category.brief_download_url && <a className={styles.link} href={category.brief_download_url} target="_blank" rel="noopener noreferrer">Download your brief materials<ArrowUpRight className={styles.icon} aria-hidden="true" /></a>}
     {!!category.rubric?.length && <details className={styles.rubricDetails}><summary>Assessment criteria · {rubricTotal} points</summary>
       <ul className={styles.rubric}>{category.rubric.map((item) => <li key={item.id} className={styles.criterion}>
         <div className={styles.criterionHead}><span className={styles.criterionLabel}>{item.label}</span><span className={styles.pointsPill}>{Number(item.max_points)} points</span></div>

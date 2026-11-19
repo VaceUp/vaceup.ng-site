@@ -212,7 +212,7 @@ function evidenceContentType(file: File): string {
 }
 
 export async function uploadChallengeBrief(categoryId: ChallengeId, file: File, onProgress: (value: number) => void): Promise<void> {
-  const initialized = await api.request<{ id: string; upload_url: string; content_type: string }>(`${BASE}/admin/categories/${pathPart(categoryId)}/upload-brief/`, { method: 'POST', body: JSON.stringify({ name: file.name, content_type: 'application/pdf', size_bytes: file.size }) });
+  const initialized = await api.request<{ id: string; upload_url: string; content_type: string }>(`${BASE}/admin/categories/${pathPart(categoryId)}/upload-brief/`, { method: 'POST', body: JSON.stringify({ name: file.name, content_type: evidenceContentType(file), size_bytes: file.size }) });
   await putFileWithProgress(initialized.upload_url, file, { 'Content-Type': initialized.content_type }, (state) => onProgress(state.percent), () => onProgress(-1)).promise;
   await api.request(`${BASE}/admin/categories/${pathPart(categoryId)}/complete-brief/`, { method: 'POST', body: JSON.stringify({ id: initialized.id }) });
 }

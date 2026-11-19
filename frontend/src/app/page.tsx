@@ -13,6 +13,7 @@ import { HowItWorks } from '@/components/homepage/HowItWorks';
 import { BlogSection } from '@/components/homepage/BlogSection';
 import { FinalCTA } from '@/components/homepage/FinalCTA';
 import { Reveal } from '@/components/ui/Reveal';
+import IntakeNotice from '@/components/homepage/IntakeNotice';
 import { BLOG_POSTS } from '@/data/posts';
 
 export default function Home() {
@@ -23,6 +24,9 @@ export default function Home() {
     <div className="min-h-screen bg-white text-[#00088A] font-sans">
       <main>
         <Hero onOpenAuth={openAuth} />
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <IntakeNotice />
+        </div>
         <Stats />
         <Reveal>
           <FeaturedCourses />

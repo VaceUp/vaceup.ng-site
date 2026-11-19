@@ -48,6 +48,7 @@ Durable log of product decisions and mid-code changes. Newest first. Every agent
 - frontend: confirmation shows the access code; access form takes the code; ChallengesManager has Disqualify/Reinstate/Delete per row; MarketingManager has challenge segments; lib/seo.tsx + app/sitemap.ts + app/robots.ts + app/error.tsx + app/global-error.tsx; JSON-LD in the challenge and events pages.
 
 **Open**
+- 2026-11-19: briefs are now correctable while a round runs (text, deliverables, email instructions, material file up to 20 MB as XLSX/CSV/ZIP/PDF); the rubric and identity stay locked. The Data Analysis dataset reaches participants via the brief email link AND the portal download (`brief_download_url`); existing registrants re-request their access email to receive updated materials. Delta zip `vaceup-backend-2026-11-19-editable-briefs.zip` delivered (no migration).
 - The cross-device 500 needs the real error text from error.tsx once deployed — record it here when the user reports it.
 - Ops checklist for email: process_challenges cron every minute (brief emails), process_marketing_queue cron (campaigns), send_progress_reminders cron (weekly), marketing_sending_enabled ON in Platform Settings, challenge_email_selftest before assuming non-delivery.
 - Rendered-pixel inspection of the marketing composer with segments not yet done.

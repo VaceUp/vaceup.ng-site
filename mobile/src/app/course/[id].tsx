@@ -5,7 +5,7 @@ import { Image, Linking, ScrollView, StyleSheet, Text, View } from 'react-native
 import { Button, Card, EmptyState, Note, Screen, Separator } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { Course } from '@/lib/types';
-import { colors, spacing, type } from '@/constants/theme';
+import { light as colors, spacing, type } from '@/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

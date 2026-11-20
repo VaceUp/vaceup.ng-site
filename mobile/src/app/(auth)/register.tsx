@@ -4,11 +4,12 @@ import { Link, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { Button, Field, Note, Screen } from '@/components/ui';
-import { colors, radius, spacing, type } from '@/constants/theme';
+import { light, radius, spacing, type, useTheme } from '@/theme';
 import { useAuth } from '@/state/auth';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const signUp = useAuth((state) => state.signUp);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,16 +43,15 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Create your account</Text>
-        <Text style={styles.heroSubtitle}>One account for courses, lessons and your challenge entries. Registering for a challenge never creates this account.</Text>
+        <View style={styles.logoMark}>
+          <Text style={styles.logoLetter}>V</Text>
+        </View>
+        <Text style={styles.heroTitle}>Create Your Account</Text>
+        <Text style={styles.heroSubtitle}>Join VaceUp Digital Academy and start your tech career.</Text>
       </View>
 
       {error ? <Note tone="error">{error}</Note> : null}
-      {notice ? (
-        <Note tone="success">
-          {notice} Sign in after verifying to start learning.
-        </Note>
-      ) : null}
+      {notice ? <Note tone="success">{notice} Sign in after verifying to start learning.</Note> : null}
 
       <Field label="Full name" autoCapitalize="words" autoComplete="name" value={fullName} onChangeText={setFullName} placeholder="Your full name" />
       <Field label="Email address" keyboardType="email-address" autoCapitalize="none" autoComplete="email" value={email} onChangeText={setEmail} placeholder="you@example.com" />
@@ -76,7 +76,7 @@ export default function RegisterScreen() {
 
       <Button label="Create account" onPress={() => void submit()} loading={busy} wide />
       <View style={styles.footer}>
-        <Text style={type.small}>Already have an account? </Text>
+        <Text style={[type.small, { color: colors.textMuted }]}>Already have an account? </Text>
         <Link href="/login" asChild>
           <Pressable accessibilityRole="link">
             <Text style={[type.small, styles.link]}>Sign in</Text>
@@ -95,15 +95,15 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.navy950,
-    borderRadius: radius.xl,
-    padding: spacing(5),
-    gap: spacing(2),
+  hero: { gap: spacing(2.5), marginTop: spacing(4), marginBottom: spacing(2) },
+  logoMark: {
+    width: 56, height: 56, borderRadius: radius.lg,
+    backgroundColor: light.gold, alignItems: 'center', justifyContent: 'center',
   },
-  heroTitle: { ...type.title, color: colors.white },
-  heroSubtitle: { ...type.body, color: colors.navy200 },
+  logoLetter: { ...type.heading, fontWeight: '800', color: light.navy950 },
+  heroTitle: { ...type.title, color: light.navy950 },
+  heroSubtitle: { ...type.body, color: '#5C6684' },
   eyeButton: { position: 'absolute', right: spacing(3), top: '50%', transform: [{ translateY: -12 }] },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  link: { color: colors.focus, fontWeight: '700' },
+  link: { color: light.focus, fontWeight: '700' },
 });

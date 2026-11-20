@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button, Card, EmptyState, Note, Screen, Separator } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { Notification } from '@/lib/types';
-import { colors, spacing, type } from '@/constants/theme';
+import { light as colors, spacing, type } from '@/theme';
 
 export default function AlertsScreen() {
   const [items, setItems] = useState<Notification[]>([]);

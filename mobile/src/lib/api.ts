@@ -6,8 +6,9 @@ import Constants from 'expo-constants';
 
 import { clearTokens, readAccessToken, readRefreshToken, saveTokens } from './storage';
 import type {
-  AuthResponse, ChallengePortal, ChallengeRound, Course, DashboardCourse, DashboardStats,
-  Enrollment, Notification, PaginatedResponse, User, WorkspaceCourseDetail,
+  Assignment, AuthResponse, ChallengePortal, ChallengeRound, ConversationSummary, Course,
+  DashboardCourse, DashboardStats, Enrollment, Message, Notification, PaginatedResponse,
+  Submission, User, WorkspaceCourseDetail,
 } from './types';
 
 const BASE_URL: string =
@@ -214,10 +215,6 @@ class ApiClient {
     return this.request<Enrollment[]>('/enrollments/my/');
   }
 
-  async dashboardStats(): Promise<DashboardStats> {
-    return this.request<DashboardStats>('/dashboard/stats/');
-  }
-
   async dashboardCourses(): Promise<DashboardCourse[]> {
     return this.request<DashboardCourse[]>('/dashboard/courses/');
   }
@@ -254,6 +251,61 @@ class ApiClient {
 
   async markAllNotificationsRead(): Promise<void> {
     return this.request('/notifications/read-all/', { method: 'POST' });
+  }
+
+  // ------------------------------------------------ workspace + teaching
+  async overview(): Promise<import('./workspace').WorkspaceOverview> {
+    return this.request<import('./workspace').WorkspaceOverview>('/dashboard/overview/');
+  }
+
+  async instructorDashboard(): Promise<import('./workspace').InstructorDashboard> {
+    return this.request<import('./workspace').InstructorDashboard>('/instructor/dashboard/');
+  }
+
+  async instructorStudents(page = 1): Promise<import('./types').PaginatedResponse<import('./workspace').InstructorStudent>> {
+    return this.request(`/instructor/students/?page=${page}`);
+  }
+
+  async courseGradebook(courseId: number): Promise<import('./workspace').GradebookResponse> {
+    return this.request(`/instructor/courses/${courseId}/gradebook/`);
+  }
+
+  async assignments(): Promise<PaginatedResponse<Assignment>> {
+    return this.request<PaginatedResponse<Assignment>>('/assignments/');
+  }
+
+  async assignment(id: string): Promise<Assignment> {
+    return this.request<Assignment>(`/assignments/${id}/`);
+  }
+
+  async assignmentSubmissions(assignmentId: number): Promise<PaginatedResponse<Submission>> {
+    return this.request(`/submissions/?assignment=${assignmentId}`);
+  }
+
+  async gradeSubmission(assignmentId: number, submissionId: number, score: number, feedback: string): Promise<Submission> {
+    return this.request(`/assignments/${assignmentId}/grade/`, {
+      method: 'POST',
+      body: JSON.stringify({ submission_id: submissionId, score, feedback }),
+    });
+  }
+
+  async conversations(page = 1): Promise<PaginatedResponse<ConversationSummary>> {
+    return this.request(`/messages/?page=${page}`);
+  }
+
+  async thread(withUserId: number, page = 1): Promise<{ results: Message[]; next: string | null }> {
+    return this.request(`/messages/thread/?with=${withUserId}&page=${page}&page_size=50`);
+  }
+
+  async sendMessage(recipientId: number, body: string, clientMessageId: string): Promise<Message> {
+    return this.request('/messages/', {
+      method: 'POST',
+      body: JSON.stringify({ recipient: recipientId, body, client_message_id: clientMessageId }),
+    });
+  }
+
+  async markThreadRead(conversationId: string): Promise<void> {
+    await this.request(`/messages/${conversationId}/read/`, { method: 'POST' }).catch(() => undefined);
   }
 
   // ----------------------------------------------------------- challenge

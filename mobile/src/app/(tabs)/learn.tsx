@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Card, EmptyState, Note, ProgressBar, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { Enrollment } from '@/lib/types';
-import { colors, spacing, type } from '@/constants/theme';
+import { light as colors, spacing, type } from '@/theme';
 
 export default function LearnScreen() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { Badge, Card, Note, Screen, Separator } from '@/components/ui';
-import { colors, spacing, type } from '@/constants/theme';
+import { light as colors, spacing, type } from '@/theme';
 import { useAuth } from '@/state/auth';
 
 export default function ProfileScreen() {

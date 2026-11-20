@@ -4,11 +4,12 @@ import { Link, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { Button, Field, Note, Screen } from '@/components/ui';
-import { colors, radius, spacing, type } from '@/constants/theme';
+import { light, radius, spacing, type, useTheme } from '@/theme';
 import { useAuth } from '@/state/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const signIn = useAuth((state) => state.signIn);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,8 +39,8 @@ export default function LoginScreen() {
         <View style={styles.logoMark}>
           <Text style={styles.logoLetter}>V</Text>
         </View>
-        <Text style={styles.heroTitle}>Welcome back</Text>
-        <Text style={styles.heroSubtitle}>Sign in to continue your courses, lessons and challenge entries.</Text>
+        <Text style={styles.heroTitle}>Welcome Back</Text>
+        <Text style={styles.heroSubtitle}>Sign in to access your dashboard and active courses.</Text>
       </View>
 
       {error ? <Note tone="error">{error}</Note> : null}
@@ -73,7 +74,7 @@ export default function LoginScreen() {
 
       <Button label="Sign in" onPress={() => void submit()} loading={busy} wide />
       <View style={styles.footer}>
-        <Text style={type.small}>New to VaceUp? </Text>
+        <Text style={[type.small, { color: colors.textMuted }]}>New to VaceUp? </Text>
         <Link href="/register" asChild>
           <Pressable accessibilityRole="link">
             <Text style={[type.small, styles.link]}>Create an account</Text>
@@ -92,20 +93,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.navy950,
-    borderRadius: radius.xl,
-    padding: spacing(5),
-    gap: spacing(3),
-  },
+  hero: { gap: spacing(2.5), marginTop: spacing(4), marginBottom: spacing(2) },
   logoMark: {
     width: 56, height: 56, borderRadius: radius.lg,
-    backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: light.gold, alignItems: 'center', justifyContent: 'center',
   },
-  logoLetter: { ...type.heading, fontWeight: '800', color: colors.navy950 },
-  heroTitle: { ...type.title, color: colors.white },
-  heroSubtitle: { ...type.body, color: colors.navy200 },
+  logoLetter: { ...type.heading, fontWeight: '800', color: light.navy950 },
+  heroTitle: { ...type.title, color: light.navy950 },
+  heroSubtitle: { ...type.body, color: '#5C6684' },
   eyeButton: { position: 'absolute', right: spacing(3), top: '50%', transform: [{ translateY: -12 }] },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  link: { color: colors.focus, fontWeight: '700' },
+  link: { color: light.focus, fontWeight: '700' },
 });

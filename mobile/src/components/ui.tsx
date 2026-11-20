@@ -1,19 +1,21 @@
-/** VaceUp mobile UI kit: the small set of primitives every screen composes.
+/** VaceUp mobile UI kit: theme-aware primitives every screen composes.
  * Every interactive element carries default, disabled, and loading states;
- * touch targets meet the 44-point accessibility bar. */
+ * touch targets meet the 44-point accessibility bar; colors follow the
+ * light/dark theme. */
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-import { colors, radius, spacing, TOUCH_TARGET, type } from '@/constants/theme';
+import { radius, spacing, TOUCH_TARGET, type, useTheme } from '@/theme';
 
 export function Screen({ children, scroll = true, style, refreshControl }: {
   children: React.ReactNode; scroll?: boolean; style?: StyleProp<ViewStyle>; refreshControl?: React.ReactElement;
 }) {
-  if (!scroll) return <View style={[styles.screen, style]}>{children}</View>;
+  const { colors } = useTheme();
+  if (!scroll) return <View style={[styles.screen, { backgroundColor: colors.page }, style]}>{children}</View>;
   return (
     <ScrollView
-      style={styles.screen}
+      style={[styles.screen, { backgroundColor: colors.page }]}
       contentContainerStyle={[styles.screenContent, style]}
       refreshControl={refreshControl}
       keyboardShouldPersistTaps="handled"
@@ -23,8 +25,17 @@ export function Screen({ children, scroll = true, style, refreshControl }: {
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, style, tinted }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; tinted?: 'navy' }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[
+      styles.card,
+      { backgroundColor: tinted === 'navy' ? colors.navy950 : colors.surface, borderColor: colors.line },
+      style,
+    ]}>
+      {children}
+    </View>
+  );
 }
 
 type ButtonProps = {
@@ -38,6 +49,7 @@ type ButtonProps = {
 };
 
 export function Button({ label, onPress, intent = 'primary', loading = false, disabled = false, icon, wide = false }: ButtonProps) {
+  const { colors } = useTheme();
   const palette = intent === 'primary'
     ? { bg: colors.gold, fg: colors.navy950, border: colors.gold }
     : intent === 'danger'
@@ -69,43 +81,47 @@ export function Button({ label, onPress, intent = 'primary', loading = false, di
   );
 }
 
-export function Field({ label, hint, error, children, ...inputProps }: TextInputProps & { label: string; hint?: string; error?: string; children?: React.ReactNode }) {
+export function Field({ label, hint, error, children, ...inputProps }: TextInputProps & { label: string; hint?: string; error?: string; children?: React.ReactNode; disabled?: boolean }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
       <View>
         <TextInput
           {...inputProps}
-          style={[styles.input, error ? styles.inputError : undefined]}
+          style={[styles.input, { backgroundColor: colors.surface, borderColor: error ? colors.error : colors.line, color: colors.text }, error && styles.inputError]}
           placeholderTextColor={colors.textMuted}
         />
         {children}
       </View>
-      {error ? <Text style={styles.fieldError}>{error}</Text> : hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      {error ? <Text style={[styles.fieldHint, { color: colors.error }]}>{error}</Text> : hint ? <Text style={[styles.fieldHint, { color: colors.textMuted }]}>{hint}</Text> : null}
     </View>
   );
 }
 
 export function Heading({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.stack}>
-      <Text style={type.title}>{title}</Text>
-      {subtitle ? <Text style={[type.body, styles.muted]}>{subtitle}</Text> : null}
+      <Text style={[type.title, { color: colors.text }]}>{title}</Text>
+      {subtitle ? <Text style={[type.body, { color: colors.textMuted }]}>{subtitle}</Text> : null}
     </View>
   );
 }
 
 export function EmptyState({ icon, title, body }: { icon: keyof typeof Feather.glyphMap; title: string; body: string }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.empty}>
       <Feather name={icon} size={36} color={colors.focus} />
-      <Text style={[type.heading, styles.emptyTitle]}>{title}</Text>
-      <Text style={[type.body, styles.muted, styles.emptyBody]}>{body}</Text>
+      <Text style={[type.heading, { color: colors.text, marginTop: spacing(1) }]}>{title}</Text>
+      <Text style={[type.body, { color: colors.textMuted, maxWidth: 320 }]}>{body}</Text>
     </View>
   );
 }
 
 export function Note({ tone = 'info', children }: { tone?: 'info' | 'success' | 'error'; children: React.ReactNode }) {
+  const { colors } = useTheme();
   const palette = tone === 'success'
     ? { bg: colors.successBg, fg: colors.success, border: colors.success }
     : tone === 'error'
@@ -120,15 +136,17 @@ export function Note({ tone = 'info', children }: { tone?: 'info' | 'success' | 
 }
 
 export function ProgressBar({ percent }: { percent: number }) {
+  const { colors } = useTheme();
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
   return (
-    <View accessibilityLabel={`Progress ${clamped} percent`} style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${clamped}%` }]} />
+    <View accessibilityLabel={`Progress ${clamped} percent`} style={[styles.progressTrack, { backgroundColor: colors.navy100 }]}>
+      <View style={[styles.progressFill, { width: `${clamped}%`, backgroundColor: colors.gold }]} />
     </View>
   );
 }
 
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'gold' | 'success' | 'error' }) {
+  const { colors } = useTheme();
   const palette = tone === 'gold'
     ? { bg: colors.gold, fg: colors.navy950 }
     : tone === 'success'
@@ -144,17 +162,21 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
 }
 
 export function Separator() {
-  return <View style={styles.separator} />;
+  const { colors } = useTheme();
+  return <View style={[styles.separator, { backgroundColor: colors.line }]} />;
+}
+
+export function Eyebrow({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return <Text style={[type.caption, { color: colors.focus, letterSpacing: 1.5, textTransform: 'uppercase' }]}>{children}</Text>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.page },
+  screen: { flex: 1 },
   screenContent: { padding: spacing(4), paddingBottom: spacing(8), gap: spacing(4) },
   card: {
-    backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
     padding: spacing(4),
     gap: spacing(3),
   },
@@ -173,24 +195,17 @@ const styles = StyleSheet.create({
   buttonWide: { alignSelf: 'stretch' },
   buttonLabel: { ...type.subheading, fontWeight: '700' },
   field: { gap: spacing(1.5) },
-  fieldLabel: { ...type.small, fontWeight: '700', color: colors.text },
-  fieldHint: { ...type.small, color: colors.textMuted },
-  fieldError: { ...type.small, color: colors.error },
+  fieldLabel: { ...type.small, fontWeight: '700' },
+  fieldHint: { ...type.small },
   input: {
     minHeight: TOUCH_TARGET,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
     paddingHorizontal: spacing(3),
-    color: colors.text,
     fontSize: 15,
   },
-  inputError: { borderColor: colors.error },
-  muted: { color: colors.textMuted },
+  inputError: { borderColor: '#B4232C' },
   empty: { alignItems: 'flex-start', gap: spacing(2), paddingVertical: spacing(6) },
-  emptyTitle: { marginTop: spacing(1) },
-  emptyBody: { maxWidth: 320 },
   note: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -202,15 +217,14 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 6,
     borderRadius: radius.full,
-    backgroundColor: colors.navy100,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', backgroundColor: colors.gold, borderRadius: radius.full },
+  progressFill: { height: '100%', borderRadius: radius.full },
   badge: {
     alignSelf: 'flex-start',
     borderRadius: radius.full,
     paddingHorizontal: spacing(2.5),
     paddingVertical: spacing(1),
   },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line },
+  separator: { height: StyleSheet.hairlineWidth },
 });

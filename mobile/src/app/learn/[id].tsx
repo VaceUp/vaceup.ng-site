@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Button, Card, EmptyState, Note, ProgressBar, Screen } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { WorkspaceCourseDetail, WorkspaceLesson } from '@/lib/types';
-import { colors, spacing, type } from '@/constants/theme';
+import { light as colors, spacing, type } from '@/theme';
 
 /** Lesson screen for one enrollment: module list, selected lesson, and the
  * mark-complete action that drives progress everywhere. */

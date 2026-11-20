@@ -121,6 +121,52 @@ export interface ChallengeRound {
   categories: ChallengeCategory[];
 }
 
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  course: string | { id: number; title: string };
+  due_at?: string;
+  due_date?: string;
+  max_score?: number;
+  is_published?: boolean;
+  created_at?: string;
+}
+
+export interface Submission {
+  id: string;
+  assignment: string;
+  student: string | { id: number; full_name: string; email: string };
+  content?: string;
+  file?: string;
+  text_answer?: string;
+  submitted_at?: string;
+  grade?: number | null;
+  feedback?: string;
+  status: string;
+  is_late?: boolean;
+}
+
+export interface Message {
+  id: number;
+  sender: number;
+  sender_name: string;
+  recipient: number;
+  body: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  client_message_id: string | null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  participant: { id: number; name: string; avatar?: string };
+  last_message: string;
+  timestamp: string;
+  unread_count: number;
+}
+
 export interface ChallengePortal {
   registration: {
     id: string;

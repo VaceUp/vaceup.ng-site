@@ -2,6 +2,21 @@
 
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
+## 2026-11-20 — Mobile v1 verified: emulator runs the CI-built APK; releases automated
+
+**Decision**
+- The Android APK ships via GitHub Actions (`.github/workflows/mobile-android.yml`): every push touching `mobile/` runs npm ci, expo prebuild, gradle assembleRelease on Linux, and attaches the APK to a rolling prerelease (mobile-v1, v2, ...). Downloadable without auth — e.g. https://github.com/VaceUp/vaceup.ng-site/releases/download/mobile-v4/app-release.apk
+- Local Windows builds are NOT viable for this repo and were abandoned: ninja ignores Windows long paths (no manifest flag; registry LongPathsEnabled=1 was set but does not apply to ninja) and codegen object paths exceed MAX_PATH even from `C:\m`. Always build via CI or EAS.
+- The mobile release APK talks to the same production backend as the website (`expo.extra.apiBaseUrl` = https://api.vaceup.ng/api/v1).
+
+**Changed**
+- `mobile/src/app/index.tsx` — launcher route redirects into the tab flow (the "Unmatched Route" screen on launch was a missing index).
+- `mobile/.gitignore` — built APKs ignored.
+
+**Open**
+- Rendered-pixel pass over the remaining mobile screens (tabs after sign-in) still pending — needs a real learner account on the production backend or a local backend for the emulator.
+- iOS builds need EAS + Apple Developer access.
+
 ## 2026-11-18 — Production 500 root cause found: foreign zip corrupted the backend folder
 
 **Decision**

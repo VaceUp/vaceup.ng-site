@@ -97,6 +97,7 @@ class RegisterView(PublicView):
             raise ValidationError("Registration is outside this round's published opening and closing times.")
         category = get_object_or_404(RoundCategory, pk=values["category_id"], round=round, enabled=True)
         existing = ChallengeRegistration.objects.filter(round=round, email=values["email"]).first()
+        response_payload = {"detail": "Check your registration email for your personal challenge link and selected category brief. Existing registrations keep their original category.", "email_status": "queued"}
         if existing:
             _reg, access_code = existing, issue_access_code(existing)
             transaction.on_commit(lambda: send_email_now(_reg, access_code=access_code))
@@ -109,7 +110,9 @@ class RegisterView(PublicView):
             )
             _reg, access_code = registration, issue_access_code(registration)
             transaction.on_commit(lambda: send_email_now(_reg, access_code=access_code))
-        return private_response({"detail": "Check your registration email for your personal challenge link and selected category brief. Existing registrations keep their original category.", "email_status": "queued", "access_code": access_code}, status=202)
+            # Safe to hand the code to a registration the requester just created.
+            response_payload["access_code"] = access_code
+        return private_response(response_payload, status=202)
 
 
 class AccessView(PublicView):
@@ -119,10 +122,9 @@ class AccessView(PublicView):
         email = serializers.EmailField().run_validation(request.data.get("email")).lower()
         slug = serializers.SlugField().run_validation(request.data.get("round_slug"))
         registration = ChallengeRegistration.objects.filter(round__slug=slug, email=email).exclude(round__status="draft").first()
-        access_code = issue_access_code(registration) if registration else None
         if registration:
-            send_email_now(registration, access_code=access_code)
-        return private_response({"detail": "If this email registered for the round, a personal access link has been queued for that inbox.", "email_status": "queued", "access_code": access_code}, status=202)
+            send_email_now(registration, access_code=issue_access_code(registration))
+        return private_response({"detail": "If this email registered for the round, a personal access link has been queued for that inbox.", "email_status": "queued"}, status=202)
 
 
 class VerifyView(PublicView):

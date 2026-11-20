@@ -62,13 +62,18 @@ class ChallengeApiTests(TestCase):
 
     def test_guest_registration_queues_mail_without_lms_identity(self):
         user_count = get_user_model().objects.count()
-        response = APIClient().post(ROOT + "register/", {"round_slug": self.round.slug, "category_id": self.category.pk, "full_name": "New Participant", "email": "NEW@Example.COM", "phone": "08012345678", "accept_rules": True}, format="json")
+        outbox_before = len(mail.outbox)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = APIClient().post(ROOT + "register/", {"round_slug": self.round.slug, "category_id": self.category.pk, "full_name": "New Participant", "email": "NEW@Example.COM", "phone": "08012345678", "accept_rules": True}, format="json")
         self.assertEqual(response.status_code, 202, response.data)
         registration = ChallengeRegistration.objects.get(email="new@example.com")
         self.assertEqual(registration.category_id, self.category.pk)
         self.assertEqual(get_user_model().objects.count(), user_count)
         self.assertEqual(registration.jobs.get().kind, "brief_email")
-        self.assertEqual(len(mail.outbox), 0)
+        # The brief (and the access code it carries) is delivered immediately.
+        self.assertEqual(len(mail.outbox), outbox_before + 1)
+        self.assertIn("new@example.com", mail.outbox[-1].to)
+        self.assertIn("access_code", response.data)
         self.assertNotIn("access_token", response.data)
 
     def test_duplicate_registration_cannot_change_category(self):
@@ -116,8 +121,9 @@ class ChallengeApiTests(TestCase):
         self.assertEqual(response["Cache-Control"], "no-store")
 
     def test_recovery_is_uniform_for_unknown_email(self):
-        one = APIClient().post(ROOT + "access/", {"round_slug": self.round.slug, "email": self.registration.email}, format="json")
-        two = APIClient().post(ROOT + "access/", {"round_slug": self.round.slug, "email": "unknown@example.com"}, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            one = APIClient().post(ROOT + "access/", {"round_slug": self.round.slug, "email": self.registration.email}, format="json")
+            two = APIClient().post(ROOT + "access/", {"round_slug": self.round.slug, "email": "unknown@example.com"}, format="json")
         self.assertEqual(one.status_code, 202)
         self.assertEqual(one.data, two.data)
         self.assertEqual(ChallengeJob.objects.filter(kind="brief_email").count(), 1)
@@ -187,20 +193,26 @@ class ChallengeApiTests(TestCase):
         self.category.save()
         self.assertEqual(self.admin_client.post(base + "open/").status_code, 200)
         self.assertEqual(self.admin_client.patch(base, {"mode": "quality_only"}, format="json").status_code, 400)
-        self.assertEqual(self.admin_client.patch(ROOT + f"admin/categories/{self.category.pk}/", {"brief": "Changed after opening"}, format="json").status_code, 400)
+        # Brief text stays correctable while the round runs (materials can be
+        # fixed after opening); the rubric does not.
+        self.assertEqual(self.admin_client.patch(ROOT + f"admin/categories/{self.category.pk}/", {"brief": "Changed after opening"}, format="json").status_code, 200)
+        self.assertEqual(self.admin_client.patch(ROOT + f"admin/categories/{self.category.pk}/", {"rubric": [{"id": "accuracy", "label": "Accuracy", "max_points": 100, "description": "locked"}]}, format="json").status_code, 400)
 
     def test_open_registration_requires_provider_and_calibration(self):
         self.round.status = "draft"
         self.round.save()
         base = ROOT + f"admin/rounds/{self.round.slug}/"
+        # AI grading is optional: a manually graded round opens without any
+        # provider configuration or calibration attestation.
         with override_settings(CHALLENGE_AI_ENABLED=False, CHALLENGE_ASSESSMENT_CALIBRATED=False):
-            response = self.admin_client.post(base + "open/")
-            self.assertEqual(response.status_code, 400)
-            self.assertTrue(any("provider" in message for message in response.data["readiness"]))
-            self.assertTrue(any("capacity" in message for message in response.data["readiness"]))
+            self.assertEqual(self.admin_client.post(base + "open/").status_code, 200)
+        self.round.status = "draft"
+        self.round.save()
+        # Machine-graded rounds still need the calibrated provider before opening.
         with override_settings(CHALLENGE_AI_ENABLED=True, GROQ_API_KEY="unit-test-key", CHALLENGE_ASSESSMENT_CALIBRATED=False):
             response = self.admin_client.post(base + "open/")
             self.assertEqual(response.status_code, 400)
+            self.assertTrue(any("capacity review" in message or "representative assessment" in message for message in response.data["readiness"]))
         self.round.refresh_from_db()
         self.assertEqual(self.round.status, "draft")
 

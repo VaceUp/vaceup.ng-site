@@ -20,6 +20,12 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
 
   restore: async () => {
+    // Session expiry anywhere in the app clears the client session; keep the
+    // store in sync so the auth gate routes back to sign-in.
+    api.onAuthChanged(() => {
+      const authed = api.isAuthenticated;
+      set(authed ? { status: 'signed-in' } : { status: 'signed-out', user: null });
+    });
     const hadSession = await api.restoreSession();
     if (!hadSession) {
       set({ status: 'signed-out', user: null });

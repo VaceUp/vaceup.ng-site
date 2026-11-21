@@ -14,6 +14,7 @@ Durable log of product decisions and mid-code changes. Newest first. Every agent
 - `mobile/.gitignore` — built APKs ignored.
 
 **Open**
+- 2026-11-20/21 verification: the CI-built release APK (mobile-v7) installs and runs on the Android emulator; tapped through Home/Alerts/Profile signed-out with no crashes. Tab bar intentionally shows 3 tabs for a signed-out session (role-aware: students see Courses/Learn after sign-in, tutors see Grade/Students). The user's reported "crash on navigation from profile" did not reproduce on the emulator after the tab/session fixes — if it recurs on a real device, the root ErrorBoundary now shows the exact error text to report.
 - Rendered-pixel pass over the remaining mobile screens (tabs after sign-in) still pending — needs a real learner account on the production backend or a local backend for the emulator.
 - iOS builds need EAS + Apple Developer access.
 

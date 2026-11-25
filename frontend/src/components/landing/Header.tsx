@@ -10,6 +10,7 @@ import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
   { href: '/courses', label: 'Courses' },
+  { href: '/intakes', label: 'Cohorts' },
   { href: SITE.kidsUrl, label: 'Kids Academy' },
   { href: '/about', label: 'About' },
   { href: '/team', label: 'Team' },

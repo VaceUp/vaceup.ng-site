@@ -87,6 +87,7 @@ export const Footer = () => {
               <li><Link href="/about" className={linkClass}>About VaceUp</Link></li>
               <li><Link href="/team" className={linkClass}>Meet the Team</Link></li>
               <li><Link href="/courses" className={linkClass}>All Courses</Link></li>
+              <li><Link href="/intakes" className={linkClass}>Academy Cohorts</Link></li>
               <li><Link href={SITE.kidsUrl} className={linkClass}>Kids Tech Academy</Link></li>
               <li><Link href="/testimonials" className={linkClass}>Success Stories</Link></li>
             </ul>

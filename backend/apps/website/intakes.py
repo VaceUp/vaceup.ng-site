@@ -186,7 +186,7 @@ class IntakeViewSet(viewsets.ModelViewSet):
                 category="Academy admissions",
                 details=(("Cohort", intake.title), ("Course", course.title), ("Dates", f"{intake.starts_on:%d %b %Y} - {intake.ends_on:%d %b %Y}")),
                 cta_label="Continue to payment" if payment_url else "View cohort calendar",
-                cta_url=_frontend(payment_url) if payment_url else _frontend("/intakes/"),
+                cta_url=_frontend(payment_url) if payment_url else _frontend("/cohorts/"),
                 footer="You received this because you registered interest in a VaceUp cohort.",
             ), "text/html")
             send_account_message(message)

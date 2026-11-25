@@ -8,7 +8,8 @@
 
 **Changed**
 - Added `CohortRegistration`, public cohort registration and admin registration endpoints, payment-to-registration synchronization, and the `send_intake_reminders` management command.
-- Rebuilt the public `/cohorts/` page as a cohort-to-course registration flow with waitlist handling, a shared accessible cohort dialog, checkout intake context, branded registration/reminder emails, admin registration visibility/export, and header/footer navigation; `/intakes/` remains a compatibility alias.
+- The public-facing name is Admissions and the canonical page is `/admissions/`; `/cohorts/` and `/intakes/` remain compatibility aliases while the backend keeps its internal intake terminology.
+- Rebuilt the public admissions page as a cohort-to-course registration flow with waitlist handling, a shared accessible cohort dialog, checkout intake context, branded registration/reminder emails, admin registration visibility/export, and header/footer navigation.
 - Verification: backend checks, 10 intake tests on SQLite, frontend typecheck and production build completed; existing storage configuration warnings remain environment-specific.
 
 **Open**

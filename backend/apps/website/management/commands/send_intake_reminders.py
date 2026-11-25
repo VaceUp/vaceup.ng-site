@@ -14,7 +14,7 @@ from apps.website.models import CohortRegistration
 
 
 class Command(BaseCommand):
-    help = "Send periodic cohort-interest reminders and one daily class reminder to paid learners."
+    help = "Send periodic admissions-interest reminders and one daily class reminder to paid learners."
 
     def handle(self, *args, **options):
         now = timezone.now()
@@ -40,7 +40,7 @@ class Command(BaseCommand):
             body = (
                 f"Hello {row.full_name},\n\n"
                 f"You registered your interest in {row.course.title} for {row.intake.title}. "
-                f"The cohort runs from {row.intake.starts_on:%d %b %Y} to {row.intake.ends_on:%d %b %Y}.\n\n"
+                f"The admission runs from {row.intake.starts_on:%d %b %Y} to {row.intake.ends_on:%d %b %Y}.\n\n"
                 f"When you are ready, sign in at VaceUp and continue here: {payment_path}\n\n"
                 "Reply to this email if you need help.\n\nVaceUp"
             )
@@ -52,13 +52,13 @@ class Command(BaseCommand):
                     to=[row.email],
                 )
                 message.attach_alternative(render_email(
-                    title="Your cohort is still open",
-                    text=f"Hello {row.full_name},\n\nYou registered interest in **{row.course.title}** for **{row.intake.title}**.\n\nThe cohort runs from {row.intake.starts_on:%d %b %Y} to {row.intake.ends_on:%d %b %Y}. When you are ready, sign in to continue.",
+                    title="Your admission is still open",
+                    text=f"Hello {row.full_name},\n\nYou registered interest in **{row.course.title}** for **{row.intake.title}**.\n\nThe admission runs from {row.intake.starts_on:%d %b %Y} to {row.intake.ends_on:%d %b %Y}. When you are ready, sign in to continue.",
                     category="Academy reminder",
-                    details=(("Cohort", row.intake.title), ("Course", row.course.title), ("Dates", f"{row.intake.starts_on:%d %b %Y} - {row.intake.ends_on:%d %b %Y}")),
+                    details=(("Admission", row.intake.title), ("Course", row.course.title), ("Dates", f"{row.intake.starts_on:%d %b %Y} - {row.intake.ends_on:%d %b %Y}")),
                     cta_label="Continue to application",
                     cta_url=f"{settings.FRONTEND_LINK_BASE.rstrip('/')}{payment_path}",
-                    footer="You received this reminder because you registered interest in this VaceUp cohort.",
+                    footer="You received this reminder because you registered interest in VaceUp admissions.",
                 ), "text/html")
                 send_account_message(message)
             except Exception:
@@ -104,10 +104,10 @@ class Command(BaseCommand):
                     title=f"Your {row.course.title} class is today",
                     text=f"Hello {row.full_name},\n\nYour **{row.course.title}** class is scheduled for today.\n\n{schedule}\n\nSign in to VaceUp shortly before the class to join. Your recording will be available in the platform after publication.",
                     category="Class reminder",
-                    details=(("Cohort", row.intake.title), ("Course", row.course.title), ("Class date", f"{today:%d %b %Y}")),
+                    details=(("Admission", row.intake.title), ("Course", row.course.title), ("Class date", f"{today:%d %b %Y}")),
                     cta_label="Open VaceUp",
                     cta_url=f"{settings.FRONTEND_LINK_BASE.rstrip('/')}/dashboard/",
-                    footer="You received this daily reminder because you registered for this VaceUp cohort.",
+                    footer="You received this daily reminder because you registered for this VaceUp admission.",
                 ), "text/html")
                 send_account_message(message)
             except Exception:

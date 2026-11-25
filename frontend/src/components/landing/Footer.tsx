@@ -87,7 +87,7 @@ export const Footer = () => {
               <li><Link href="/about" className={linkClass}>About VaceUp</Link></li>
               <li><Link href="/team" className={linkClass}>Meet the Team</Link></li>
               <li><Link href="/courses" className={linkClass}>All Courses</Link></li>
-              <li><Link href="/cohorts" className={linkClass}>Academy Cohorts</Link></li>
+              <li><Link href="/admissions" className={linkClass}>Academy Admissions</Link></li>
               <li><Link href={SITE.kidsUrl} className={linkClass}>Kids Tech Academy</Link></li>
               <li><Link href="/testimonials" className={linkClass}>Success Stories</Link></li>
             </ul>
@@ -120,7 +120,7 @@ export const Footer = () => {
               Stay Updated
             </h4>
             <p className="text-xs leading-relaxed text-gray-300">
-              Cohort dates, free workshops and career tips — once a month.
+              Admission dates, free workshops and career tips — once a month.
             </p>
 
             {subscribed ? (

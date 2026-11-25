@@ -153,15 +153,15 @@ class IntakeViewSet(viewsets.ModelViewSet):
     def register(self, request, pk=None):
         intake = self.get_object()
         if not intake.is_active or intake.is_archived or intake.ends_on < timezone.localdate():
-            return Response({"detail": "This cohort is no longer accepting registrations."}, status=400)
+            return Response({"detail": "This admission is no longer accepting registrations."}, status=400)
         serializer = CohortRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         course = serializer.validated_data["course"]
         if not course.is_published or (not intake.all_courses and not intake.courses.filter(pk=course.pk).exists()):
-            raise serializers.ValidationError({"course": "Choose a published course offered in this cohort."})
+            raise serializers.ValidationError({"course": "Choose a published course offered in this admission."})
         occupied = intake.enrollments.filter(course=course, status__in=("active", "completed")).count()
         if occupied >= intake.capacity_per_course:
-            return Response({"detail": "This course is full for the selected cohort. Join the waitlist instead."}, status=409)
+            return Response({"detail": "This course is full for the selected admission. Join the waitlist instead."}, status=409)
         user = request.user if request.user.is_authenticated and getattr(request.user, "is_student", False) else None
         preference = serializer.validated_data["payment_preference"]
         status_value = CohortRegistration.Status.PAYMENT_PENDING if preference == CohortRegistration.Preference.PAY_NOW else CohortRegistration.Status.INTERESTED
@@ -173,27 +173,27 @@ class IntakeViewSet(viewsets.ModelViewSet):
         payment_url = (checkout_path if user else f"/register?next={quote(checkout_path, safe='')}") if preference == CohortRegistration.Preference.PAY_NOW else ""
         email_sent = False
         try:
-            extra = f"\nTo continue to payment, open: {payment_url}" if payment_url else "\nWe will remind you before this cohort begins so you can complete payment when you are ready."
+            extra = f"\nTo continue to payment, open: {payment_url}" if payment_url else "\nWe will remind you before this admission begins so you can complete payment when you are ready."
             message = EmailMultiAlternatives(
-                subject=f"VaceUp cohort registration received: {intake.title}",
+                subject=f"VaceUp admission registration received: {intake.title}",
                 body=f"Hello {registration.full_name},\n\nWe recorded your interest in {course.title} for {intake.title}.{extra}\n\nVaceUp",
                 from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
                 to=[registration.email],
             )
             message.attach_alternative(render_email(
-                title="Your cohort registration is recorded",
-                text=f"Hello {registration.full_name},\n\nWe recorded your interest in **{course.title}** for **{intake.title}**.\n\n{('When you are ready, continue to application and payment.' if payment_url else 'We will send periodic reminders before the cohort begins.')}\n\nYou can opt out from future reminders at any time.",
+                title="Your admission registration is recorded",
+                text=f"Hello {registration.full_name},\n\nWe recorded your interest in **{course.title}** for **{intake.title}**.\n\n{('When you are ready, continue to application and payment.' if payment_url else 'We will send periodic reminders before the admission begins.')}\n\nYou can opt out from future reminders at any time.",
                 category="Academy admissions",
-                details=(("Cohort", intake.title), ("Course", course.title), ("Dates", f"{intake.starts_on:%d %b %Y} - {intake.ends_on:%d %b %Y}")),
-                cta_label="Continue to payment" if payment_url else "View cohort calendar",
-                cta_url=_frontend(payment_url) if payment_url else _frontend("/cohorts/"),
-                footer="You received this because you registered interest in a VaceUp cohort.",
+                details=(("Admission", intake.title), ("Course", course.title), ("Dates", f"{intake.starts_on:%d %b %Y} - {intake.ends_on:%d %b %Y}")),
+                cta_label="Continue to payment" if payment_url else "View admissions calendar",
+                cta_url=_frontend(payment_url) if payment_url else _frontend("/admissions/"),
+                footer="You received this because you registered interest in VaceUp admissions.",
             ), "text/html")
             send_account_message(message)
             email_sent = True
         except Exception:
             email_sent = False
-        return Response({"detail": "Your cohort registration is recorded.", "status": registration.status, "payment_url": payment_url, "email_sent": email_sent}, status=201 if created else 200)
+        return Response({"detail": "Your admission registration is recorded.", "status": registration.status, "payment_url": payment_url, "email_sent": email_sent}, status=201 if created else 200)
 
     @action(detail=True, methods=["post"], url_path="waitlist")
     def waitlist(self, request, pk=None):

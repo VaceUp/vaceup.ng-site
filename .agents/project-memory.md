@@ -1,5 +1,17 @@
 # VaceUp Project Memory
 
+## 2026-11-26 — Kids Academy branding asset
+
+**Decision**
+- Use the supplied VaceUp Kids Tech Academy logo (`IMG-20260708-WA0000.jpg`) for the independent kids site and the main-site Kids Academy promotion.
+
+**Changed**
+- Copied the logo into both frontend public folders and replaced the kids navbar, footer and shared logo component mark; the main homepage Kids Academy section now uses the supplied asset.
+- Verified the local Kids Academy browser preview shows the logo in the header and footer, with the kids build and typecheck still passing.
+
+**Open**
+- After the next deployment, confirm the logo is served from `kids.vaceup.ng/IMG-20260708-WA0000.jpg` and that the Cloudflare cache has the new asset.
+
 ## 2026-11-25 — Rename public cohorts experience to admissions
 
 **Decision**

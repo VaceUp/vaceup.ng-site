@@ -390,12 +390,24 @@ if not OBJECT_STORAGE_CONFIGURED:
     }
 
 # --- CORS: lock to the known frontend origin(s) ---
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
+    "https://vaceup.ng",
+    "https://www.vaceup.ng",
+    "https://kids.vaceup.ng",
+    "http://localhost:3000",
+    "http://localhost:3001",
+])
 from corsheaders.defaults import default_headers  # noqa: E402
 CORS_ALLOW_HEADERS = (*default_headers, "x-challenge-token")
 
 # --- CSRF: required by Django 4+ for admin/form POSTs served from these hosts ---
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[
+    "https://vaceup.ng",
+    "https://www.vaceup.ng",
+    "https://kids.vaceup.ng",
+    "http://localhost:3000",
+    "http://localhost:3001",
+])
 
 # --- Shared cache: explicit Redis mode or a migrated database table --------
 # Abuse counters are separate, transactional database rows in both modes.

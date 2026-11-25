@@ -11,12 +11,8 @@ export const SITE = {
   phoneHref: 'tel:+2348145798943',
   whatsapp: 'https://wa.me/2348145798943',
   address: '669, Abeokuta Expressway, Ahmadiya Bus-stop, Ijaiye Ojokoro, Lagos State',
-  /**
-   * VaceUp Kids Tech Academy is a separate site on its own subdomain.
-   * Until kids.vaceup.ng ships, this points at the interim landing page
-   * in this repo — flip it to 'https://kids.vaceup.ng' in one line.
-   */
-  kidsUrl: '/kids-academy',
+  /** VaceUp Kids Tech Academy runs as an independent Cloudflare Pages site. */
+  kidsUrl: process.env.NEXT_PUBLIC_KIDS_ACADEMY_URL || 'https://kids.vaceup.ng',
 } as const;
 
 /** TikTok has no Bootstrap icon — rendered as inline SVG by <SocialIcon/>. */

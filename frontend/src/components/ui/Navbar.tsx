@@ -7,12 +7,13 @@ import { Logo } from './Logo';
 import { Button } from './Button';
 import { cn } from '@/lib/utils';
 import { LordIconComponent, LordIcons } from './LordIcon';
+import { SITE } from '@/lib/site-config';
 
 const navItems = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/courses', label: 'Courses' },
-  { href: '/kids-academy', label: 'Kids Academy' },
+  { href: SITE.kidsUrl, label: 'Kids Academy', external: true },
   { href: '/events', label: 'Events' },
   { href: '/blog', label: 'Blog' },
   { href: '/resources', label: 'Resources' },
@@ -88,23 +89,10 @@ export function Navbar() {
           <Logo size="lg" />
 
           <div className="hidden md:flex items-center gap-8">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'text-sm font-medium transition-colors relative py-2',
-                  pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
-                    ? 'text-navy-950'
-                    : 'text-gray-600 hover:text-navy-950'
-                )}
-              >
-                {item.label}
-                {item.href === '/courses' && (
-                  <LordIconComponent src={LordIcons.chevronDown} size={16} className="ml-1 inline-block" />
-                )}
-              </Link>
-            ))}
+            {navItems.map((item) => item.external ? <a key={item.href} href={item.href} className="text-sm font-medium transition-colors relative py-2 text-gray-600 hover:text-navy-950">{item.label}</a> : <Link key={item.href} href={item.href} className={cn('text-sm font-medium transition-colors relative py-2', pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)) ? 'text-navy-950' : 'text-gray-600 hover:text-navy-950')}>
+              {item.label}
+              {item.href === '/courses' && <LordIconComponent src={LordIcons.chevronDown} size={16} className="ml-1 inline-block" />}
+            </Link>)}
           </div>
 
           <div className="hidden md:flex items-center gap-4">
@@ -130,18 +118,9 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden px-6 pb-6 border-t border-gray-100 bg-white animate-slide-down">
           <div className="flex flex-col gap-2 pt-4">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'px-4 py-3 rounded-xl text-base font-medium transition-colors',
-                  pathname === item.href ? 'bg-navy-50 text-navy-950' : 'text-gray-600 hover:bg-gray-50'
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => item.external ? <a key={item.href} href={item.href} className="px-4 py-3 rounded-xl text-base font-medium transition-colors text-gray-600 hover:bg-gray-50">{item.label}</a> : <Link key={item.href} href={item.href} className={cn('px-4 py-3 rounded-xl text-base font-medium transition-colors', pathname === item.href ? 'bg-navy-50 text-navy-950' : 'text-gray-600 hover:bg-gray-50')}>
+              {item.label}
+            </Link>)}
             <div className="pt-4 border-t border-gray-100 flex flex-col gap-3">
               <Link href="/login">
                 <Button variant="outline" className="w-full">Login</Button>

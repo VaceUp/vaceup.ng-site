@@ -9,6 +9,11 @@
   --color-gold-brand: #FFC72C;
   --color-gold-hover: #e8b428;
   --color-gold-light: #fff9e6;
+  --color-surface-muted: #f8fafc;
+  --color-content: #0a1128;
+  --color-content-secondary: #475569;
+  --color-content-muted: #64748b;
+  --color-line: #e2e8f0;
 
   --bg-primary: #FFFFFF;
   --bg-secondary: #F8FAFC;
@@ -46,6 +51,14 @@
   --color-navy-950: #000459;
 
   --color-teal-brand: #008B8B;
+  --color-gold-brand: #FFC72C;
+  --color-gold-hover: #e8b428;
+  --color-gold-light: #fff9e6;
+  --color-surface-muted: #f8fafc;
+  --color-content: #0a1128;
+  --color-content-secondary: #475569;
+  --color-content-muted: #64748b;
+  --color-line: #e2e8f0;
 
   --color-gold-50: #fffbeb;
   --color-gold-100: #fef3c7;

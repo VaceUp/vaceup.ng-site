@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${inter.className} bg-white text-[#0A1128] antialiased`}>
         <KidsNavbar />
-        <main className="pt-24 min-h-screen">{children}</main>
+        {children}
         <KidsFooter />
       </body>
     </html>

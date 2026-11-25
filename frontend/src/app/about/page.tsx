@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
 import { SITE, SOCIAL_LINKS } from '@/lib/site-config';
 import { getAcademyProfile, getPublishedTeam, type AcademyProfile, type TeamMember } from '@/lib/website-api';
 import { SocialIcon } from '@/components/ui/SocialIcon';
@@ -133,6 +134,17 @@ export default function AboutPage() {
               <p className="text-gray-600">Evolving curriculum matching tech pace.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-gold-light py-16" aria-labelledby="kids-academy-heading">
+        <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-teal-brand">For young learners</p>
+            <h2 id="kids-academy-heading" className="mt-2 text-3xl font-bold text-navy-950">Meet VaceUp Kids Tech Academy</h2>
+            <p className="mt-3 leading-7 text-navy-800">A dedicated, parent-friendly space for children and teenagers to learn technology through live projects. It uses the same trusted VaceUp account and learning backend.</p>
+          </div>
+          <a href={SITE.kidsUrl} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-950 px-5 py-3 font-bold text-white transition-colors hover:bg-navy-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950">Visit Kids Academy <ArrowUpRight aria-hidden="true" className="size-4" /></a>
         </div>
       </section>
 

@@ -3,8 +3,14 @@ name: Deploy to Cloudflare
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - 'kids-academy/**'
+      - '.github/workflows/deploy-kids-cloudflare.yml'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - 'kids-academy/**'
+      - '.github/workflows/deploy-kids-cloudflare.yml'
   workflow_dispatch:
 
 permissions:

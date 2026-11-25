@@ -1,0 +1,71 @@
+name: Deploy Kids Academy to Cloudflare
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'kids-academy/**'
+      - '.github/workflows/deploy-kids-cloudflare.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'kids-academy/**'
+      - '.github/workflows/deploy-kids-cloudflare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: kids-cloudflare-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KIDS_PAGES_PROJECT: ${{ vars.CLOUDFLARE_KIDS_PAGES_PROJECT || 'vaceup-kids-academy' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kids-academy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: kids-academy/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.vaceup.ng/api/v1
+          NEXT_PUBLIC_KIDS_SITE_URL: https://kids.vaceup.ng
+          NEXT_PUBLIC_MAIN_SITE_URL: https://vaceup.ng
+          NEXT_PUBLIC_PORTAL_URL: https://vaceup.ng/login?next=%2Fdashboard%2F
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kids-academy-build
+          path: kids-academy/out/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: kids-academy-build
+          path: kids-academy/out/
+      - name: Deploy independent Kids Academy Pages site
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: kids-academy
+          command: pages deploy out --project-name=${{ env.KIDS_PAGES_PROJECT }} --branch=${{ github.ref_name }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

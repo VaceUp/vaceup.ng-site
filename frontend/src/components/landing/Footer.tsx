@@ -88,7 +88,7 @@ export const Footer = () => {
               <li><Link href="/team" className={linkClass}>Meet the Team</Link></li>
               <li><Link href="/courses" className={linkClass}>All Courses</Link></li>
               <li><Link href="/admissions" className={linkClass}>Academy Admissions</Link></li>
-              <li><Link href={SITE.kidsUrl} className={linkClass}>Kids Tech Academy</Link></li>
+              <li><a href={SITE.kidsUrl} className={linkClass}>Kids Tech Academy</a></li>
               <li><Link href="/testimonials" className={linkClass}>Success Stories</Link></li>
             </ul>
           </div>

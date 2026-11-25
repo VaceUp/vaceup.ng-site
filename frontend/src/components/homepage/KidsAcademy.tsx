@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 import { LordIconComponent, LordIcons } from '@/components/ui/LordIcon';
+import { SITE } from '@/lib/site-config';
 
 const kidsPrograms = [
   { icon: LordIcons.code, title: 'Coding for Kids', age: 'Ages 8-14', duration: '8 weeks', color: 'from-blue-500 to-blue-600' },
@@ -21,7 +21,7 @@ export function KidsAcademy() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
           <img
-            src="/kids-academy-logo.webp"
+            src="/IMG-20260708-WA0000.jpg"
             loading="lazy"
             alt="VaceUp Kids Tech Academy logo — Learn Today. Build Tomorrow. Lead the Future."
             className="h-28 w-28 mx-auto mb-6 rounded-2xl bg-white object-contain p-2 shadow-lg"
@@ -57,11 +57,11 @@ export function KidsAcademy() {
                 <p className="text-navy-600 text-sm mb-6">
                   Hands-on, age-appropriate curriculum designed by educators and tech professionals.
                 </p>
-                <Link href="/kids-academy">
+                <a href={SITE.kidsUrl}>
                   <Button variant="outline" size="sm" className="w-full border-navy-200 text-navy-700 hover:bg-navy-50 hover:border-gold-brand hover:text-gold-brand">
                     Learn More
                   </Button>
-                </Link>
+                </a>
               </CardContent>
             </Card>
           ))}
@@ -92,12 +92,12 @@ export function KidsAcademy() {
         </div>
 
         <div className="text-center">
-          <Link href="/kids-academy">
+          <a href={SITE.kidsUrl}>
             <Button size="lg" variant="primary" className="bg-gold-brand text-navy-950 hover:bg-gold-hover">
               Explore Kids Academy
               <LordIconComponent src={LordIcons.arrowRight} size={20} colors="primary:#00088A,secondary:#FFC72C" className="ml-2" />
             </Button>
-          </Link>
+          </a>
         </div>
       </div>
     </section>

@@ -10,7 +10,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: 'challenge/', priority: 0.9, change: 'daily' },
     { path: 'events/', priority: 0.9, change: 'daily' },
     { path: 'courses/', priority: 0.9, change: 'weekly' },
-    { path: 'kids-academy/', priority: 0.8, change: 'monthly' },
     { path: 'blog/', priority: 0.7, change: 'weekly' },
     { path: 'about/', priority: 0.6, change: 'monthly' },
     { path: 'team/', priority: 0.6, change: 'monthly' },

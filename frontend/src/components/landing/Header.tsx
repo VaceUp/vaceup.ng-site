@@ -11,7 +11,7 @@ const NAV_LINKS = [
   { href: '/', label: 'Home' },
   { href: '/courses', label: 'Courses' },
   { href: '/admissions', label: 'Admissions' },
-  { href: SITE.kidsUrl, label: 'Kids Academy' },
+  { href: SITE.kidsUrl, label: 'Kids Academy', external: true },
   { href: '/about', label: 'About' },
   { href: '/team', label: 'Team' },
   { href: '/events', label: 'Events' },
@@ -57,7 +57,7 @@ export const Header = () => {
   }, [isMobileMenuOpen]);
 
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+    href.startsWith('http') ? false : href === '/' ? pathname === '/' : pathname.startsWith(href);
 
   return (
     <header className="sticky top-0 z-40 w-full">
@@ -112,14 +112,10 @@ export const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-4 lg:gap-5 xl:gap-8 text-xs sm:text-sm font-semibold text-gray-700 flex-wrap">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`transition-colors whitespace-nowrap ${
-                  isActive(link.href) ? 'text-gold-brand' : 'hover:text-gold-brand'
-                }`}
-              >
+            {NAV_LINKS.map((link) => link.external ? (
+              <a key={link.label} href={link.href} className="transition-colors whitespace-nowrap hover:text-gold-brand">{link.label}</a>
+            ) : (
+              <Link key={link.label} href={link.href} className={`transition-colors whitespace-nowrap ${isActive(link.href) ? 'text-gold-brand' : 'hover:text-gold-brand'}`}>
                 {link.label}
               </Link>
             ))}
@@ -170,16 +166,10 @@ export const Header = () => {
           className="sm:hidden border-t border-gray-200 bg-white shadow-lg animate-slide-down max-h-[calc(100dvh-64px)] overflow-y-auto"
         >
           <nav aria-label="Mobile navigation" className="flex flex-col px-6 py-4" onKeyDown={onMenuKeys}>
-            {NAV_LINKS.map((link, index) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                ref={index === 0 ? firstMenuLink : undefined}
-                onClick={() => closeMenu()}
-                className={`py-3 border-b border-gray-50 font-semibold transition-colors ${
-                  isActive(link.href) ? 'text-gold-brand' : 'text-gray-700 hover:text-gold-brand'
-                }`}
-              >
+            {NAV_LINKS.map((link, index) => link.external ? (
+              <a key={link.label} href={link.href} ref={index === 0 ? firstMenuLink : undefined} onClick={() => closeMenu()} className="py-3 border-b border-gray-50 font-semibold transition-colors text-gray-700 hover:text-gold-brand">{link.label}</a>
+            ) : (
+              <Link key={link.label} href={link.href} ref={index === 0 ? firstMenuLink : undefined} onClick={() => closeMenu()} className={`py-3 border-b border-gray-50 font-semibold transition-colors ${isActive(link.href) ? 'text-gold-brand' : 'text-gray-700 hover:text-gold-brand'}`}>
                 {link.label}
               </Link>
             ))}

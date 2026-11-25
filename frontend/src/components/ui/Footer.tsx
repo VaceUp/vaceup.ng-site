@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { Logo } from './Logo';
-import { cn } from '@/lib/utils';
+import { SITE, SOCIAL_LINKS } from '@/lib/site-config';
+import { SocialIcon } from './SocialIcon';
 
 const footerLinks = {
   academy: [
     { label: 'About Us', href: '/about' },
     { label: 'Courses', href: '/courses' },
-    { label: 'Kids Academy', href: '/kids-academy' },
+    { label: 'Kids Academy', href: SITE.kidsUrl, external: true },
     { label: 'Admissions', href: '/apply' },
     { label: 'Events', href: '/events' },
   ],
@@ -31,14 +32,6 @@ const footerLinks = {
   ],
 };
 
-const socialLinks = [
-  { label: 'Facebook', href: 'https://facebook.com/vaceup', icon: '📘' },
-  { label: 'Twitter', href: 'https://twitter.com/vaceup', icon: '🐦' },
-  { label: 'LinkedIn', href: 'https://linkedin.com/company/vaceup', icon: '💼' },
-  { label: 'Instagram', href: 'https://instagram.com/vaceup', icon: '📷' },
-  { label: 'YouTube', href: 'https://youtube.com/@vaceup', icon: '▶️' },
-];
-
 export function Footer() {
   return (
     <footer className="bg-navy-950 text-white" role="contentinfo">
@@ -52,16 +45,16 @@ export function Footer() {
               of technology professionals.
             </p>
             <div className="flex gap-4">
-              {socialLinks.map((social) => (
+              {SOCIAL_LINKS.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center text-lg hover:bg-gold-brand hover:text-navy-950 transition-all duration-300"
+                  className="w-10 h-10 rounded-full bg-navy-800 flex items-center justify-center hover:bg-gold-brand hover:text-navy-950 transition-all duration-300"
                   aria-label={social.label}
                 >
-                  {social.icon}
+                  <SocialIcon icon={social.icon} size={17} />
                 </a>
               ))}
             </div>
@@ -72,12 +65,7 @@ export function Footer() {
             <ul className="space-y-3">
               {footerLinks.academy.map((link) => (
                 <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-navy-300 hover:text-gold-brand transition-colors text-sm"
-                  >
-                    {link.label}
-                  </Link>
+                  {link.external ? <a href={link.href} className="text-navy-300 hover:text-gold-brand transition-colors text-sm">{link.label}</a> : <Link href={link.href} className="text-navy-300 hover:text-gold-brand transition-colors text-sm">{link.label}</Link>}
                 </li>
               ))}
             </ul>
@@ -139,7 +127,7 @@ export function Footer() {
             © {new Date().getFullYear()} VaceUp Digital Academy. All rights reserved.
           </p>
           <p className="text-navy-400 text-sm text-center md:text-right">
-            Made with excellence in Nigeria 🇳🇬 for the world 🌍
+            Made with excellence in Nigeria for the world.
           </p>
         </div>
       </div>

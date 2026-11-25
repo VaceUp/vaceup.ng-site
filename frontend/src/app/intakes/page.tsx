@@ -23,6 +23,13 @@ function dateLabel(value: string) {
   return new Intl.DateTimeFormat('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
 }
 
+function admissionTitle(value: string) {
+  return value.replace(/\bcohorts?\b/gi, (word) => {
+    const plural = word.toLowerCase().endsWith('s');
+    return word[0] === word[0].toUpperCase() ? (plural ? 'Admissions' : 'Admission') : (plural ? 'admissions' : 'admission');
+  });
+}
+
 const blankForm = (): FormValues => ({ full_name: '', email: '', phone: '', consent_reminders: true });
 
 export default function IntakesPage() {
@@ -103,7 +110,7 @@ export default function IntakesPage() {
 
     {loading ? <p role="status">Loading admissions calendar...</p> : error && !rows.length ? <div role="alert" className="rounded-2xl border border-red-500/40 bg-red-50 p-4 text-red-900">{error}</div> : <section className="grid gap-5 md:grid-cols-2" aria-label="Academy admissions">
       {rows.map((intake) => <article key={intake.id} className="flex flex-col rounded-3xl border border-line bg-surface p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-content-muted">{intake.status === 'open' ? 'Open for registration' : 'Upcoming admission'}</p><h2 className="mt-2 text-2xl font-bold text-content">{intake.title}</h2></div><CalendarDays aria-hidden="true" className="size-6 shrink-0 text-content-muted" /></div>
+        <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-content-muted">{intake.status === 'open' ? 'Open for registration' : 'Upcoming admission'}</p><h2 className="mt-2 text-2xl font-bold text-content">{admissionTitle(intake.title)}</h2></div><CalendarDays aria-hidden="true" className="size-6 shrink-0 text-content-muted" /></div>
         <p className="mt-4 flex items-center gap-2 text-content-secondary"><Clock3 aria-hidden="true" className="size-4" />{dateLabel(intake.starts_on)} - {dateLabel(intake.ends_on)}</p>
         <p className="mt-5 flex items-center gap-2 text-sm text-content-muted"><UsersRound aria-hidden="true" className="size-4" />{intake.available_courses.length} courses available</p>
         <ul className="mt-5 space-y-2 text-sm">{(intake.available_courses as CourseOption[]).slice(0, 4).map((item) => <li key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface-muted px-3 py-2"><span className="font-medium text-content">{item.title}</span><span className="text-content-muted">{item.status === 'waitlist_open' ? 'Waitlist' : `${item.remaining ?? 0} places`}</span></li>)}</ul>
@@ -111,7 +118,7 @@ export default function IntakesPage() {
       </article>)}
     </section>}
 
-    <Modal isOpen={Boolean(selected)} onClose={closeCohort} size="full" title={selected ? `${selected.title} — ${step === 'courses' ? 'Choose a course' : step === 'register' ? 'Register your interest' : 'Join the waitlist'}` : ''} description={step === 'courses' ? 'Select a course to continue. Registration does not charge you.' : 'We will use these details for admissions and class updates.'}>
+    <Modal isOpen={Boolean(selected)} onClose={closeCohort} size="full" title={selected ? `${admissionTitle(selected.title)} — ${step === 'courses' ? 'Choose a course' : step === 'register' ? 'Register your interest' : 'Join the waitlist'}` : ''} description={step === 'courses' ? 'Select a course to continue. Registration does not charge you.' : 'We will use these details for admissions and class updates.'}>
         {step === 'courses' && <div className="mt-6 space-y-3"><p className="text-content-secondary">Select one course. Registration does not charge you; you can choose whether to pay now or later.</p>{selectedCourses.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-2xl border border-line p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-content">{item.title}</h3><p className="mt-1 text-sm text-content-muted">{item.status === 'waitlist_open' ? 'This course is full. Join the waitlist.' : `${item.remaining ?? 0} places remaining`}</p></div><button type="button" className="shrink-0 rounded-xl border border-navy-950 px-4 py-2.5 font-semibold text-navy-950 transition hover:bg-navy-950 hover:text-white focus:outline-none focus:ring-2 focus:ring-navy-950" onClick={() => item.status === 'waitlist_open' ? beginWaitlist(item) : beginRegistration(item)}>{item.status === 'waitlist_open' ? 'Join waitlist' : 'Register interest'}</button></div>)}</div>}
 
         {(step === 'register' || step === 'waitlist') && <form className="mt-6 space-y-5" onSubmit={(event) => void (step === 'register' ? submitRegistration(event) : joinWaitlist(event))}>

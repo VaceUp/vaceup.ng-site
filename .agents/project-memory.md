@@ -1,5 +1,18 @@
 # VaceUp Project Memory
 
+## 2026-11-25 — Rename public cohorts experience to admissions
+
+**Decision**
+- The owner wants the public-facing academy entry point and its registration language called Admissions rather than Cohorts; existing compatibility URLs may remain available.
+
+**Changed**
+- `/admissions/` is the canonical public route; header, footer, page copy, card actions, registration emails and admin registration labels now use Admissions terminology.
+- Dynamic intake titles are normalized for the public page so titles containing “cohort” display as “admission” without changing internal database/API names.
+- Pushed commit `72d7e08` to `origin/master`.
+
+**Open**
+- Trigger the Cloudflare frontend deployment from the latest `master` commit and confirm the production cache serves `/admissions/`.
+
 ## 2026-11-25 — Public cohort calendar and registration lifecycle
 
 **Decision**

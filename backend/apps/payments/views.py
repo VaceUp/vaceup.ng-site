@@ -66,6 +66,8 @@ class PaymentViewSet(
         payment = services.initialize_payment(
             student=request.user, course=serializer.validated_data["course"],
             expected_total=serializer.validated_data.get("expected_total"),
+            intake_id=serializer.validated_data.get("intake"),
+            installment_number=serializer.validated_data.get("installment_number", 1),
         )
         return Response(
             PaymentSerializer(payment).data, status=status.HTTP_201_CREATED

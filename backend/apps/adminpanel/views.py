@@ -446,7 +446,11 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
     def enrollments_list(self, request):
         """GET /admin/dashboard/enrollments/ — every enrollment on the platform."""
         from apps.enrollment.models import Enrollment
-        enrollments = Enrollment.objects.select_related("student", "course").order_by(
+        from apps.payments.models import Payment
+        from django.db.models import Sum
+        from datetime import timedelta
+        from django.utils import timezone
+        enrollments = Enrollment.objects.select_related("student", "course", "intake").order_by(
             "-enrolled_at"
         )[:300]
         data = [
@@ -458,9 +462,16 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
                 "status": e.status,
                 "progress_percent": e.progress_percent,
                 "enrolled_at": e.enrolled_at,
+                "intake_title": e.intake.title if e.intake else None,
+                "total_fee": e.course.price,
+                "paid_amount": (Payment.objects.filter(student=e.student, course=e.course, status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"] or 0),
             }
             for e in enrollments
         ]
+        for row, enrollment in zip(data, enrollments):
+            row["outstanding_amount"] = max(row["total_fee"] - row["paid_amount"], 0)
+            row["payment_deadline"] = (enrollment.enrolled_at + timedelta(days=max(enrollment.course.duration_months - 1, 0) * 30)) if enrollment.course.installment_eligible else None
+            row["access_restricted"] = bool(row["payment_deadline"] and timezone.now() >= row["payment_deadline"] and row["outstanding_amount"] > 0)
         return Response(data)
 
     @action(detail=False, methods=["get"], url_path="submissions")
@@ -536,6 +547,10 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             is_published=data["is_published"],
             duration=data.get("duration", ""),
             image_url=data.get("image_url", ""),
+            duration_months=data.get("duration_months", 1),
+            installment_eligible=data.get("installment_eligible", False),
+            installment_first_amount=data.get("installment_first_amount", 0),
+            installment_final_amount=data.get("installment_final_amount", 0),
         )
         return Response(AdminCourseListSerializer(course).data, status=status.HTTP_201_CREATED)
 

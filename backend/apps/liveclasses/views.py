@@ -61,7 +61,7 @@ class LiveClassViewSet(viewsets.ModelViewSet):
             status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED)
         ).first()
         
-        is_paid = enrollment is not None
+        is_paid = enrollment is not None and services.course_access_is_current(user=user, course=live_class.course)
         is_live = class_start <= now <= class_end
         is_past = now > class_end
         is_future = now < class_start

@@ -15,6 +15,7 @@ PERSONAL_FIELDS = (
 
 def application_submit(*, student, course, motivation="", details=None):
     """Student submits an application (idempotent — updates while still open)."""
+    intake = (details or {}).get("intake")
     details = {
         key: value for key, value in (details or {}).items()
         if key in PERSONAL_FIELDS and value not in (None, "")
@@ -26,6 +27,7 @@ def application_submit(*, student, course, motivation="", details=None):
             "motivation": motivation,
             **details,
             "status": Application.Status.SUBMITTED,
+            "intake": intake,
         },
     )
     if not created and application.status in (
@@ -40,6 +42,9 @@ def application_submit(*, student, course, motivation="", details=None):
             if getattr(application, key) != value:
                 setattr(application, key, value)
                 changed.append(key)
+        if intake is not None and application.intake_id != intake.pk:
+            application.intake = intake
+            changed.append("intake")
         if changed:
             application.save(update_fields=changed + ["updated_at"])
     return application
@@ -63,7 +68,7 @@ def application_review(*, application, reviewer, action, rejection_reason=""):
         # access; paid courses use verified checkout or explicit admin grants.
         if application.course.price == 0:
             from apps.enrollment.services import grant_enrollment
-            grant_enrollment(student=application.student, course=application.course)
+            grant_enrollment(student=application.student, course=application.course, intake=application.intake)
     elif action == "reject":
         application.status = Application.Status.REJECTED
         application.reviewed_by = reviewer

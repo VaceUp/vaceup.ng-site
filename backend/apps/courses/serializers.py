@@ -7,6 +7,8 @@ Admins bypass the ownership check.
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 
 from apps.courses.models import Category, Course, Lesson, Module
 from apps.enrollment.models import Enrollment
@@ -28,10 +30,19 @@ def is_entitled_to_content(user, course) -> bool:
         return False
     if user.is_admin or course.instructor_id == user.id:
         return True
-    return course.enrollments.filter(
+    enrollment = course.enrollments.filter(
         student=user,
         status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-    ).exists()
+    ).order_by("-enrolled_at").first()
+    if enrollment is None:
+        return False
+    if course.installment_eligible:
+        from apps.payments.models import Payment
+        from django.db.models import Sum
+        paid = Payment.objects.filter(student=user, course=course, status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"]
+        if paid is not None and paid < course.price and timezone.now() >= enrollment.enrolled_at + timedelta(days=max(course.duration_months - 1, 0) * 30):
+            return False
+    return True
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -138,16 +149,22 @@ class NestedModuleSerializer(serializers.ModelSerializer):
 
     lessons = NestedLessonSerializer(many=True, read_only=True)
     meeting_url = serializers.SerializerMethodField()
+    live_room_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Module
-        fields = ("id", "title", "order", "week", "duration_minutes", "meeting_url", "lessons")
+        fields = ("id", "title", "order", "week", "duration_minutes", "delivery_method", "meeting_url", "live_room_url", "lessons")
 
     def get_meeting_url(self, module):
         # Live-room links are for enrolled learners and staff only.
         if not self.context.get("entitled", False):
             return ""
         return module.meeting_url
+
+    def get_live_room_url(self, module):
+        if not self.context.get("entitled", False):
+            return ""
+        return module.live_room_url
 
 
 class ModuleSerializer(serializers.ModelSerializer):
@@ -164,13 +181,29 @@ class ModuleSerializer(serializers.ModelSerializer):
         model = Module
         fields = (
             "id", "course", "title", "order", "week",
-            "duration_minutes", "meeting_url", "lessons",
+            "duration_minutes", "delivery_method", "meeting_url", "live_room_url", "lessons",
         )
 
     def validate_meeting_url(self, value):
         if value and not value.startswith(("https://", "http://")):
             raise serializers.ValidationError("Enter a full meeting link starting with https://.")
         return value
+
+    def validate_live_room_url(self, value):
+        if value and not value.startswith(("https://", "http://")):
+            raise serializers.ValidationError("Enter a full Live Room link starting with https://.")
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        method = attrs.get("delivery_method", getattr(self.instance, "delivery_method", Module.DeliveryMethod.GOOGLE_MEET))
+        meeting = attrs.get("meeting_url", getattr(self.instance, "meeting_url", ""))
+        live_room = attrs.get("live_room_url", getattr(self.instance, "live_room_url", ""))
+        if method == Module.DeliveryMethod.GOOGLE_MEET and live_room:
+            raise serializers.ValidationError({"live_room_url": "Clear the Live Room link when Google Meet is selected."})
+        if method == Module.DeliveryMethod.VACEUP_LIVE_ROOM and meeting:
+            raise serializers.ValidationError({"meeting_url": "Clear the Google Meet link when VaceUp Live Room is selected."})
+        return attrs
 
     def validate_course(self, course):
         user = _user(self)
@@ -206,6 +239,7 @@ class CourseListSerializer(serializers.ModelSerializer):
             "description",
             "duration",
             "image_url",
+            "duration_months", "installment_eligible", "installment_first_amount", "installment_final_amount",
         )
 
 
@@ -268,6 +302,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "duration",
             "image_url",
+            "duration_months", "installment_eligible", "installment_first_amount", "installment_final_amount",
         )
         # instructor is bound from request.user server-side; slug is derived.
         read_only_fields = ("slug",)

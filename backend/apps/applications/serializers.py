@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.applications.models import Application
 from apps.courses.models import Course
+from apps.website.models import AcademyIntake
 
 
 class CourseBasicSerializer(serializers.ModelSerializer):
@@ -23,6 +24,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     student_email = serializers.CharField(source="student.email", read_only=True)
     course_title = serializers.CharField(source="course.title", read_only=True)
     reviewer_name = serializers.CharField(source="reviewed_by.full_name", read_only=True)
+    intake_title = serializers.CharField(source="intake.title", read_only=True, allow_null=True)
 
     class Meta:
         model = Application
@@ -51,6 +53,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "rejection_reason",
             "created_at",
+            "intake", "intake_title",
         )
         read_only_fields = ("student", "course", "reviewed_by", "reviewed_at")
 
@@ -72,6 +75,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
         model = Application
         fields = (
             "course",
+            "intake",
             "motivation",
             "full_name",
             "phone",
@@ -99,6 +103,24 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             "goals": {"required": False, "allow_blank": True},
             "heard_from": {"required": False, "allow_blank": True},
         }
+
+    intake = serializers.PrimaryKeyRelatedField(
+        queryset=AcademyIntake.objects.filter(is_active=True, is_archived=False),
+        required=False, allow_null=True,
+    )
+
+    def validate(self, attrs):
+        intake = attrs.get("intake")
+        course = attrs.get("course")
+        if intake and not (intake.all_courses or intake.courses.filter(pk=course.pk).exists()):
+            raise serializers.ValidationError({"intake": "This course is not offered in the selected intake."})
+        if intake:
+            from apps.enrollment.models import Enrollment
+            occupied = Enrollment.objects.filter(course=course, intake=intake, status__in=("active", "completed")).count()
+            occupied += Application.objects.filter(course=course, intake=intake, status__in=("submitted", "under_review", "approved")).exclude(student=self.context["request"].user).count()
+            if occupied >= intake.capacity_per_course:
+                raise serializers.ValidationError({"intake": "This course is full for the selected intake. Join the waitlist instead."})
+        return attrs
 
     def validate_course(self, course):
         user = self.context["request"].user

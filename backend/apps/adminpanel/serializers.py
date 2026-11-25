@@ -215,7 +215,8 @@ class AdminCourseListSerializer(serializers.ModelSerializer):
         model = Course
         fields = ("id", "title", "slug", "price", "level", "category", "instructor",
                   "is_published", "description", "thumbnail", "duration", "image_url",
-                  "tagline", "learning_outcomes", "requirements", "benefits", "target_audience", "outline")
+                  "tagline", "learning_outcomes", "requirements", "benefits", "target_audience", "outline",
+                  "duration_months", "installment_eligible", "installment_first_amount", "installment_final_amount")
         read_only_fields = fields
 
 
@@ -232,6 +233,10 @@ class AdminCourseCreateSerializer(serializers.Serializer):
     duration = serializers.CharField(max_length=80, required=False, allow_blank=True)
     image_url = serializers.URLField(required=False, allow_blank=True)
     is_published = serializers.BooleanField(default=False)
+    duration_months = serializers.IntegerField(min_value=1, max_value=60, default=1)
+    installment_eligible = serializers.BooleanField(default=False)
+    installment_first_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, default=0)
+    installment_final_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, default=0)
 
 
 class AdminCourseUpdateSerializer(serializers.Serializer):
@@ -245,3 +250,7 @@ class AdminCourseUpdateSerializer(serializers.Serializer):
     duration = serializers.CharField(max_length=80, required=False, allow_blank=True)
     image_url = serializers.URLField(required=False, allow_blank=True)
     is_published = serializers.BooleanField(required=False)
+    duration_months = serializers.IntegerField(min_value=1, max_value=60, required=False)
+    installment_eligible = serializers.BooleanField(required=False)
+    installment_first_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
+    installment_final_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)

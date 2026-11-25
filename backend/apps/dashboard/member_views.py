@@ -62,11 +62,41 @@ class WorkspaceCourseSerializer(serializers.Serializer):
     is_published = serializers.BooleanField()
     level = serializers.CharField()
     duration = serializers.CharField()
+    duration_months = serializers.IntegerField()
+    installment_eligible = serializers.BooleanField()
     lesson_count = serializers.IntegerField(allow_null=True)
     enrollment_status = serializers.CharField(allow_null=True)
     enrollment_id = serializers.IntegerField(allow_null=True)
     progress_percent = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
     student_count = serializers.IntegerField(allow_null=True)
+    total_fee = serializers.DecimalField(source="price", max_digits=10, decimal_places=2)
+    paid_amount = serializers.DecimalField(allow_null=True, max_digits=10, decimal_places=2)
+    outstanding_amount = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+    payment_deadline = serializers.SerializerMethodField()
+    access_restricted = serializers.SerializerMethodField()
+
+    def get_outstanding_amount(self, obj):
+        from decimal import Decimal
+        paid = obj.paid_amount or Decimal("0")
+        return max(obj.price - paid, Decimal("0")).quantize(Decimal("0.01"))
+
+    def get_payment_status(self, obj):
+        if obj.price <= 0 or (obj.paid_amount or 0) >= obj.price:
+            return "paid"
+        return "installment_due" if getattr(obj, "installment_eligible", False) else "payment_due"
+
+    def get_payment_deadline(self, obj):
+        enrollment = getattr(obj, "_workspace_enrollment", None)
+        if not enrollment or not getattr(obj, "installment_eligible", False):
+            return None
+        return enrollment.enrolled_at + timedelta(days=max((obj.duration_months - 1), 0) * 30)
+
+    def get_access_restricted(self, obj):
+        deadline = self.get_payment_deadline(obj)
+        if deadline is None:
+            return False
+        return timezone.now() >= deadline and self.get_outstanding_amount(obj) > 0
 
 
 def workspace_courses(user):
@@ -74,13 +104,14 @@ def workspace_courses(user):
     lesson_count = (Lesson.objects.filter(module__course=OuterRef("pk"))
                     .order_by().values("module__course").annotate(n=Count("pk")).values("n"))
     mine = Enrollment.objects.filter(student=user, course=OuterRef("pk"))
+    paid = Payment.objects.filter(student=user, course=OuterRef("pk"), status=Payment.Status.SUCCESS).order_by().values("course").annotate(total=Sum("amount")).values("total")
     students = (Enrollment.objects.filter(course=OuterRef("pk"), status__in=ACCESS_STATUSES)
                 .order_by().values("course").annotate(n=Count("student", distinct=True)).values("n"))
     qs = Course.objects.select_related("instructor", "category").annotate(
         lesson_count=Subquery(lesson_count), enrollment_status=Subquery(mine.values("status")[:1]),
         enrollment_id=Subquery(mine.values("pk")[:1]),
         progress_percent=Subquery(mine.values("progress_percent")[:1]),
-        student_count=Subquery(students),
+        student_count=Subquery(students), paid_amount=Subquery(paid),
     )
     if user.is_instructor:
         return qs.filter(instructor=user).order_by("-updated_at", "-pk")
@@ -97,7 +128,12 @@ class WorkspaceCourseListView(PrivateWorkspaceResponse, ListAPIView):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Course.objects.none()
-        return workspace_courses(self.request.user)
+        rows = workspace_courses(self.request.user)
+        if not self.request.user.is_instructor:
+            rows = rows.select_related("instructor", "category").prefetch_related("enrollments")
+            for course in rows:
+                course._workspace_enrollment = Enrollment.objects.filter(student=self.request.user, course=course).order_by("-enrolled_at").first()
+        return rows
 
 
 class WorkspaceLiveClassSerializer(serializers.ModelSerializer):

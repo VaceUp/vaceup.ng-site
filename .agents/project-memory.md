@@ -1,5 +1,23 @@
 # VaceUp Project Memory
 
+## 2026-11-25 — Academy intake, capacity, delivery and installment requirements implemented
+
+**Decision**
+- Course modules now explicitly choose Google Meet or VaceUp Live Room; only the selected learner-facing link is exposed to entitled learners. Live Room join links are configured per module in course content.
+- 2027 academy intakes expose course-by-course capacity (30 by default), remaining places and waitlist state. A waitlist request never creates payment or enrollment; it stores the learner's name, email, phone, preferred course and intake and can be exported or reminded by an administrator.
+- Installment terms are stored on courses. The seeded academy pricing is Excel NGN 30,000 full payment; Virtual Assistance and Graphic Design NGN 36,000 + NGN 24,000; Data Analysis and UI/UX NGN 42,000 + NGN 28,000; Web Development NGN 48,000 + NGN 32,000. Verified payments are the source of paid and outstanding totals.
+- Capacity is enforced inside the transaction that grants enrollment, separately per course and intake. Course content and live-class access are paused after the configured final-month deadline when an installment balance remains.
+
+**Changed**
+- Backend models, serializers, services and migrations add module delivery, intake capacity/waitlist, course payment terms, intake-aware applications/enrollments/payments, installment checkout amounts, student/admin balance reporting, and public waitlist email confirmation.
+- Frontend adds `/intakes`, intake selection during applications, payment-term copy and first/final installment checkout, learner payment status, admin capacity/waitlist controls, and the module delivery selector.
+- Verification: `python manage.py check`, `python -m compileall -q apps`, `python manage.py makemigrations --check --dry-run`, targeted SQLite-backed Django tests (41 existing intake/course/live-class tests and 14 admin tests), `npm run typecheck`, and `npm run build` all completed successfully. The repository-wide accuracy report remains the pre-existing 5/37 objective-gate result because its sample harness directories are absent.
+
+**Open**
+- Run the new migrations in the deployed MySQL database before using the intake, installment, or Live Room fields in production.
+- Configure and verify the production Paystack callback/webhook for installment number 1 and 2, and confirm the production email backend accepts waitlist confirmations/reminders.
+- Browser-level rendered-pixel inspection of the new `/intakes` page and module editor remains pending; the production build and TypeScript gate are green.
+
 Durable log of product decisions and mid-code changes. Newest first. Every agent reads this file at session start and appends a dated entry before finishing (see `.agents/skills/project-memory/SKILL.md`). Never delete entries; record reversals as new entries.
 
 ## 2026-11-20 — Mobile v1 verified: emulator runs the CI-built APK; releases automated

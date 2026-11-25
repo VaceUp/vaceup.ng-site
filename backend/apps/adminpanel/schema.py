@@ -32,6 +32,12 @@ class AdminEnrollmentRowSerializer(serializers.Serializer):
     status = serializers.CharField()
     progress_percent = serializers.FloatField()
     enrolled_at = serializers.DateTimeField()
+    intake_title = serializers.CharField(allow_null=True)
+    total_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    outstanding_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_deadline = serializers.DateTimeField(allow_null=True)
+    access_restricted = serializers.BooleanField()
 
 
 class AdminSubmissionRowSerializer(serializers.Serializer):

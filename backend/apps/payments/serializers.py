@@ -18,6 +18,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     course_title = serializers.CharField(source="course.title", read_only=True)
     items = PaymentItemSerializer(many=True, read_only=True)
+    intake_title = serializers.CharField(source="intake.title", read_only=True, allow_null=True)
 
     class Meta:
         model = Payment
@@ -32,6 +33,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             "paid_at",
             "created_at",
             "items",
+            "intake", "intake_title", "installment_number", "installment_total",
         )
         read_only_fields = fields
 
@@ -43,6 +45,8 @@ class InitializePaymentSerializer(serializers.Serializer):
         queryset=Course.objects.filter(is_published=True)
     )
     expected_total = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
+    intake = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    installment_number = serializers.IntegerField(min_value=1, max_value=2, required=False, default=1)
 
 
 class VerifyPaymentSerializer(serializers.Serializer):

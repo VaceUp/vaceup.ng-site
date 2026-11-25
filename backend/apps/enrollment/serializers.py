@@ -17,6 +17,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     """Read shape for a student's enrollment."""
 
     course = EnrolledCourseSerializer(read_only=True)
+    intake_title = serializers.CharField(source="intake.title", read_only=True, allow_null=True)
 
     class Meta:
         model = Enrollment
@@ -27,6 +28,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             "progress_percent",
             "enrolled_at",
             "completed_at",
+            "intake", "intake_title",
         )
         read_only_fields = fields
 
@@ -37,6 +39,7 @@ class EnrollCreateSerializer(serializers.Serializer):
     course = serializers.PrimaryKeyRelatedField(
         queryset=Course.objects.filter(is_published=True)
     )
+    intake = serializers.IntegerField(min_value=1, required=False, allow_null=True)
 
 
 class CompleteLessonSerializer(serializers.Serializer):

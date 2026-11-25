@@ -21,12 +21,14 @@ from rest_framework.exceptions import NotFound, ValidationError
 from apps.core.exceptions import AlreadyExists, DomainError, PaymentFailed, PaymentProviderUnavailable
 from apps.enrollment.models import Enrollment
 from apps.enrollment.services import grant_enrollment
+from apps.enrollment.services import _capacity_check
+from apps.website.models import AcademyIntake
 from apps.payments.gateway import get_gateway, to_minor_unit
 from apps.payments.models import Payment, PaymentItem
 
 
 @transaction.atomic
-def initialize_payment(*, student, course, expected_total=None):
+def initialize_payment(*, student, course, expected_total=None, intake_id=None, installment_number=1):
     """Create a pending Payment and get a Paystack authorization URL.
 
     Idempotent-ish: an existing PENDING payment for the same (student, course)
@@ -41,14 +43,24 @@ def initialize_payment(*, student, course, expected_total=None):
     if not course.price or course.price <= 0:
         raise DomainError("This course is free — enrol directly, no payment.",
                           code="course_free")
-    already = Enrollment.objects.filter(
-        student=student, course=course,
-    ).exists()
-    if already:
+    intake = AcademyIntake.objects.select_for_update().filter(pk=intake_id, is_active=True, is_archived=False).first() if intake_id else None
+    already = Enrollment.objects.filter(student=student, course=course, intake=intake).exists()
+    if already and (installment_number != 2 or not course.installment_eligible):
         raise AlreadyExists("You are already enrolled in this course.")
 
-    _check_quote(course.price, expected_total)
-    return _initialize_order(student, [(course, course.price)])
+    if installment_number == 2 and not course.installment_eligible:
+        raise ValidationError("This course does not support installment payments.")
+    amount = course.price
+    total_installments = 1
+    if course.installment_eligible:
+        total_installments = 2
+        amount = course.installment_first_amount if installment_number == 1 else course.installment_final_amount
+        if amount <= 0:
+            raise ValidationError("Installment terms are not configured for this course. Contact admissions.")
+    if intake:
+        _capacity_check(course=course, intake=intake, student=student)
+    _check_quote(amount, expected_total)
+    return _initialize_order(student, [(course, amount)], intake=intake, installment_number=installment_number, installment_total=total_installments)
 
 
 def _check_quote(total, expected_total):
@@ -101,11 +113,11 @@ def _hand_back_attempt(payment):
     return payment
 
 
-def _initialize_order(student, lines):
+def _initialize_order(student, lines, *, intake=None, installment_number=1, installment_total=1):
     """Caller holds the student row lock for concurrent checkout serialization."""
     currency = settings.PAYMENT_CURRENCY.upper()
     fingerprint = hashlib.sha256(json.dumps(
-        [currency, sorted((course.pk, format(Decimal(amount), ".2f")) for course, amount in lines)],
+        [currency, installment_number, intake.pk if intake else None, sorted((course.pk, format(Decimal(amount), ".2f")) for course, amount in lines)],
     ).encode()).hexdigest()
     payment = Payment.objects.filter(
         student=student, checkout_fingerprint=fingerprint, status=Payment.Status.PENDING, pricing_version=1,
@@ -123,7 +135,8 @@ def _initialize_order(student, lines):
     if payment is None:
         payment = Payment.objects.create(
             student=student, course=lines[0][0], amount=sum(amount for _, amount in lines),
-            currency=currency, checkout_fingerprint=fingerprint,
+            currency=currency, checkout_fingerprint=fingerprint, intake=intake,
+            installment_number=installment_number, installment_total=installment_total,
         )
         PaymentItem.objects.bulk_create([
             PaymentItem(payment=payment, course=course, amount=amount, course_title=course.title)
@@ -295,10 +308,10 @@ def _grant_enrollments_for_payment(payment):
     lines = list(payment.items.select_related("course"))
     courses = [line.course for line in lines] if lines else [payment.course]
     for course in courses:
-        existing = Enrollment.objects.filter(student=payment.student, course=course).first()
+        existing = Enrollment.objects.filter(student=payment.student, course=course, intake=payment.intake).first()
         # Replayed successful callbacks must never reverse an admin suspension.
         if existing is None:
-            grant_enrollment(student=payment.student, course=course)
+            grant_enrollment(student=payment.student, course=course, intake=payment.intake)
     CartItem.objects.filter(cart__user=payment.student, course__in=courses).delete()
 
 

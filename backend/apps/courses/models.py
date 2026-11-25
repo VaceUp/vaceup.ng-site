@@ -67,6 +67,10 @@ class Course(TimeStampedModel):
         max_length=20, choices=Level.choices, default=Level.BEGINNER
     )
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    duration_months = models.PositiveSmallIntegerField(default=1)
+    installment_eligible = models.BooleanField(default=False)
+    installment_first_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    installment_final_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     thumbnail = models.ImageField(
         upload_to="course/thumbnails/", blank=True, null=True,
         storage=public_media_storage,
@@ -110,9 +114,21 @@ class Module(TimeStampedModel):
     duration_minutes = models.PositiveIntegerField(
         default=0, help_text="Planned contact time for this module in minutes."
     )
+    class DeliveryMethod(models.TextChoices):
+        GOOGLE_MEET = "google_meet", _("Google Meet")
+        VACEUP_LIVE_ROOM = "vaceup_live_room", _("VaceUp Live Room")
+
+    delivery_method = models.CharField(
+        max_length=24, choices=DeliveryMethod.choices,
+        default=DeliveryMethod.GOOGLE_MEET,
+    )
     meeting_url = models.URLField(
         blank=True,
         help_text="Optional Google Meet link for live sessions of this module.",
+    )
+    live_room_url = models.URLField(
+        blank=True,
+        help_text="Private VaceUp Live Room join link for this module.",
     )
 
     class Meta:

@@ -12,6 +12,7 @@ from apps.enrollment.serializers import (
     EnrollmentSerializer,
     LessonProgressSerializer,
 )
+from apps.website.models import AcademyIntake
 
 
 class IsStudent(IsAuthenticated):
@@ -44,8 +45,13 @@ class EnrollmentViewSet(
         """POST /enrollments/ {course} — enrol in a (free, published) course."""
         serializer = EnrollCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        intake = None
+        if serializer.validated_data.get("intake"):
+            intake = AcademyIntake.objects.filter(pk=serializer.validated_data["intake"], is_active=True, is_archived=False).first()
+            if intake is None:
+                return Response({"detail": "That intake is not open."}, status=status.HTTP_400_BAD_REQUEST)
         enrollment = services.enroll(
-            student=request.user, course=serializer.validated_data["course"]
+            student=request.user, course=serializer.validated_data["course"], intake=intake
         )
         return Response(
             EnrollmentSerializer(enrollment).data,

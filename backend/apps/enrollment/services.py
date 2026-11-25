@@ -11,10 +11,27 @@ from django.utils import timezone
 
 from apps.core.exceptions import NotEnrolled, PaymentRequired
 from apps.enrollment.models import Enrollment, LessonProgress
+from apps.website.models import AcademyIntake
+
+
+def _capacity_check(*, course, intake, student=None):
+    if intake is None:
+        return
+    if not intake.all_courses and not intake.courses.filter(pk=course.pk).exists():
+        raise NotEnrolled("This course is not offered in the selected intake.")
+    existing = Enrollment.objects.filter(student=student, course=course, intake=intake).exists() if student else False
+    if existing:
+        return
+    occupied = Enrollment.objects.filter(
+        course=course, intake=intake,
+        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
+    ).count()
+    if occupied >= intake.capacity_per_course:
+        raise NotEnrolled("This course is full for the selected intake. Join the next intake waitlist.")
 
 
 @transaction.atomic
-def enroll(*, student, course):
+def enroll(*, student, course, intake=None):
     """Enrol a student in a published course.
 
     Free courses (price == 0) enrol directly. Paid courses defer to the
@@ -24,7 +41,7 @@ def enroll(*, student, course):
     if not course.is_published:
         raise NotEnrolled("This course is not open for enrollment.")
 
-    existing = Enrollment.objects.filter(student=student, course=course).first()
+    existing = Enrollment.objects.filter(student=student, course=course, intake=intake).first()
     if existing is not None:
         return existing
 
@@ -33,20 +50,24 @@ def enroll(*, student, course):
             "This course requires payment, which isn't available yet."
         )
 
-    return grant_enrollment(student=student, course=course)
+    return grant_enrollment(student=student, course=course, intake=intake)
 
 
 @transaction.atomic
-def grant_enrollment(*, student, course):
+def grant_enrollment(*, student, course, intake=None):
     """Idempotently create an ACTIVE enrollment regardless of price.
 
     The single source of truth for creating enrollments. Called by the free
     path above, by the payments app after a verified successful payment, and by
     admin tooling. Bypasses the price gate on purpose — callers decide entitlement.
     """
+    if intake is not None:
+        intake = AcademyIntake.objects.select_for_update().get(pk=getattr(intake, "pk", intake))
+        _capacity_check(course=course, intake=intake, student=student)
     enrollment, _ = Enrollment.objects.get_or_create(
         student=student,
         course=course,
+        intake=intake,
         defaults={"status": Enrollment.Status.ACTIVE},
     )
     return enrollment

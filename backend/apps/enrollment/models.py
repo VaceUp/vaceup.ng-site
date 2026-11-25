@@ -31,6 +31,10 @@ class Enrollment(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="enrollments",
     )
+    intake = models.ForeignKey(
+        "website.AcademyIntake", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="enrollments",
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -48,10 +52,7 @@ class Enrollment(TimeStampedModel):
     class Meta:
         constraints = [
             # One enrollment per student per course.
-            models.UniqueConstraint(
-                fields=["student", "course"],
-                name="uq_enrollment_student_course",
-            )
+            models.UniqueConstraint(fields=["student", "course", "intake"], name="uq_enrollment_student_course_intake")
         ]
         indexes = [
             models.Index(fields=["student", "status"]),

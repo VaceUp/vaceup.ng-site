@@ -35,6 +35,10 @@ class Payment(TimeStampedModel):
     course = models.ForeignKey(
         "courses.Course", on_delete=models.CASCADE, related_name="payments"
     )
+    intake = models.ForeignKey(
+        "website.AcademyIntake", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="payments",
+    )
     reference = models.CharField(
         max_length=64, unique=True, default=generate_reference, editable=False
     )
@@ -53,6 +57,8 @@ class Payment(TimeStampedModel):
     gateway_response = models.JSONField(null=True, blank=True)
     checkout_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
     pricing_version = models.PositiveSmallIntegerField(default=1)
+    installment_number = models.PositiveSmallIntegerField(default=1)
+    installment_total = models.PositiveSmallIntegerField(default=1)
 
     class Meta:
         ordering = ("-created_at",)

@@ -29,6 +29,10 @@ class Application(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="applications",
     )
+    intake = models.ForeignKey(
+        "website.AcademyIntake", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="applications",
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

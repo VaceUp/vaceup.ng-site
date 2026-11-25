@@ -3,6 +3,9 @@ Includes breakout room and recording support."""
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Sum
+from django.utils import timezone
+from datetime import timedelta
 
 from apps.core.exceptions import DomainError, NotEnrolled
 from apps.enrollment.models import Enrollment
@@ -31,6 +34,21 @@ class BreakoutRoomFull(DomainError):
     default_code = "breakout_full"
 
 
+def course_access_is_current(*, user, course):
+    enrollment = Enrollment.objects.filter(
+        student=user, course=course,
+        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
+    ).order_by("-enrolled_at").first()
+    if enrollment is None:
+        return False
+    if course.installment_eligible:
+        from apps.payments.models import Payment
+        paid = Payment.objects.filter(student=user, course=course, status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"]
+        if paid is not None and paid < course.price and timezone.now() >= enrollment.enrolled_at + timedelta(days=max(course.duration_months - 1, 0) * 30):
+            return False
+    return True
+
+
 @transaction.atomic
 def join_live_class(*, user, live_class):
     """Return join credentials for ``user``.
@@ -49,11 +67,7 @@ def join_live_class(*, user, live_class):
             user=user, live_class=live_class, can_publish=True, is_host=True
         )
 
-    enrolled = Enrollment.objects.filter(
-        student=user, course=live_class.course,
-        status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-    ).exists()
-    if not enrolled:
+    if not course_access_is_current(user=user, course=live_class.course):
         raise NotEnrolled("You must be enrolled in this course to join.")
     if not live_class.is_joinable():
         raise ClassNotJoinable()
@@ -76,11 +90,7 @@ def join_breakout_room(*, user, live_class, breakout_room: str) -> dict:
     is_host = user.is_admin or live_class.course.instructor_id == user.id
     if not is_host:
         # Verify user is in main class and breakout exists
-        enrolled = Enrollment.objects.filter(
-            student=user, course=live_class.course,
-            status__in=(Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED),
-        ).exists()
-        if not enrolled:
+        if not course_access_is_current(user=user, course=live_class.course):
             raise NotEnrolled("You must be enrolled in this course to join.")
     
     # Generate token for breakout room

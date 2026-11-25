@@ -363,9 +363,25 @@ class AcademyIntake(TimeStampedModel):
     all_courses = models.BooleanField(default=False)
     courses = models.ManyToManyField("courses.Course", blank=True, related_name="academy_intakes")
     registration_url = models.URLField(max_length=500, blank=True)
+    capacity_per_course = models.PositiveIntegerField(default=30)
 
     class Meta:
         ordering = ("starts_on", "pk")
 
     def __str__(self):
         return self.title
+
+
+class IntakeWaitlistEntry(TimeStampedModel):
+    """A no-payment expression of interest for one course and intake."""
+
+    intake = models.ForeignKey(AcademyIntake, on_delete=models.CASCADE, related_name="waitlist_entries")
+    full_name = models.CharField(max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=40, blank=True)
+    preferred_course = models.ForeignKey("courses.Course", on_delete=models.PROTECT, related_name="intake_waitlist_entries")
+    status = models.CharField(max_length=20, default="active", choices=[("active", "Active"), ("contacted", "Contacted"), ("closed", "Closed")])
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("intake", "email", "preferred_course"), name="uq_intake_waitlist_email_course")]

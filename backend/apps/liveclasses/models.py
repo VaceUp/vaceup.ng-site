@@ -184,6 +184,15 @@ class LiveClass(TimeStampedModel):
         
         if not is_enrolled:
             return False
+
+        if self.course.installment_eligible:
+            from django.db.models import Sum
+            from datetime import timedelta
+            from apps.payments.models import Payment
+            paid = Payment.objects.filter(student=user, course=self.course, status=Payment.Status.SUCCESS).aggregate(total=Sum("amount"))["total"]
+            enrollment = Enrollment.objects.filter(student=user, course=self.course, status__in=[Enrollment.Status.ACTIVE, Enrollment.Status.COMPLETED]).order_by("-enrolled_at").first()
+            if paid is not None and paid < self.course.price and enrollment and timezone.now() >= enrollment.enrolled_at + timedelta(days=max(self.course.duration_months - 1, 0) * 30):
+                return False
         
         # Replays also let enrolled learners catch up on a missed class.
         return True

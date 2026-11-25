@@ -1,4 +1,7 @@
 """One source for the next advertised intake and administrator scheduling."""
+from urllib.parse import quote
+
+from django.conf import settings
 from django.db.models import Q, Count
 from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
@@ -9,8 +12,13 @@ from rest_framework.response import Response
 
 from apps.core.permissions import IsAdmin
 from apps.courses.models import Course
-from apps.website.models import AcademyIntake, IntakeWaitlistEntry
+from apps.website.models import AcademyIntake, CohortRegistration, IntakeWaitlistEntry
 from apps.accounts.mail_delivery import send_account_message
+from apps.core.email_layout import render_email
+
+
+def _frontend(path):
+    return f"{settings.FRONTEND_LINK_BASE.rstrip('/')}{path}"
 
 
 def upcoming_intakes(course_slug=None, today=None):
@@ -80,13 +88,44 @@ class PublicIntakeSerializer(IntakeSerializer):
         fields = ("id", "title", "starts_on", "ends_on", "is_active", "available_courses", "registration_url", "capacity_per_course", "status")
 
 
+class CohortRegistrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CohortRegistration
+        fields = ("full_name", "email", "phone", "course", "payment_preference", "consent_reminders")
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if len(value) < 2:
+            raise serializers.ValidationError("Enter your full name.")
+        return value
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate_phone(self, value):
+        value = value.strip()
+        if len(value) < 7:
+            raise serializers.ValidationError("Enter a phone number we can use for class updates.")
+        return value
+
+
+class CohortRegistrationAdminSerializer(serializers.ModelSerializer):
+    intake_title = serializers.CharField(source="intake.title", read_only=True)
+    course_title = serializers.CharField(source="course.title", read_only=True)
+
+    class Meta:
+        model = CohortRegistration
+        fields = ("id", "intake", "intake_title", "course", "course_title", "full_name", "email", "phone", "payment_preference", "status", "consent_reminders", "registered_at", "paid_at", "next_interest_reminder_at", "last_class_reminder_on")
+        read_only_fields = ("id", "intake_title", "course_title", "registered_at", "paid_at", "next_interest_reminder_at", "last_class_reminder_on")
+
+
 class IntakeViewSet(viewsets.ModelViewSet):
     queryset = AcademyIntake.objects.prefetch_related("courses").all()
     serializer_class = IntakeSerializer
     permission_classes = [IsAdmin]
 
     def get_permissions(self):
-        public = self.action in ("list", "retrieve", "next_intake", "waitlist") and not self._admin()
+        public = self.action in ("list", "retrieve", "next_intake", "waitlist", "register") and not self._admin()
         return [AllowAny()] if public else [IsAdmin()]
 
     def _admin(self):
@@ -96,17 +135,65 @@ class IntakeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self._admin():
             return super().get_queryset()
-        if self.action in ("list", "retrieve", "waitlist"):
-            return AcademyIntake.objects.filter(is_archived=False, ends_on__gte=timezone.localdate()).prefetch_related("courses").order_by("starts_on", "pk")
+        if self.action in ("list", "retrieve", "waitlist", "register"):
+            return AcademyIntake.objects.filter(is_active=True, is_archived=False, ends_on__gte=timezone.localdate()).prefetch_related("courses").order_by("starts_on", "pk")
         return upcoming_intakes(self.request.query_params.get("course"))
 
     def get_serializer_class(self):
+        if self.action == "registrations_list":
+            return CohortRegistrationAdminSerializer
         return IntakeSerializer if self._admin() else PublicIntakeSerializer
 
     @action(detail=False, methods=["get"], url_path="next")
     def next_intake(self, request):
         row = upcoming_intakes(request.query_params.get("course")).first()
         return Response({"intake": PublicIntakeSerializer(row).data if row else None})
+
+    @action(detail=True, methods=["post"], url_path="register")
+    def register(self, request, pk=None):
+        intake = self.get_object()
+        if not intake.is_active or intake.is_archived or intake.ends_on < timezone.localdate():
+            return Response({"detail": "This cohort is no longer accepting registrations."}, status=400)
+        serializer = CohortRegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        course = serializer.validated_data["course"]
+        if not course.is_published or (not intake.all_courses and not intake.courses.filter(pk=course.pk).exists()):
+            raise serializers.ValidationError({"course": "Choose a published course offered in this cohort."})
+        occupied = intake.enrollments.filter(course=course, status__in=("active", "completed")).count()
+        if occupied >= intake.capacity_per_course:
+            return Response({"detail": "This course is full for the selected cohort. Join the waitlist instead."}, status=409)
+        user = request.user if request.user.is_authenticated and getattr(request.user, "is_student", False) else None
+        preference = serializer.validated_data["payment_preference"]
+        status_value = CohortRegistration.Status.PAYMENT_PENDING if preference == CohortRegistration.Preference.PAY_NOW else CohortRegistration.Status.INTERESTED
+        registration, created = CohortRegistration.objects.update_or_create(
+            intake=intake, email=serializer.validated_data["email"], course=course,
+            defaults={**serializer.validated_data, "user": user, "status": status_value, "next_interest_reminder_at": timezone.now()},
+        )
+        checkout_path = f"/checkout?course_id={course.id}&intake={intake.id}"
+        payment_url = f"/register?next={quote(checkout_path, safe='')}" if preference == CohortRegistration.Preference.PAY_NOW else ""
+        email_sent = False
+        try:
+            extra = f"\nTo continue to payment, open: {payment_url}" if payment_url else "\nWe will remind you before this cohort begins so you can complete payment when you are ready."
+            message = EmailMultiAlternatives(
+                subject=f"VaceUp cohort registration received: {intake.title}",
+                body=f"Hello {registration.full_name},\n\nWe recorded your interest in {course.title} for {intake.title}.{extra}\n\nVaceUp",
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                to=[registration.email],
+            )
+            message.attach_alternative(render_email(
+                title="Your cohort registration is recorded",
+                text=f"Hello {registration.full_name},\n\nWe recorded your interest in **{course.title}** for **{intake.title}**.\n\n{('When you are ready, continue to application and payment.' if payment_url else 'We will send periodic reminders before the cohort begins.')}\n\nYou can opt out from future reminders at any time.",
+                category="Academy admissions",
+                details=(("Cohort", intake.title), ("Course", course.title), ("Dates", f"{intake.starts_on:%d %b %Y} - {intake.ends_on:%d %b %Y}")),
+                cta_label="Continue to payment" if payment_url else "View cohort calendar",
+                cta_url=_frontend(payment_url) if payment_url else _frontend("/intakes/"),
+                footer="You received this because you registered interest in a VaceUp cohort.",
+            ), "text/html")
+            send_account_message(message)
+            email_sent = True
+        except Exception:
+            email_sent = False
+        return Response({"detail": "Your cohort registration is recorded.", "status": registration.status, "payment_url": payment_url, "email_sent": email_sent}, status=201 if created else 200)
 
     @action(detail=True, methods=["post"], url_path="waitlist")
     def waitlist(self, request, pk=None):
@@ -176,6 +263,28 @@ class IntakeViewSet(viewsets.ModelViewSet):
         if page is not None:
             return self.get_paginated_response(WaitlistEntrySerializer(page, many=True).data)
         return Response(WaitlistEntrySerializer(rows, many=True).data)
+
+    @action(detail=False, methods=["get", "patch"], url_path="registrations")
+    def registrations_list(self, request):
+        rows = CohortRegistration.objects.select_related("intake", "course").order_by("-registered_at")
+        if request.query_params.get("intake"):
+            rows = rows.filter(intake_id=request.query_params["intake"])
+        if request.query_params.get("status"):
+            rows = rows.filter(status=request.query_params["status"])
+        if request.method == "PATCH":
+            registration = rows.filter(pk=request.data.get("id")).first()
+            if registration is None:
+                return Response({"detail": "Cohort registration not found."}, status=404)
+            status_value = request.data.get("status", registration.status)
+            if status_value not in {choice[0] for choice in CohortRegistration.Status.choices}:
+                return Response({"detail": "Invalid registration status."}, status=400)
+            registration.status = status_value
+            registration.save(update_fields=["status", "updated_at"])
+            return Response(CohortRegistrationAdminSerializer(registration).data)
+        page = self.paginate_queryset(rows)
+        if page is not None:
+            return self.get_paginated_response(CohortRegistrationAdminSerializer(page, many=True).data)
+        return Response(CohortRegistrationAdminSerializer(rows, many=True).data)
 
 
 class WaitlistEntrySerializer(serializers.ModelSerializer):

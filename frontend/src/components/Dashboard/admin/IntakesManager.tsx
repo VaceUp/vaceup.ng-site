@@ -14,6 +14,7 @@ interface Intake {
   courses: number[]; registration_url: string; capacity_per_course: number;
 }
 interface WaitlistEntry { id: number; intake: number; intake_title: string; full_name: string; email: string; phone: string; preferred_course: number; course_title: string; status: string; created_at: string }
+interface RegistrationEntry { id: number; intake: number; intake_title: string; course: number; course_title: string; full_name: string; email: string; phone: string; payment_preference: string; status: string; registered_at: string; paid_at: string | null }
 interface CourseOption { id: number; title: string; is_published: boolean }
 type Form = Omit<Intake, 'id'>;
 const initial = (): Form => ({
@@ -42,13 +43,15 @@ export default function IntakesManager() {
   const [message, setMessage] = useState('');
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [waitlistFilter, setWaitlistFilter] = useState('');
+  const [registrations, setRegistrations] = useState<RegistrationEntry[]>([]);
+  const [registrationFilter, setRegistrationFilter] = useState('');
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [intakes, options, entries] = await Promise.all([
-        readPages<Intake>('/website/intakes/'), readPages<CourseOption>('/courses/'), readPages<WaitlistEntry>('/website/intakes/waitlist/'),
+      const [intakes, options, entries, cohortRegistrations] = await Promise.all([
+        readPages<Intake>('/website/intakes/'), readPages<CourseOption>('/courses/'), readPages<WaitlistEntry>('/website/intakes/waitlist/'), readPages<RegistrationEntry>('/website/intakes/registrations/'),
       ]);
-      setRows(intakes); setCourses(options); setWaitlist(entries);
+      setRows(intakes); setCourses(options); setWaitlist(entries); setRegistrations(cohortRegistrations);
     } catch (reason) { setError(failureMessage(reason)); }
     finally { setLoading(false); }
   }, []);
@@ -72,6 +75,12 @@ export default function IntakesManager() {
   async function updateWaitlist(entry: WaitlistEntry, status: string, send_reminder = false) {
     setBusy(true); setError('');
     try { await api.request('/website/intakes/waitlist/', { method: 'PATCH', body: JSON.stringify({ id: entry.id, status, send_reminder }) }); await load(); }
+    catch (reason) { setError(failureMessage(reason)); }
+    finally { setBusy(false); }
+  }
+  async function updateRegistration(entry: RegistrationEntry, status: string) {
+    setBusy(true); setError('');
+    try { await api.request('/website/intakes/registrations/', { method: 'PATCH', body: JSON.stringify({ id: entry.id, status }) }); await load(); }
     catch (reason) { setError(failureMessage(reason)); }
     finally { setBusy(false); }
   }
@@ -115,6 +124,10 @@ export default function IntakesManager() {
     <AdminSection title="Waitlist requests" description="Filter interest by intake and use these details for follow-up when a place opens.">
       <div className="flex flex-wrap gap-3"><select className={controlClass} value={waitlistFilter} onChange={(event) => setWaitlistFilter(event.target.value)}><option value="">All intakes</option>{rows.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select><Action onClick={() => { const lines = [['Name', 'Email', 'Phone', 'Intake', 'Course', 'Status'], ...waitlist.filter((entry) => !waitlistFilter || String(entry.intake) === waitlistFilter).map((entry) => [entry.full_name, entry.email, entry.phone, entry.intake_title, entry.course_title, entry.status])]; const blob = new Blob([lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'vaceup-waitlist.csv'; anchor.click(); URL.revokeObjectURL(url); }}>Export CSV</Action></div>
       {waitlist.filter((entry) => !waitlistFilter || String(entry.intake) === waitlistFilter).length ? <AdminList label="Waitlist entries">{waitlist.filter((entry) => !waitlistFilter || String(entry.intake) === waitlistFilter).map((entry) => <AdminRow key={entry.id} title={entry.full_name} meta={`${entry.email}${entry.phone ? ` / ${entry.phone}` : ''}`} description={`${entry.intake_title} / ${entry.course_title} / ${entry.status}`} actions={<><Action disabled={busy} onClick={() => void updateWaitlist(entry, 'contacted', true)}>Mark contacted and remind</Action><Action disabled={busy} onClick={() => void updateWaitlist(entry, 'closed')}>Close</Action></>} />)}</AdminList> : <EmptyState title="No waitlist requests" description="New requests will appear here without creating a payment or enrollment." />}
+    </AdminSection>
+    <AdminSection title="Cohort registrations" description="Every public registration is tracked here. Pay-now registrations become paid after Paystack verification; pay-later registrations remain interest leads for reminders.">
+      <div className="flex flex-wrap gap-3"><select className={controlClass} value={registrationFilter} onChange={(event) => setRegistrationFilter(event.target.value)}><option value="">All intakes</option>{rows.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select><Action onClick={() => { const lines = [['Name', 'Email', 'Phone', 'Intake', 'Course', 'Payment preference', 'Status'], ...registrations.filter((entry) => !registrationFilter || String(entry.intake) === registrationFilter).map((entry) => [entry.full_name, entry.email, entry.phone, entry.intake_title, entry.course_title, entry.payment_preference, entry.status])]; const blob = new Blob([lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'vaceup-cohort-registrations.csv'; anchor.click(); URL.revokeObjectURL(url); }}>Export CSV</Action></div>
+      {registrations.filter((entry) => !registrationFilter || String(entry.intake) === registrationFilter).length ? <AdminList label="Cohort registrations">{registrations.filter((entry) => !registrationFilter || String(entry.intake) === registrationFilter).map((entry) => <AdminRow key={entry.id} title={entry.full_name} meta={`${entry.email}${entry.phone ? ` / ${entry.phone}` : ''}`} description={`${entry.intake_title} / ${entry.course_title} / ${entry.payment_preference} / ${entry.status}`} actions={<>{entry.status !== 'paid' && <Action disabled={busy} onClick={() => void updateRegistration(entry, 'paid')}>Mark paid</Action>}{entry.status !== 'closed' && <Action disabled={busy} onClick={() => void updateRegistration(entry, 'closed')}>Close</Action>}</>} />)}</AdminList> : <EmptyState title="No cohort registrations" description="Public course registrations will appear here as visitors choose a cohort." />}
     </AdminSection>
   </>;
 }

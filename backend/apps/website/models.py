@@ -385,3 +385,39 @@ class IntakeWaitlistEntry(TimeStampedModel):
     class Meta:
         ordering = ("-created_at",)
         constraints = [models.UniqueConstraint(fields=("intake", "email", "preferred_course"), name="uq_intake_waitlist_email_course")]
+
+
+class CohortRegistration(TimeStampedModel):
+    """A public, no-payment registration or paid cohort interest record."""
+
+    class Preference(models.TextChoices):
+        PAY_NOW = "pay_now", "Pay now"
+        PAY_LATER = "pay_later", "Pay later"
+
+    class Status(models.TextChoices):
+        INTERESTED = "interested", "Interested"
+        PAYMENT_PENDING = "payment_pending", "Payment pending"
+        PAID = "paid", "Paid"
+        CLOSED = "closed", "Closed"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="cohort_registrations",
+    )
+    intake = models.ForeignKey(AcademyIntake, on_delete=models.CASCADE, related_name="cohort_registrations")
+    course = models.ForeignKey("courses.Course", on_delete=models.PROTECT, related_name="cohort_registrations")
+    full_name = models.CharField(max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=40)
+    payment_preference = models.CharField(max_length=20, choices=Preference.choices, default=Preference.PAY_LATER)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INTERESTED, db_index=True)
+    consent_reminders = models.BooleanField(default=True)
+    registered_at = models.DateTimeField(default=timezone.now)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    next_interest_reminder_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_class_reminder_on = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-registered_at",)
+        constraints = [models.UniqueConstraint(fields=("intake", "email", "course"), name="uq_cohort_registration_email_course")]
+        indexes = [models.Index(fields=("intake", "status")), models.Index(fields=("course", "status"))]

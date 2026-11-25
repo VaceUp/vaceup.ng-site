@@ -16,13 +16,14 @@ import json
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.core.exceptions import AlreadyExists, DomainError, PaymentFailed, PaymentProviderUnavailable
 from apps.enrollment.models import Enrollment
 from apps.enrollment.services import grant_enrollment
 from apps.enrollment.services import _capacity_check
-from apps.website.models import AcademyIntake
+from apps.website.models import AcademyIntake, CohortRegistration
 from apps.payments.gateway import get_gateway, to_minor_unit
 from apps.payments.models import Payment, PaymentItem
 
@@ -312,6 +313,16 @@ def _grant_enrollments_for_payment(payment):
         # Replayed successful callbacks must never reverse an admin suspension.
         if existing is None:
             grant_enrollment(student=payment.student, course=course, intake=payment.intake)
+        CohortRegistration.objects.filter(
+            intake=payment.intake,
+            course=course,
+            email__iexact=payment.student.email,
+        ).update(
+            user=payment.student,
+            status=CohortRegistration.Status.PAID,
+            paid_at=payment.paid_at or timezone.now(),
+            next_interest_reminder_at=None,
+        )
     CartItem.objects.filter(cart__user=payment.student, course__in=courses).delete()
 
 

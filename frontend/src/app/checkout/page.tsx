@@ -58,7 +58,7 @@ export default function CheckoutPage() {
         await api.enrollInCourse(lines[0].courseId); setEnrolled(true); return;
       }
       const payment = direct
-        ? await api.initializePayment({ course: lines[0].courseId, expected_total: total, installment_number: installmentNumber })
+        ? await api.initializePayment({ course: lines[0].courseId, expected_total: total, intake: new URLSearchParams(window.location.search).get('intake') ? Number(new URLSearchParams(window.location.search).get('intake')) : undefined, installment_number: installmentNumber })
         : await api.checkoutCart(lines.map(line => line.cartItemId!), total);
       if (!('reference' in payment)) {
         if (Number(total) !== 0) throw new Error('The server did not return a payment order. No payment has been started. Contact support.');

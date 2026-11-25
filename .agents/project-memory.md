@@ -1,5 +1,19 @@
 # VaceUp Project Memory
 
+## 2026-11-25 — Public cohort calendar and registration lifecycle
+
+**Decision**
+- The public website presents the year's active cohorts. Visitors choose a course inside a cohort, register interest without an account, and choose pay now or pay later.
+- Cohort registrations are tracked separately from enrollments; paid registrations are confirmed only after verified payment, while opted-in interest leads receive periodic reminders and paid learners receive one reminder for each class day.
+
+**Changed**
+- Added `CohortRegistration`, public cohort registration and admin registration endpoints, payment-to-registration synchronization, and the `send_intake_reminders` management command.
+- Rebuilt the public `/intakes` page as a cohort-to-course registration flow with waitlist handling, added checkout intake context, branded registration/reminder emails, and added admin registration visibility/export.
+- Verification: backend checks, 10 intake tests on SQLite, frontend typecheck and production build completed; existing storage configuration warnings remain environment-specific.
+
+**Open**
+- Deploy migration `0013_cohortregistration` before enabling public registrations. Configure a daily cPanel cron for `python manage.py send_intake_reminders` and verify production email and Paystack callback behavior.
+
 ## 2026-11-25 — Academy intake, capacity, delivery and installment requirements implemented
 
 **Decision**

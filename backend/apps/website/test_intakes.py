@@ -91,3 +91,28 @@ class IntakeTests(TestCase):
         self.assertEqual(AcademyIntake.objects.count(), 4)
         self.assertFalse(AcademyIntake.objects.filter(is_active=True).exists())
         self.assertEqual(list(AcademyIntake.objects.values_list("starts_on", flat=True)), [date(2027, 1, 8), date(2027, 4, 9), date(2027, 7, 9), date(2027, 10, 8)])
+
+    @patch("apps.website.intakes.timezone.localdate", return_value=date(2027, 2, 1))
+    @patch("apps.website.intakes.send_account_message")
+    def test_public_registration_records_interest_and_payment_choice(self, _send, _today):
+        row = self.intake(month=3, all_courses=False)
+        row.courses.add(self.course)
+        response = self.client.post(
+            f"/api/v1/website/intakes/{row.pk}/register/",
+            {"full_name": "Ada Learner", "email": "ADA@example.com", "phone": "08012345678", "course": self.course.pk, "payment_preference": "pay_now", "consent_reminders": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("/register?next=", response.data["payment_url"])
+        self.assertEqual(row.cohort_registrations.get().email, "ada@example.com")
+        self.assertEqual(row.cohort_registrations.get().status, "payment_pending")
+
+    @patch("apps.website.intakes.timezone.localdate", return_value=date(2027, 2, 1))
+    def test_admin_can_list_cohort_registrations(self, _today):
+        row = self.intake(month=3, all_courses=False)
+        row.courses.add(self.course)
+        row.cohort_registrations.create(full_name="Ada Learner", email="ada@example.com", phone="08012345678", course=self.course)
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/website/intakes/registrations/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"][0]["course_title"], self.course.title)

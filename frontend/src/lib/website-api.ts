@@ -5,7 +5,11 @@ import { api, type PaginatedResponse } from './api';
 export interface AcademyIntake {
   id: number; title: string; starts_on: string; ends_on: string;
   is_active?: boolean;
-  available_courses: { id: number; slug: string; title: string }[];
+  available_courses: {
+    id: number; slug: string; title: string;
+    capacity?: number; enrolled?: number; remaining?: number;
+    status?: 'open' | 'waitlist_open';
+  }[];
   registration_url: string;
   capacity_per_course?: number;
   status?: 'open' | 'upcoming' | 'closed';

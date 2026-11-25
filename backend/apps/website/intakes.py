@@ -170,7 +170,7 @@ class IntakeViewSet(viewsets.ModelViewSet):
             defaults={**serializer.validated_data, "user": user, "status": status_value, "next_interest_reminder_at": timezone.now()},
         )
         checkout_path = f"/checkout?course_id={course.id}&intake={intake.id}"
-        payment_url = f"/register?next={quote(checkout_path, safe='')}" if preference == CohortRegistration.Preference.PAY_NOW else ""
+        payment_url = (checkout_path if user else f"/register?next={quote(checkout_path, safe='')}") if preference == CohortRegistration.Preference.PAY_NOW else ""
         email_sent = False
         try:
             extra = f"\nTo continue to payment, open: {payment_url}" if payment_url else "\nWe will remind you before this cohort begins so you can complete payment when you are ready."

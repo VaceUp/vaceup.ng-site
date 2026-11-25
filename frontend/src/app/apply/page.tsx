@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getPublicCourses } from '@/lib/public-catalog';
+import type { AcademyIntake } from '@/lib/website-api';
 
 
 const steps = [
@@ -23,6 +24,8 @@ export default function ApplyPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [selectedIntake, setSelectedIntake] = useState<string>('');
+  const [intakes, setIntakes] = useState<AcademyIntake[]>([]);
   const [courses, setCourses] = useState<{ id: string; title: string; price: number; duration: string }[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [coursesError, setCoursesError] = useState('');
@@ -67,9 +70,10 @@ export default function ApplyPage() {
     let cancelled = false;
     setCoursesLoading(true);
     setCoursesError('');
-    getPublicCourses()
-      .then((res) => {
+    Promise.all([getPublicCourses(), api.request<{ results: AcademyIntake[] }>('/website/intakes/?page=1', {}, false)])
+      .then(([res, intakeResponse]) => {
         if (cancelled) return;
+        setIntakes(intakeResponse.results || []);
         setCourses(
           res.results.map((c) => ({
             id: String(c.id),
@@ -119,6 +123,7 @@ export default function ApplyPage() {
     
     if (step === 1) {
       if (!courses.some((course) => course.id === selectedCourse)) newErrors.course = 'Please select an available course';
+      if (intakes.length && (!selectedIntake || !intakes.some((intake) => String(intake.id) === selectedIntake && intake.is_active))) newErrors.intake = 'Choose an intake that is open for registration';
     }
     if (step === 2) {
       if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
@@ -188,6 +193,7 @@ export default function ApplyPage() {
         .catch(() => undefined);
       await api.submitApplication({
         course: selectedCourse,
+        intake: selectedIntake ? Number(selectedIntake) : undefined,
         motivation: formData.motivation.trim(),
         goals: formData.goals.trim(),
         full_name: formData.fullName.trim(),
@@ -306,6 +312,7 @@ export default function ApplyPage() {
                   <h2 className="text-2xl font-black text-navy-950 mb-2">Select Your Course</h2>
                   <p className="text-gray-600">Choose the program that aligns with your career goals</p>
                 </div>
+                {intakes.length > 0 && <div className="mb-8"><label htmlFor="intake" className="block text-sm font-semibold text-navy-900 mb-2">Preferred intake *</label><select id="intake" value={selectedIntake} onChange={(event) => setSelectedIntake(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white p-3"><option value="">Choose a 2027 intake</option>{intakes.map((intake) => <option key={intake.id} value={intake.id} disabled={!intake.is_active}>{intake.title} ({intake.starts_on} - {intake.ends_on}){intake.is_active ? '' : ' - upcoming'}</option>)}</select>{errors.intake && <p className="mt-2 text-sm text-red-500">{errors.intake}</p>}</div>}
                 {coursesLoading ? (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Loading courses">
                     {[0, 1, 2].map((index) => (
@@ -699,7 +706,7 @@ export default function ApplyPage() {
               {currentStep === 1 && !coursesLoading && !coursesError && courses.length > 0 && (
                 <p className="mb-4 text-center text-sm text-gray-500">
                   {selectedCourseData
-                    ? `${selectedCourseData.title} selected - continue to personal information.`
+                    ? `${selectedCourseData.title}${selectedIntake ? ' and intake selected' : ''} - continue to personal information.`
                     : 'Select a course above to continue.'}
                 </p>
               )}

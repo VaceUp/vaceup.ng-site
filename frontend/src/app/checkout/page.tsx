@@ -21,6 +21,7 @@ export default function CheckoutPage() {
   const [enrolled, setEnrolled] = useState(false);
   const [settled, setSettled] = useState('');
   const [returnTo, setReturnTo] = useState('/checkout/');
+  const [installmentNumber, setInstallmentNumber] = useState(1);
   const submitting = useRef(false);
   const load = useCallback(async () => {
     setLoading(true); setError(''); setLines([]);
@@ -33,8 +34,10 @@ export default function CheckoutPage() {
       const courseId = new URLSearchParams(window.location.search).get('course_id');
       if (courseId) {
         const course = await getPublicCourseById(courseId);
-        setLines([{ courseId: String(course.id), title: course.title, price: course.price }]);
-        setTotal(course.price);
+        const requestedInstallment = new URLSearchParams(window.location.search).get('installment') === '2' ? 2 : 1;
+        const price = course.installment_eligible ? (requestedInstallment === 1 ? course.installment_first_amount : course.installment_final_amount) : course.price;
+        setInstallmentNumber(requestedInstallment); setLines([{ courseId: String(course.id), title: course.title, price: price || course.price }]);
+        setTotal(price || course.price);
       } else {
         const cart = await api.getCart();
         setLines(cart.items.map(item => ({ cartItemId: item.id, courseId: String(item.course.id), title: item.course.title, price: item.effective_price })));
@@ -55,7 +58,7 @@ export default function CheckoutPage() {
         await api.enrollInCourse(lines[0].courseId); setEnrolled(true); return;
       }
       const payment = direct
-        ? await api.initializePayment({ course: lines[0].courseId, expected_total: total })
+        ? await api.initializePayment({ course: lines[0].courseId, expected_total: total, installment_number: installmentNumber })
         : await api.checkoutCart(lines.map(line => line.cartItemId!), total);
       if (!('reference' in payment)) {
         if (Number(total) !== 0) throw new Error('The server did not return a payment order. No payment has been started. Contact support.');
@@ -85,7 +88,7 @@ export default function CheckoutPage() {
         <p className={styles.muted}>Enrolling as {email}</p>
         <ul className={styles.list}>{lines.map(line => <li className={styles.row + ' ' + styles.between} key={line.courseId}><span>{line.title}</span><strong>{formatPrice(line.price)}</strong></li>)}</ul>
         <p className={styles.row + ' ' + styles.between}><strong>Total</strong><strong>{formatPrice(total)}</strong></p>
-        <Action intent="primary" loading={paying} onClick={pay}>{Number(total) === 0 ? 'Enroll for free' : 'Continue to Paystack — ' + formatPrice(total)}</Action>
+        <Action intent="primary" loading={paying} onClick={pay}>{Number(total) === 0 ? 'Enroll for free' : `Pay ${installmentNumber > 1 ? 'final installment' : 'first installment'} — ${formatPrice(total)}`}</Action>
         <p className={styles.muted}>Review the <Link href="/terms/">terms</Link> and <Link href="/refund-policy/">refund policy</Link> before paying.</p>
       </>}
       {!error && !lines.length && <p>No courses selected. Add a course to your cart to continue.</p>}

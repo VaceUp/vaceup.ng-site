@@ -20,7 +20,9 @@ function ModuleForm({ module, courseId, suggestedWeek, formId, onSaved, onBusyCh
     week: module ? String(module.week) : String(suggestedWeek),
     duration_minutes: String(module?.duration_minutes ?? 0),
     order: module?.order ?? 0,
+    delivery_method: module?.delivery_method || 'google_meet',
     meeting_url: module?.meeting_url || '',
+    live_room_url: module?.live_room_url || '',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +41,9 @@ function ModuleForm({ module, courseId, suggestedWeek, formId, onSaved, onBusyCh
         title: form.title.trim(),
         week: Number(form.week) || suggestedWeek,
         duration_minutes: Math.max(0, Number(form.duration_minutes) || 0),
-        meeting_url: form.meeting_url.trim(),
+        delivery_method: form.delivery_method,
+        meeting_url: form.delivery_method === 'google_meet' ? form.meeting_url.trim() : '',
+        live_room_url: form.delivery_method === 'vaceup_live_room' ? form.live_room_url.trim() : '',
       };
       if (module) payload.order = Math.max(0, Math.floor(Number(form.order) || 0));
       else payload.course = courseId;
@@ -73,13 +77,17 @@ function ModuleForm({ module, courseId, suggestedWeek, formId, onSaved, onBusyCh
           </Field>
         )}
       </FormGrid>
-      <Field
-        label="Google Meet link for live sessions"
-        optional
-        hint="Enrolled learners see this link on the module. Leave it blank for self-paced teaching."
-      >
-        <TextInput type="url" inputMode="url" placeholder="https://meet.google.com/abc-defg-hij" value={form.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} />
+      <Field label="Delivery method" required hint="Choose where learners should join this module’s live teaching.">
+        <select className={controlClass} value={form.delivery_method} onChange={(event) => set('delivery_method', event.target.value as 'google_meet' | 'vaceup_live_room')}>
+          <option value="google_meet">Google Meet</option>
+          <option value="vaceup_live_room">VaceUp Live Room</option>
+        </select>
       </Field>
+      {form.delivery_method === 'google_meet' ? <Field label="Google Meet link" optional hint="Enrolled learners see this link on the module.">
+        <TextInput type="url" inputMode="url" placeholder="https://meet.google.com/abc-defg-hij" value={form.meeting_url} onChange={(event) => set('meeting_url', event.target.value)} />
+      </Field> : <Field label="VaceUp Live Room link" optional hint="Paste the room link created for this module. Learners see it only after access is granted.">
+        <TextInput type="url" inputMode="url" placeholder="https://vaceup.ng/live/?room=..." value={form.live_room_url} onChange={(event) => set('live_room_url', event.target.value)} />
+      </Field>}
     </form>
   );
 }
@@ -210,11 +218,11 @@ export default function CourseCurriculum({ course }: { course: ManagedCourse }) 
                 <div className={adminStyles.rowTop}>
                   <span className={adminStyles.rowTitle}>Week {module.week} · {module.title}</span>
                   <Pill tone="muted">{module.lessons.length} {module.lessons.length === 1 ? 'lesson' : 'lessons'}</Pill>
-                  {module.meeting_url && <Pill tone="live">Live link</Pill>}
+                  {(module.meeting_url || module.live_room_url) && <Pill tone="live">{module.delivery_method === 'vaceup_live_room' ? 'Live Room' : 'Live link'}</Pill>}
                 </div>
                 <p className={adminStyles.rowMeta}>
                   Position {module.order + 1} · {module.duration_minutes ? `${module.duration_minutes} minutes planned` : 'contact time not set'}
-                  {module.meeting_url ? ' · Google Meet link set' : ' · no live session link'}
+                  {module.delivery_method === 'vaceup_live_room' ? (module.live_room_url ? ' · VaceUp Live Room set' : ' · Live Room not set') : (module.meeting_url ? ' · Google Meet link set' : ' · no live session link')}
                 </p>
               </div>
               <div className={adminStyles.actions}>

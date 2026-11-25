@@ -45,11 +45,13 @@ export function CourseImage({ course }: { course: WorkspaceCourse }) {
 }
 export function WorkspaceCourseCard({ course, instructor, featured = false }: { course: WorkspaceCourse; instructor: boolean; featured?: boolean }) {
   const suspended = course.enrollment_status === 'suspended';
+  const paymentDue = !instructor && course.outstanding_amount && Number(course.outstanding_amount) > 0;
   return <WorkspacePanel className={cn(styles.courseCard, featured && styles.featuredCourse)}><CourseImage course={course} /><div className={styles.courseBody}>
     <div className={styles.row}><span className={styles.eyebrow}>{course.category_name}</span><span className={styles.badge}>{instructor ? (course.is_published ? 'Published' : 'Draft') : course.enrollment_status}</span></div>
     <h2>{course.title}</h2><p className={styles.muted}>{instructor ? `${course.student_count ?? 0} enrolled students` : course.instructor_name}</p>
     <p className={styles.muted}>{course.lesson_count ?? 0} lessons{course.duration ? ` / ${course.duration}` : ''}</p>
     {!instructor && <WorkspaceProgress value={course.progress_percent} label={`Progress in ${course.title}`} />}
+    {!instructor && paymentDue && <p className={styles.muted}>Paid {course.paid_amount || '0'} of {course.total_fee}. Outstanding {course.outstanding_amount}. {course.access_restricted ? 'Access is paused until the balance is cleared.' : 'Keep your final installment before the final month.'} <WorkspaceLink href={`/checkout?course_id=${course.id}&installment=${course.payment_status === 'installment_due' ? '2' : '1'}`}>Pay now</WorkspaceLink></p>}
     {suspended ? <p className={styles.muted}>Access is suspended. Contact support to discuss your enrollment.</p> : <WorkspaceLink href={courseWorkspaceHref(course.id)} primary={featured}>{instructor ? 'View course content' : course.enrollment_status === 'completed' ? 'Review course' : 'Continue learning'}<ArrowRight className="size-4" aria-hidden="true" /></WorkspaceLink>}
     {instructor && <WorkspaceLink href={`/dashboard/content?course=${course.id}`}>Edit teaching content</WorkspaceLink>}
   </div></WorkspacePanel>;

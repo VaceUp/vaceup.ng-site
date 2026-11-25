@@ -679,7 +679,7 @@ export interface Certificate {
 }
 
 export interface InitializePaymentRequest {
-  course: string; expected_total: string;
+  course: string; expected_total: string; intake?: number; installment_number?: number;
 }
 
 export type PaymentInitializationResponse = Payment;
@@ -766,6 +766,7 @@ export interface ApplicationListParams { page?: number; page_size?: number; stat
 
 export interface SubmitApplicationRequest {
   course: string;
+  intake?: number;
   motivation: string;
   goals?: string;
   full_name?: string;

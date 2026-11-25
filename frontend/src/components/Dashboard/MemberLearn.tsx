@@ -11,6 +11,7 @@ import { WorkspaceHeading, WorkspacePanel, WorkspaceEmpty, WorkspaceFeedback, Wo
 
 function Lesson({ lesson, module, completed, student, onComplete }: { lesson: WorkspaceLesson; module: WorkspaceModule; completed: boolean; student: boolean; onComplete: () => void }) {
   const meetUrl = webUrl(module.meeting_url);
+  const liveRoomUrl = webUrl(module.live_room_url);
   const [busy, setBusy] = useState(false);
   const [videoBusy, setVideoBusy] = useState(false);
   const [source, setSource] = useState<string | null>(null);
@@ -36,7 +37,10 @@ function Lesson({ lesson, module, completed, student, onComplete }: { lesson: Wo
   };
   return <WorkspacePanel><div className={styles.stack}><div className={styles.row}><h2>{lesson.title}</h2>{completed && <span className={styles.badge}><Check aria-hidden="true" />Completed</span>}</div>
     <p className={styles.muted}>Week {module.week} - {module.title}{module.duration_minutes ? ` - ${module.duration_minutes} minutes planned` : ''}</p>
-    {module.meeting_url && (meetUrl
+    {module.delivery_method === 'vaceup_live_room' && (liveRoomUrl
+      ? <a className={styles.action} href={liveRoomUrl}>Join the VaceUp Live Room</a>
+      : <p className={styles.muted}>Your VaceUp Live Room session is not ready yet. Contact your tutor.</p>)}
+    {module.delivery_method !== 'vaceup_live_room' && module.meeting_url && (meetUrl
       ? <a className={styles.action} href={meetUrl} target="_blank" rel="noopener noreferrer">Join the live Google Meet session</a>
       : <p className={styles.muted}>The live session link for this module is invalid. Contact your tutor.</p>)}
     {error && <p className={styles.error} role="alert">{error}</p>}

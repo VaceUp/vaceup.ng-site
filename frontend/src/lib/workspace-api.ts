@@ -4,6 +4,7 @@ export interface WorkspaceCourse {
   id: number; title: string; slug: string; description: string; instructor_name: string;
   category_name: string; thumbnail: string | null; image_url: string; is_published: boolean;
   level: string; duration: string; lesson_count: number | null; enrollment_id: number | null;
+  duration_months: number; installment_eligible: boolean; total_fee: string; paid_amount: string | null; outstanding_amount: string; payment_status: string; payment_deadline: string | null; access_restricted: boolean;
   enrollment_status: 'active' | 'completed' | 'suspended' | null;
   progress_percent: string | null; student_count: number | null;
 }
@@ -36,7 +37,7 @@ export interface WorkspaceLesson {
 }
 export interface WorkspaceModule {
   id: number; title: string; week: number; duration_minutes: number;
-  meeting_url: string; lessons: WorkspaceLesson[];
+  delivery_method: 'google_meet' | 'vaceup_live_room'; meeting_url: string; live_room_url: string; lessons: WorkspaceLesson[];
 }
 export interface WorkspaceCourseDetail {
   course: { id: number; title: string; description: string; instructor_name: string;

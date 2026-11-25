@@ -33,6 +33,7 @@ interface Enrollment {
   status: 'active' | 'completed' | 'suspended';
   progress_percent: number;
   enrolled_at: string;
+  intake_title: string | null; total_fee: string; paid_amount: string; outstanding_amount: string; payment_deadline: string | null; access_restricted: boolean;
 }
 
 const STATUS: Record<Enrollment['status'], { label: string; tone: 'live' | 'muted' | 'danger' }> = {
@@ -159,7 +160,7 @@ export default function EnrollmentsTab() {
                     <Pill tone={STATUS[row.status].tone}>{STATUS[row.status].label}</Pill>
                     <span className={adminStyles.amount}>{progress}% complete</span>
                   </>}
-                  meta={`${row.student_email || 'No email on record'} · ${row.course_title} · started ${formatWorkspaceDate(row.enrolled_at)}`}
+                  meta={`${row.student_email || 'No email on record'} · ${row.course_title}${row.intake_title ? ` · ${row.intake_title}` : ''} · paid ${row.paid_amount} / ${row.total_fee}${row.access_restricted ? ' · access restricted' : ''} · started ${formatWorkspaceDate(row.enrolled_at)}`}
                 />
               );
             })}

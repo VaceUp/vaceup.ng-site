@@ -5,6 +5,7 @@ export interface ManagedCourse {
   id: number; slug: string; title: string; category: number; instructor: number;
   description: string; duration: string; image_url: string; thumbnail: string | null;
   level: CourseLevel; price: string; is_published: boolean;
+  duration_months?: number; installment_eligible?: boolean; installment_first_amount?: string; installment_final_amount?: string;
   tagline?: string; learning_outcomes?: string; requirements?: string;
   benefits?: string; target_audience?: string; outline?: string;
 }
@@ -16,7 +17,7 @@ export interface ManagedLesson {
 }
 export interface ManagedModule {
   id: number; course: number; title: string; order: number;
-  week: number; duration_minutes: number; meeting_url: string;
+  week: number; duration_minutes: number; delivery_method: 'google_meet' | 'vaceup_live_room'; meeting_url: string; live_room_url: string;
   lessons: ManagedLesson[];
 }
 interface Page<T> { results: T[]; next: string | null; }

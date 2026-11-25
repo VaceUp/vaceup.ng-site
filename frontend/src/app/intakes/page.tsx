@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, UsersRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Clock3, UsersRound } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { AcademyIntake } from '@/lib/website-api';
+import { Modal } from '@/components/ui/Modal';
 
 type CourseOption = {
   id: number;
@@ -110,9 +111,7 @@ export default function IntakesPage() {
       </article>)}
     </section>}
 
-    {selected && <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCohort(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="cohort-dialog-title" className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl bg-surface p-6 shadow-xl sm:p-8">
-        <div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-content-muted">{selected.title}</p><h2 id="cohort-dialog-title" className="mt-2 text-2xl font-bold text-content">{step === 'courses' ? 'Choose a course' : step === 'register' ? 'Register your interest' : 'Join the waitlist'}</h2></div><button type="button" aria-label="Close cohort dialog" className="rounded-lg border border-line p-2 text-content transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-navy-950" onClick={closeCohort}><X aria-hidden="true" className="size-5" /></button></div>
+    <Modal isOpen={Boolean(selected)} onClose={closeCohort} size="full" title={selected ? `${selected.title} — ${step === 'courses' ? 'Choose a course' : step === 'register' ? 'Register your interest' : 'Join the waitlist'}` : ''} description={step === 'courses' ? 'Select a course to continue. Registration does not charge you.' : 'We will use these details for cohort and class updates.'}>
         {step === 'courses' && <div className="mt-6 space-y-3"><p className="text-content-secondary">Select one course. Registration does not charge you; you can choose whether to pay now or later.</p>{selectedCourses.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-2xl border border-line p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-content">{item.title}</h3><p className="mt-1 text-sm text-content-muted">{item.status === 'waitlist_open' ? 'This course is full. Join the waitlist.' : `${item.remaining ?? 0} places remaining`}</p></div><button type="button" className="shrink-0 rounded-xl border border-navy-950 px-4 py-2.5 font-semibold text-navy-950 transition hover:bg-navy-950 hover:text-white focus:outline-none focus:ring-2 focus:ring-navy-950" onClick={() => item.status === 'waitlist_open' ? beginWaitlist(item) : beginRegistration(item)}>{item.status === 'waitlist_open' ? 'Join waitlist' : 'Register interest'}</button></div>)}</div>}
 
         {(step === 'register' || step === 'waitlist') && <form className="mt-6 space-y-5" onSubmit={(event) => void (step === 'register' ? submitRegistration(event) : joinWaitlist(event))}>
@@ -126,7 +125,6 @@ export default function IntakesPage() {
           {error && <p role="alert" className="rounded-xl border border-red-600/40 bg-red-50 p-4 text-red-900">{error}</p>}
           <button disabled={busy || Boolean(result)} className="w-full rounded-xl bg-navy-950 px-4 py-3 font-semibold text-white transition hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-navy-950 focus:ring-offset-2" type="submit">{busy ? 'Saving...' : step === 'register' ? 'Register my interest' : 'Join waitlist'}</button>
         </form>}
-      </section>
-    </div>}
+    </Modal>
   </main>;
 }

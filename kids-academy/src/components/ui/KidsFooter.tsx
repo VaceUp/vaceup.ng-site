@@ -1,6 +1,5 @@
 import Image from 'next/image';
-import { ArrowUpRight, BriefcaseBusiness, Globe, Mail, Phone, Play, Sparkles } from 'lucide-react';
-import { MAIN_SITE_URL, PORTAL_URL } from '@/lib/config';
+import { BriefcaseBusiness, Globe, Mail, Phone, Play, Sparkles } from 'lucide-react';
 
 const socialLinks = [
   { label: 'Facebook', href: 'https://www.facebook.com/vaceupkidstech', icon: Globe },
@@ -33,17 +32,17 @@ export function KidsFooter() {
               <li><a href="#programs" className="transition-colors hover:text-gold-brand">Programs</a></li>
               <li><a href="#why" className="transition-colors hover:text-gold-brand">Why VaceUp Kids</a></li>
               <li><a href="#parents" className="transition-colors hover:text-gold-brand">For parents</a></li>
-              <li><a href={PORTAL_URL} className="inline-flex items-center gap-1 transition-colors hover:text-gold-brand">Parent portal <ArrowUpRight aria-hidden="true" className="size-4" /></a></li>
+              <li><a href="/parent" className="transition-colors hover:text-gold-brand">Parent portal</a></li>
+              <li><a href="/register" className="transition-colors hover:text-gold-brand">Create an account</a></li>
             </ul>
           </nav>
 
-          <nav aria-label="VaceUp">
-            <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-gold-brand">VaceUp</h2>
+          <nav aria-label="Support">
+            <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-gold-brand">Support</h2>
             <ul className="mt-5 space-y-3 text-sm text-navy-200">
-              <li><a href={`${MAIN_SITE_URL}/about`} className="transition-colors hover:text-gold-brand">About the academy</a></li>
-              <li><a href={`${MAIN_SITE_URL}/admissions`} className="transition-colors hover:text-gold-brand">Admissions</a></li>
-              <li><a href={`${MAIN_SITE_URL}/contact`} className="transition-colors hover:text-gold-brand">Contact the team</a></li>
-              <li><a href={MAIN_SITE_URL} className="inline-flex items-center gap-1 transition-colors hover:text-gold-brand">Main website <ArrowUpRight aria-hidden="true" className="size-4" /></a></li>
+              <li><a href="/privacy" className="transition-colors hover:text-gold-brand">Privacy and safety</a></li>
+              <li><a href="mailto:kids@vaceup.ng" className="transition-colors hover:text-gold-brand">Contact Kids support</a></li>
+              <li><a href="/login" className="transition-colors hover:text-gold-brand">Parent login</a></li>
             </ul>
           </nav>
 
@@ -59,7 +58,7 @@ export function KidsFooter() {
 
         <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-navy-300 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} VaceUp Kids Tech Academy. A division of VaceUp Digital Academy.</p>
-          <a href={`${MAIN_SITE_URL}/privacy`} className="transition-colors hover:text-white">Privacy and safety</a>
+          <a href="/privacy" className="transition-colors hover:text-white">Privacy and safety</a>
         </div>
       </div>
     </footer>

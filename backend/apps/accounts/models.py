@@ -67,12 +67,28 @@ class User(AbstractBaseUser, PermissionsMixin):
         INSTRUCTOR = "instructor", _("Instructor")
         STUDENT = "student", _("Student")
 
+    class AcademyScope(models.TextChoices):
+        ADULT = "adult", _("Adult Academy")
+        KIDS = "kids", _("Kids Academy")
+        BOTH = "both", _("Adult and Kids Academies")
+
     email = models.EmailField(_("email address"), unique=True)  # unique => indexed
     full_name = models.CharField(_("full name"), max_length=150, blank=True)
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
         default=Role.STUDENT,
+        db_index=True,
+    )
+    # A portal boundary is deliberately separate from the role. A parent in
+    # the Kids Academy is still a student-shaped account for Django's shared
+    # infrastructure, but cannot sign into the adult portal when this is
+    # ``kids``. Existing accounts default to ``both`` during migration so the
+    # adult academy keeps its current behaviour.
+    academy_scope = models.CharField(
+        max_length=12,
+        choices=AcademyScope.choices,
+        default=AcademyScope.BOTH,
         db_index=True,
     )
     # is_active flips to True only after email verification.
@@ -116,6 +132,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_student(self) -> bool:
         return self.role == self.Role.STUDENT
+
+    @property
+    def is_kids_only(self) -> bool:
+        return self.academy_scope == self.AcademyScope.KIDS
+
+    @property
+    def can_access_kids(self) -> bool:
+        return self.academy_scope in {self.AcademyScope.KIDS, self.AcademyScope.BOTH}
+
+    @property
+    def can_access_adult(self) -> bool:
+        return self.academy_scope in {self.AcademyScope.ADULT, self.AcademyScope.BOTH}
 
 
 class StudentProfile(TimeStampedModel):

@@ -13,6 +13,7 @@ from apps.accounts.models import EmailVerificationToken, PasswordResetToken
 def deliver_token_email(kind, *, token_id=None, email=None, token=None):
     model, sender, active = {
         "verification": (EmailVerificationToken, emails.send_verification_email, False),
+        "kids_verification": (EmailVerificationToken, emails.send_kids_verification_email, False),
         "password_reset": (PasswordResetToken, emails.send_password_reset_email, True),
     }[kind]
     lookup = {"pk": token_id} if token_id is not None else {"token": token, "user__email__iexact": email}
@@ -33,6 +34,13 @@ _TASK_OPTIONS = dict(
 def send_verification_email(self, email=None, token=None, *, token_id=None):
     run_delivery("verification", lambda: deliver_token_email(
         "verification", token_id=token_id, email=email, token=token,
+    ), task=self)
+
+
+@shared_task(name="accounts.send_kids_verification_email", **_TASK_OPTIONS)
+def send_kids_verification_email(self, email=None, token=None, *, token_id=None):
+    run_delivery("kids_verification", lambda: deliver_token_email(
+        "kids_verification", token_id=token_id, email=email, token=token,
     ), task=self)
 
 

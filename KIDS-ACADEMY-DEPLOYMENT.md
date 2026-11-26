@@ -7,9 +7,9 @@ The main website is only a link to that domain, so a frontend outage on one site
 ## Shared services
 
 - `api.vaceup.ng` remains the single backend and admin source of truth.
-- Kids programmes are loaded from the published `Kids Tech Academy` category.
-- Parent portal links hand off to the existing VaceUp account and student dashboard.
-- No kid-specific credentials or database are duplicated in the frontend.
+- Kids programmes, parent accounts, learner profiles, admissions and progress use the `/api/v1/kids/` namespace.
+- The Kids frontend owns its register, login, parent portal and programme routes; functional links do not hand learners to the adult site.
+- Admins and tutors remain shared staff identities, while Kids parent sessions are separate opaque `kids_` tokens.
 
 ## Cloudflare Pages
 
@@ -22,10 +22,8 @@ It runs only when `kids-academy/` changes. Add the repository variable
 Build variables are already supplied by the workflow:
 
 ```text
-NEXT_PUBLIC_API_URL=https://api.vaceup.ng/api/v1
+NEXT_PUBLIC_KIDS_API_URL=https://api.vaceup.ng/api/v1/kids
 NEXT_PUBLIC_KIDS_SITE_URL=https://kids.vaceup.ng
-NEXT_PUBLIC_MAIN_SITE_URL=https://vaceup.ng
-NEXT_PUBLIC_PORTAL_URL=https://vaceup.ng/login?next=%2Fdashboard%2F
 ```
 
 ## Backend origin allow-list

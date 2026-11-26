@@ -27,6 +27,15 @@ def _frontend(path: str) -> str:
     return f"{base}{path}{sep}{query}"
 
 
+def _kids_frontend(path: str) -> str:
+    """Absolute link for Kids Academy account emails."""
+    base = getattr(settings, "KIDS_FRONTEND_LINK_BASE", "https://kids.vaceup.ng").rstrip("/")
+    path, sep, query = path.partition("?")
+    if not path.endswith("/"):
+        path += "/"
+    return f"{base}{path}{sep}{query}"
+
+
 def _brand_shell(title: str, body_html: str, cta_label: str | None = None, cta_url: str | None = None) -> str:
     """Return branded HTML for a VaceUp email."""
     btn = ""
@@ -77,6 +86,31 @@ def send_verification_email(*, email: str, token: str) -> None:
     )
     msg = EmailMultiAlternatives(
         subject="Verify your VaceUp account",
+        body=text,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[email],
+    )
+    msg.attach_alternative(html, "text/html")
+    mail_delivery.send_account_message(msg)
+
+
+def send_kids_verification_email(*, email: str, token: str) -> None:
+    link = _kids_frontend(f"/verify-email?token={token}")
+    text = (
+        "Welcome to VaceUp Kids Tech Academy.\n\n"
+        "Please confirm your parent email address to activate the Kids Academy portal:\n"
+        f"{link}\n\n"
+        "This link expires in 24 hours. If you did not create this account, ignore this email."
+    )
+    html = _brand_shell(
+        "Confirm your Kids Academy email",
+        '<p style="color:#3d4452;font-size:15px;line-height:1.7;margin:0 0 10px;">'
+        "Confirm your email to activate your parent portal and add a learner profile.</p>",
+        "Open Kids Academy",
+        link,
+    )
+    msg = EmailMultiAlternatives(
+        subject="Verify your VaceUp Kids Academy account",
         body=text,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         to=[email],

@@ -1,10 +1,4 @@
-import { API_BASE_URL } from './config';
-
-export interface KidsCategory {
-  id: number;
-  name: string;
-  slug: string;
-}
+import { KIDS_API_BASE_URL } from './config';
 
 export interface KidsProgram {
   id: number;
@@ -12,21 +6,18 @@ export interface KidsProgram {
   title: string;
   description: string;
   tagline?: string;
+  learning_outcomes?: string;
   target_audience?: string;
   duration?: string;
   level?: string;
   price: string | number;
+  image?: string | null;
   thumbnail?: string | null;
   image_url?: string;
 }
 
-interface Page<T> {
-  results: T[];
-  next?: string | null;
-}
-
 async function request<T>(path: string, signal: AbortSignal) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${KIDS_API_BASE_URL}${path}`, {
     signal,
     headers: { Accept: 'application/json' },
   });
@@ -35,11 +26,7 @@ async function request<T>(path: string, signal: AbortSignal) {
 }
 
 export async function getKidsPrograms(signal: AbortSignal) {
-  const categories = await request<Page<KidsCategory>>('/categories/?page=1', signal);
-  const category = categories.results.find((item) => item.name.toLowerCase() === 'kids tech academy');
-  if (!category) return [];
-  const courses = await request<Page<KidsProgram>>(`/courses/?is_published=true&category=${category.id}&page=1`, signal);
-  return courses.results;
+  return request<KidsProgram[]>('/programs/', signal);
 }
 
 export function formatPrice(value: string | number) {
@@ -47,5 +34,5 @@ export function formatPrice(value: string | number) {
 }
 
 export function programImage(program: KidsProgram) {
-  return program.thumbnail || program.image_url || '';
+  return program.image || program.thumbnail || program.image_url || '';
 }

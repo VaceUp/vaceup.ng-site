@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "apps.announcements",
     "apps.website",
     "apps.challenges",
+    "apps.kidsacademy",
     "drf_spectacular",
 ]
 
@@ -120,6 +121,10 @@ REST_FRAMEWORK = {
         "auth_verify": "10/min",
         "auth_resend": "3/min",
         "auth_password_reset": "5/min",
+        "kids_auth_login": "10/min",
+        "kids_auth_register": "5/min",
+        "kids_auth_verify": "10/min",
+        "kids_auth_resend": "3/min",
         # Paystack retries a webhook at most a few times per event.
         "payment_webhook": "600/min",
         # Re-issuing an event seat is unauthenticated, so keep it slow.
@@ -223,6 +228,7 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@vaceup.ng")
 SERVER_EMAIL = env("SERVER_EMAIL", default="").strip() or DEFAULT_FROM_EMAIL
 # Base URL of the frontend that renders the emailed verify/reset links.
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="https://vaceup.ng")
+KIDS_FRONTEND_BASE_URL = env("KIDS_FRONTEND_BASE_URL", default="https://kids.vaceup.ng")
 
 # Challenge inference is opt-in and never falls through to a paid provider.
 GROQ_API_KEY = env("GROQ_API_KEY", default="").strip()
@@ -262,6 +268,10 @@ def _frontend_link_base(base, api_url, fallback_url):
 FRONTEND_LINK_BASE = _frontend_link_base(
     FRONTEND_BASE_URL, MARKETING_PUBLIC_API_URL, ACADEMY_SITE_URL
 )
+KIDS_FRONTEND_LINK_BASE = _frontend_link_base(
+    KIDS_FRONTEND_BASE_URL, MARKETING_PUBLIC_API_URL, "https://kids.vaceup.ng"
+)
+KIDS_SESSION_TTL_HOURS = env.int("KIDS_SESSION_TTL_HOURS", default=720)
 
 # Token lifetimes (read by apps/accounts/models.py).
 EMAIL_VERIFICATION_TTL = timedelta(hours=24)

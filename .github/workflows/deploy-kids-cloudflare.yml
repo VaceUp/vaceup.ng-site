@@ -41,10 +41,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: https://api.vaceup.ng/api/v1
+          NEXT_PUBLIC_KIDS_API_URL: https://api.vaceup.ng/api/v1/kids
           NEXT_PUBLIC_KIDS_SITE_URL: https://kids.vaceup.ng
-          NEXT_PUBLIC_MAIN_SITE_URL: https://vaceup.ng
-          NEXT_PUBLIC_PORTAL_URL: https://vaceup.ng/login?next=%2Fdashboard%2F
       - uses: actions/upload-artifact@v4
         with:
           name: kids-academy-build

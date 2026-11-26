@@ -1,0 +1,1 @@
+"""Kids Academy domain application."""

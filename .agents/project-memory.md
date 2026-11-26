@@ -1,5 +1,36 @@
 # VaceUp Project Memory
 
+## 2026-11-27 — Kids Academy portal foundation implemented
+
+**Decision**
+- Keep the parent-first Kids identity: a verified parent owns learner profiles, admissions and the learning journey; Kids-only accounts do not use the adult login or dashboard.
+- Keep the Kids site and API on the shared deployment and database, but use a dedicated `/api/v1/kids/` namespace and opaque `kids_` sessions for the separate portal boundary.
+
+**Changed**
+- Added the `academy_scope` account boundary, Kids verification email routing, Kids parent and learner records, admissions, enrollments, stage progress, class sessions, certificates and admin registrations.
+- Added Kids registration, email verification, parent login/logout, programme catalogue, learner, admission and parent-portal API routes with ownership checks.
+- Replaced Kids frontend adult-site links with internal register, login, programme, parent portal and privacy routes; the Cloudflare build now targets the Kids API directly.
+- Added the first parent portal flow for learner creation, programme selection, admission submission, admission status and enrollment progress.
+- Verification: Kids frontend typecheck and production export passed; backend check, compileall, migration check and 40 targeted account/Kids tests passed. The existing storage configuration warnings remain environment-specific.
+
+**Open**
+- Add custom admin-dashboard screens/actions for Kids admissions and enrollments, then expose tutor-managed Kids class schedules, recordings, stage feedback and certificates through the Kids portal.
+- Add payment handling, parent notifications and an optional restricted learner login/PIN after the parent flow is reviewed in production.
+- Deploy the two migrations (`accounts.0006_user_academy_scope` and `kidsacademy.0001_initial`) and set `KIDS_FRONTEND_BASE_URL` in the live backend environment before enabling registrations.
+
+## 2026-11-26 — Kids Academy becomes a standalone product domain
+
+**Decision**
+- Kids Academy must not send learners or parents to the adult website for registration, authentication, learning or completion; it will have its own portal and lifecycle while remaining in the same Django project, database environment and admin operation.
+- Adult Academy and Kids Academy share infrastructure and staff administration, but their learner data, permissions, API routes, authentication context and learning workflows remain explicitly separated.
+
+**Changed**
+- Audited the current boundary: the kids frontend still points course cards and the parent portal at adult-site routes, while the backend currently exposes one shared adult `User`/application/enrollment flow.
+- Prepared the proposed separation around a Kids API namespace, parent/learner profiles, kids admissions and enrollments, stage progress, classes, recordings, certificates and admin filters without changing adult records.
+
+**Open**
+- Confirm the parent-first identity model before migrations: a verified parent owns the account and child profiles; older learners may receive a restricted learner login or PIN without becoming adult-academy students.
+
 ## 2026-11-26 — Kids Academy branding asset
 
 **Decision**

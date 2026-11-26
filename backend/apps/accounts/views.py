@@ -243,6 +243,12 @@ class _LoginSerializer(TokenObtainPairSerializer):
                 )
             raise  # genuine bad credentials
 
+        if self.user.is_kids_only:
+            raise AuthenticationFailed(
+                "This is a Kids Academy account. Use the Kids Academy sign-in page.",
+                code="kids_account",
+            )
+
         data["user"] = UserSerializer(self.user, context={
             "request": self.context["request"]
         }).data

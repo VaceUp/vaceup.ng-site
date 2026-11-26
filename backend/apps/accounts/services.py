@@ -41,7 +41,14 @@ def _dispatch_token_email(kind, token_id):
             return False
         return True
 
-    task = tasks.send_verification_email if kind == "verification" else tasks.send_password_reset_email
+    task = {
+        "verification": tasks.send_verification_email,
+        "kids_verification": tasks.send_kids_verification_email,
+        "password_reset": tasks.send_password_reset_email,
+    }.get(kind)
+    if task is None:
+        logger.error("account_email kind=%s stage=dispatch code=unsupported_kind", kind)
+        return False
     try:
         task.apply_async(kwargs={"token_id": token_id}, argsrepr="()", kwargsrepr="<account mail reference>")
     except Exception:
@@ -76,7 +83,7 @@ def _schedule_token_email(kind, record, user=None):
 
 
 @transaction.atomic
-def register_user(*, email, full_name, password, role=None, **profile):
+def register_user(*, email, full_name, password, role=None, academy_scope=None, **profile):
     """Create an inactive user, their profile, and a verification token.
 
     Preconditions: email not already registered (case-insensitive).
@@ -95,6 +102,7 @@ def register_user(*, email, full_name, password, role=None, **profile):
         password=password,
         full_name=full_name,
         role=role,
+        academy_scope=academy_scope or User.AcademyScope.ADULT,
         is_active=False,  # activated only after email verification
     )
     _create_profile_for(user)
@@ -133,7 +141,7 @@ def verify_email(*, token):
 
 
 @transaction.atomic
-def resend_verification(*, email):
+def resend_verification(*, email, kind="verification"):
     """Re-issue a verification token. Always succeeds (no enumeration).
 
     Silently no-ops for unknown emails and already-active accounts.
@@ -143,12 +151,17 @@ def resend_verification(*, email):
     if user is None:
         return  # don't reveal whether the email exists / is already active
 
+    # Keep a Kids-only account inside its own portal even when the generic
+    # resend endpoint is used by an old client or a bookmarked adult page.
+    if kind == "verification" and user.is_kids_only:
+        kind = "kids_verification"
+
     # Invalidate any outstanding verification tokens, then issue a fresh one.
     EmailVerificationToken.objects.filter(user=user, used=False).update(
         used=True
     )
     token = EmailVerificationToken.objects.create(user=user)
-    _schedule_token_email("verification", token)
+    _schedule_token_email(kind, token)
 
 
 @transaction.atomic

@@ -83,7 +83,7 @@ def _deliver(job):
     if job.kind == "announcement":
         from apps.announcements.services import deliver_announcement
         return deliver_announcement(job)
-    if job.kind in {"verification", "password_reset"}:
+    if job.kind in {"verification", "kids_verification", "password_reset"}:
         from apps.accounts.tasks import deliver_token_email
         return deliver_token_email(job.kind, token_id=job.object_id)
     if job.kind != "live_reminder":

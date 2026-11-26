@@ -17,6 +17,7 @@ urlpatterns = [
     path("healthz/", HealthView.as_view(), name="healthz"),
     # Auth: register / verify / password-reset / login / refresh / logout / me
     path("api/v1/auth/", include("apps.accounts.urls")),
+    path("api/v1/kids/", include("apps.kidsacademy.urls")),
     # App routers.
     path("api/v1/", include("apps.courses.urls")),
     path("api/v1/", include("apps.enrollment.urls")),

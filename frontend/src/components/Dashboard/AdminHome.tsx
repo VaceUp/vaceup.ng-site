@@ -16,6 +16,7 @@ import CertificatesTab from '@/components/Dashboard/admin/CertificatesTab';
 import EnrollmentsTab from '@/components/Dashboard/admin/EnrollmentsTab';
 import UsersTab from '@/components/Dashboard/admin/UsersTab';
 import ApplicationsTab from '@/components/Dashboard/admin/ApplicationsTab';
+import KidsAdmissionsTab from '@/components/Dashboard/admin/KidsAdmissionsTab';
 import PaymentsTab from '@/components/Dashboard/admin/PaymentsTab';
 import AnnouncementsManager from '@/components/Dashboard/admin/AnnouncementsManager';
 import { MessagingWorkspace } from '@/components/Dashboard/MessagingWorkspace';
@@ -61,6 +62,7 @@ export function AdminHome() {
       {tab === 'enrollments' && <EnrollmentsTab />}
 
       {tab === 'applications' && <ApplicationsTab />}
+      {tab === 'kids-admissions' && <KidsAdmissionsTab />}
 
       {tab === 'payments' && <PaymentsTab />}
 

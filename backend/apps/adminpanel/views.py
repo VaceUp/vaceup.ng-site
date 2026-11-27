@@ -144,6 +144,7 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
         from apps.liveclasses.models import LiveClass
         from apps.assignments.models import Assignment, Submission
         from apps.applications.models import Application
+        from apps.kidsacademy.models import KidsAdmission, KidsEnrollment
 
         now = timezone.now()
         thirty_days_ago = now - timedelta(days=30)
@@ -181,7 +182,110 @@ class AdminDashboardViewSet(viewsets.GenericViewSet):
             "applications": {
                 "pending": Application.objects.filter(status=Application.Status.SUBMITTED).count(),
             },
+            "kids": {
+                "pending_admissions": KidsAdmission.objects.filter(
+                    status__in=[KidsAdmission.Status.SUBMITTED, KidsAdmission.Status.REVIEW]
+                ).count(),
+                "active_enrollments": KidsEnrollment.objects.filter(status=KidsEnrollment.Status.ACTIVE).count(),
+                "completed_enrollments": KidsEnrollment.objects.filter(status=KidsEnrollment.Status.COMPLETED).count(),
+            },
         })
+
+    @action(detail=False, methods=["get"], url_path="kids/admissions")
+    def kids_admissions_list(self, request):
+        """GET /admin/dashboard/kids/admissions/ — Kids parent requests."""
+        from apps.kidsacademy.models import KidsAdmission
+
+        admissions = KidsAdmission.objects.select_related(
+            "parent__user", "learner", "course", "intake", "reviewed_by", "enrollment"
+        ).order_by("-created_at")
+        status_filter = request.query_params.get("status")
+        search = request.query_params.get("search", "").strip()
+        if status_filter:
+            admissions = admissions.filter(status=status_filter)
+        if search:
+            admissions = admissions.filter(
+                Q(parent__user__email__icontains=search)
+                | Q(parent__user__full_name__icontains=search)
+                | Q(learner__full_name__icontains=search)
+                | Q(course__title__icontains=search)
+            )
+
+        return Response([self._kids_admission_row(admission) for admission in admissions[:300]])
+
+    @staticmethod
+    def _kids_admission_row(admission):
+        enrollment = getattr(admission, "enrollment", None)
+        return {
+            "id": admission.id,
+            "parent_name": admission.parent.user.full_name,
+            "parent_email": admission.parent.user.email,
+            "parent_phone": admission.parent.phone,
+            "learner": admission.learner_id,
+            "learner_name": admission.learner.full_name,
+            "course": admission.course_id,
+            "course_title": admission.course.title,
+            "intake": admission.intake_id,
+            "intake_title": admission.intake.title if admission.intake else "",
+            "payment_preference": admission.payment_preference,
+            "status": admission.status,
+            "parent_note": admission.parent_note,
+            "created_at": admission.created_at,
+            "reviewed_at": admission.reviewed_at,
+            "reviewed_by": admission.reviewed_by.full_name if admission.reviewed_by else "",
+            "enrollment": {
+                "id": enrollment.id,
+                "status": enrollment.status,
+                "current_stage": enrollment.current_stage,
+                "progress_percent": enrollment.progress_percent,
+            } if enrollment else None,
+        }
+
+    @action(detail=False, methods=["post"], url_path="kids/admissions/review")
+    @transaction.atomic
+    def kids_admission_review(self, request):
+        """POST /admin/dashboard/kids/admissions/review/ — decide a Kids request."""
+        from apps.kidsacademy.models import KidsAdmission
+        from apps.kidsacademy.services import approve_admission
+
+        admission_id = positive_id(request.data, "admission_id")
+        decision = str(request.data.get("action", "")).strip().lower()
+        if decision not in {"approve", "review", "decline", "withdraw"}:
+            raise DomainError(
+                "Choose approve, review, decline or withdraw.",
+                code="invalid_kids_admission_action",
+            )
+        try:
+            admission = KidsAdmission.objects.select_for_update().select_related(
+                "parent__user", "learner", "course", "intake", "reviewed_by"
+            ).get(pk=admission_id)
+        except KidsAdmission.DoesNotExist:
+            raise DomainError("Kids admission not found (check the id).", code="kids_admission_not_found")
+
+        if decision == "approve":
+            approve_admission(admission=admission, reviewer=request.user)
+        else:
+            admission.status = {
+                "review": KidsAdmission.Status.REVIEW,
+                "decline": KidsAdmission.Status.DECLINED,
+                "withdraw": KidsAdmission.Status.WITHDRAWN,
+            }[decision]
+            admission.reviewed_at = timezone.now()
+            admission.reviewed_by = request.user
+            admission.save(update_fields=("status", "reviewed_at", "reviewed_by", "updated_at"))
+
+        services.log_admin_action(
+            admin=request.user,
+            action_type=AdminActionLog.ActionType.USER_UPDATE,
+            target_user=admission.parent.user,
+            description=f"Kids admission {decision}: {admission.learner.full_name} -> {admission.course.title}",
+            metadata={"kids_admission_id": admission.id, "decision": decision},
+            request=request,
+        )
+        admission = KidsAdmission.objects.select_related(
+            "parent__user", "learner", "course", "intake", "reviewed_by", "enrollment"
+        ).get(pk=admission.pk)
+        return Response(self._kids_admission_row(admission))
 
     @action(detail=False, methods=["post"], url_path="staff/invite")
     @transaction.atomic

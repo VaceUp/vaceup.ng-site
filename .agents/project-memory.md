@@ -1,5 +1,18 @@
 # VaceUp Project Memory
 
+## 2026-11-27 — Kids admissions added to the shared admin dashboard
+
+**Decision**
+- Administrators review Kids parent requests in the existing dashboard, while approval creates only a Kids enrollment and never an adult application or adult course access.
+
+**Changed**
+- Added Kids admissions stats, list/search/filter endpoint and approve, review, decline and withdraw actions under `/api/v1/admin/dashboard/kids/`.
+- Added the responsive `Kids Admissions` dashboard section with request details, status filters and an approval flow that creates the separate Kids enrollment.
+- Added regression coverage for the admin review-to-enrollment path; the combined Kids, admin and account suite now passes 48 tests.
+
+**Open**
+- Add tutor-managed Kids class schedules, recordings, stage feedback and certificates to the shared dashboard and Kids portal.
+
 ## 2026-11-27 — Kids Academy portal foundation implemented
 
 **Decision**

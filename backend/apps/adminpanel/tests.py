@@ -93,3 +93,37 @@ class AdminReadTests(APITestCase):
         for path in ("/api/v1/admin/settings/", "/api/v1/admin/announcements/", "/api/v1/admin/dashboard/payments/"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 403)
+
+    def test_kids_admission_review_creates_kids_enrollment(self):
+        from apps.courses.models import Category, Course
+        from apps.kidsacademy.models import KidsAdmission, KidsEnrollment, KidsLearner, KidsParentProfile
+
+        parent = get_user_model().objects.create_user(
+            "kids-parent@example.com", "parent-password", full_name="Kids Parent",
+            role="student", academy_scope="kids", is_active=True,
+        )
+        parent_profile = KidsParentProfile.objects.create(user=parent, relationship="Parent")
+        learner = KidsLearner.objects.create(parent=parent_profile, full_name="Young Learner")
+        tutor = get_user_model().objects.create_user(
+            "kids-tutor@example.com", "tutor-password", role="instructor", is_active=True,
+        )
+        course = Course.objects.create(
+            title="Creative Coding", slug="creative-coding", category=Category.objects.create(
+                name="Kids Tech Academy", slug="kids-tech-academy",
+            ), instructor=tutor, is_published=True,
+        )
+        admission = KidsAdmission.objects.create(
+            parent=parent_profile, learner=learner, course=course,
+        )
+
+        listing = self.client.get("/api/v1/admin/dashboard/kids/admissions/")
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.data[0]["learner_name"], "Young Learner")
+        reviewed = self.client.post(
+            "/api/v1/admin/dashboard/kids/admissions/review/",
+            {"admission_id": admission.pk, "action": "approve"}, format="json",
+        )
+        self.assertEqual(reviewed.status_code, 200, reviewed.data)
+        self.assertEqual(reviewed.data["status"], KidsAdmission.Status.APPROVED)
+        self.assertTrue(KidsEnrollment.objects.filter(admission=admission).exists())
+        self.assertEqual(self.client.get("/api/v1/admin/dashboard/").data["kids"]["active_enrollments"], 1)
